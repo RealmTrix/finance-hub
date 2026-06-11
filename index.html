@@ -1,0 +1,3948 @@
+<!-- Finance Hub v1.1 — Session 9: Login Gate + Password Management -->
+<!-- Project Kangaroo | michael-finance-hub -->
+<!-- Built: May 2026 | Sessions: 9 planned -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finance Hub — Project Kangaroo</title>
+<style>
+/* ─── Design System — Project Kangaroo (verbatim) ─────────────────────── */
+:root {
+  color-scheme: light;
+  --n1: #0f1f3d;
+  --n2: #1e3a5f;
+  --gold: #b8860b;
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --bdr: #d4d9e0;
+  --ok: #15803d;
+  --ok-bg: #ecfdf5;
+  --err: #b91c1c;
+  --err-bg: #fef2f2;
+  --warn-c: #92400e;
+  --warn-bg: #fef3c7;
+  --txt: #0f172a;
+  --muted: #64748b;
+  --amber: #d97706;
+  --amber-bg: #fffbeb;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f172a;  --card: #1e293b;  --bdr: #334155;
+  --ok: #4ade80;  --ok-bg: #14532d;
+  --err: #f87171; --err-bg: #450a0a;
+  --warn-c: #fbbf24; --warn-bg: #451a03;
+  --amber: #fbbf24;  --amber-bg: #451a03;
+  --txt: #f1f5f9; --muted: #94a3b8;
+}
+
+/* ─── Reset & Base ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--txt);
+  min-height: 100vh;
+}
+
+/* ─── Header ───────────────────────────────────────────────────────────── */
+.hdr {
+  background: var(--n1);
+  color: #fff;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+[data-theme="dark"] .hdr { background: #080f1e; }
+.hdr-left { display: flex; align-items: center; gap: 10px; }
+.hdr-logo { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+.hdr-sub { font-size: 11px; color: rgba(255,255,255,0.55); }
+.hdr-right { display: flex; align-items: center; gap: 8px; }
+
+.accent-bar {
+  height: 3px;
+  background: linear-gradient(90deg, var(--gold) 0%, transparent 55%);
+}
+
+/* ─── Sync chip ─────────────────────────────────────────────────────────── */
+.sync-chip {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sync-chip.ok    { background: var(--ok-bg); color: var(--ok); }
+.sync-chip.err   { background: var(--err-bg); color: var(--err); }
+.sync-chip.syncing { background: var(--amber-bg); color: var(--amber); }
+
+/* ─── Theme button ─────────────────────────────────────────────────────── */
+.theme-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.theme-btn:hover { background: rgba(255,255,255,0.1); }
+
+/* ─── Main tab bar ─────────────────────────────────────────────────────── */
+.main-tabs {
+  background: var(--n1);
+  display: flex;
+  padding: 0 16px;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+[data-theme="dark"] .main-tabs { background: #080f1e; }
+.main-tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 10px 14px;
+  border-bottom: 2px solid transparent;
+  color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  white-space: nowrap;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: var(--font);
+}
+.tab:hover  { color: rgba(255,255,255,0.85); }
+.tab.active { color: #fff; border-bottom-color: var(--gold); }
+
+/* ─── Main content area ─────────────────────────────────────────────────── */
+.content { padding: 20px 16px; max-width: 1100px; margin: 0 auto; }
+
+/* ─── Cards ─────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--bdr);
+  border-radius: 6px;
+  padding: 16px;
+}
+.card + .card { margin-top: 12px; }
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--txt);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ─── Placeholder cards ─────────────────────────────────────────────────── */
+.placeholder-card {
+  background: var(--card);
+  border: 1px dashed var(--bdr);
+  border-radius: 6px;
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--muted);
+}
+.placeholder-card h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--txt);
+  margin-bottom: 8px;
+}
+.placeholder-card p { font-size: 12px; line-height: 1.6; }
+.placeholder-badge {
+  display: inline-block;
+  background: var(--amber-bg);
+  color: var(--amber);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────────── */
+.btn {
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  padding: 6px 11px;
+  cursor: pointer;
+  border: 1px solid var(--bdr);
+  background: var(--card);
+  color: var(--txt);
+  font-family: var(--font);
+  transition: background 0.12s;
+}
+.btn:hover { background: var(--bg); }
+.btn-primary {
+  background: var(--n1);
+  color: #fff;
+  border-color: var(--n1);
+}
+[data-theme="dark"] .btn-primary { background: var(--n2); border-color: var(--n2); }
+.btn-primary:hover { background: var(--n2); }
+.btn-sm { padding: 4px 8px; font-size: 11px; }
+
+/* ─── Form elements ─────────────────────────────────────────────────────── */
+input, select, textarea {
+  font-family: var(--font);
+  font-size: 12px;
+  background: var(--bg);
+  color: var(--txt);
+  border: 1px solid var(--bdr);
+  border-radius: 4px;
+  padding: 6px 8px;
+  outline: none;
+  transition: border-color 0.12s;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--n2); }
+label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* ─── Settings tab ──────────────────────────────────────────────────────── */
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 600px) { .settings-grid { grid-template-columns: 1fr; } }
+.settings-field { display: flex; flex-direction: column; gap: 4px; }
+.settings-field input,
+.settings-field select { width: 100%; }
+
+.currency-toggle { display: flex; gap: 6px; }
+.currency-btn {
+  flex: 1;
+  padding: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--bdr);
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--bg);
+  color: var(--muted);
+  font-family: var(--font);
+  text-align: center;
+  transition: all 0.12s;
+}
+.currency-btn.active {
+  background: var(--n1);
+  color: #fff;
+  border-color: var(--n1);
+}
+[data-theme="dark"] .currency-btn.active { background: var(--n2); border-color: var(--n2); }
+
+/* ─── Updates tab ────────────────────────────────────────────────────────── */
+.session-list { list-style: none; }
+.session-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--bdr);
+}
+.session-item:last-child { border-bottom: none; }
+.session-badge {
+  min-width: 36px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 6px;
+  border-radius: 4px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.session-badge.done  { background: var(--ok-bg); color: var(--ok); }
+.session-badge.next  { background: var(--amber-bg); color: var(--amber); }
+.session-badge.todo  { background: var(--bg); color: var(--muted); border: 1px solid var(--bdr); }
+.session-name { font-weight: 600; font-size: 12px; margin-bottom: 2px; }
+.session-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+/* ─── Version footer ─────────────────────────────────────────────────────── */
+.ver-footer {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px solid var(--bdr);
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ─── Tables ─────────────────────────────────────────────────────────────── */
+th {
+  background: var(--bg);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+}
+
+/* ─── Section heading ────────────────────────────────────────────────────── */
+.section-heading {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  margin: 20px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--bdr);
+}
+.section-heading:first-child { margin-top: 0; }
+
+/* ─── S2: FX Widget ─────────────────────────────────────────────────────── */
+.fx-widget {
+  background: var(--n1);
+  color: #fff;
+  border-radius: 6px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+  margin-bottom: 14px;
+  font-size: 12px;
+  min-height: 42px;
+}
+[data-theme="dark"] .fx-widget { background: #0d1b35; border: 1px solid var(--bdr); }
+.fx-pair {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-right: 16px;
+  margin-right: 16px;
+  border-right: 1px solid rgba(255,255,255,0.15);
+}
+.fx-pair:last-of-type { border-right: none; }
+.fx-lbl { color: rgba(255,255,255,0.55); font-size: 11px; }
+.fx-val { font-weight: 700; font-size: 13px; color: #f0c040; letter-spacing: .01em; }
+.fx-ts  { margin-left: auto; font-size: 10px; color: rgba(255,255,255,0.4); }
+.fx-offline { color: #f87171; font-weight: 600; }
+
+/* ─── S2: Budget table ──────────────────────────────────────────────────── */
+.budget-hdr { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+.month-sel  { display:flex; align-items:center; gap:6px; }
+.month-sel label { text-transform:none; letter-spacing:0; font-size:12px; font-weight:500; color:var(--txt); margin:0; }
+.budget-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.budget-tbl th { padding:5px 8px; text-align:right; white-space:nowrap; }
+.budget-tbl th:first-child { text-align:left; }
+.budget-tbl td { padding:3px 8px; border-bottom:1px solid var(--bdr); vertical-align:middle; }
+.budget-tbl td:not(:first-child) { text-align:right; }
+.budget-tbl tr:last-child td { border-bottom:none; }
+.budget-tbl input[type="number"] { width:88px; padding:3px 6px; text-align:right; font-size:12px; }
+.bsec { background:var(--bg); font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); padding:7px 8px 5px; }
+.btot td { font-weight:700; border-top:2px solid var(--bdr) !important; border-bottom:none !important; padding-top:7px; }
+
+/* ─── Budget layout toggle (CSS-based, zoom-proof) ─────────────────────── */
+@media (min-width: 521px) { .budget-mobile-wrap  { display: none !important; } }
+@media (max-width: 520px) { .budget-desktop-wrap { display: none !important; } }
+
+/* ─── Mobile budget card layout (rendered by JS on narrow screens) ──────── */
+.bmob-section { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); background:var(--bg); padding:8px 2px 5px; margin-top:4px; }
+.bmob-section:first-child { margin-top:0; }
+.bmob-row { padding:10px 0; border-bottom:1px solid var(--bdr); }
+.bmob-cat { font-size:13px; font-weight:600; color:var(--txt); margin-bottom:8px; }
+.bmob-inputs { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px; }
+.bmob-field { display:flex; flex-direction:column; gap:3px; }
+.bmob-lbl { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.bmob-field input { width:100%; padding:9px 10px; font-size:15px; text-align:right; border:1px solid var(--bdr); border-radius:4px; background:var(--bg); color:var(--txt); box-sizing:border-box; -moz-appearance:textfield; }
+.bmob-field input::-webkit-outer-spin-button,
+.bmob-field input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+.bmob-bar-row { display:flex; align-items:center; gap:8px; }
+.bmob-bar-row .pbar { flex:1; width:auto; height:5px; }
+.bmob-pct { font-size:11px; font-weight:600; color:var(--muted); white-space:nowrap; min-width:32px; text-align:right; }
+.bmob-vrn { font-size:12px; font-weight:700; white-space:nowrap; min-width:72px; text-align:right; }
+.bmob-total { padding:10px 2px; border-top:2px solid var(--bdr); display:flex; justify-content:space-between; align-items:center; }
+.bmob-total-lbl { font-size:13px; font-weight:700; }
+.bmob-total-vals { text-align:right; }
+.bmob-total-sub { font-size:11px; color:var(--muted); margin-bottom:2px; }
+.bmob-total-vrn { font-size:12px; font-weight:700; }
+.bmob-net { padding:14px 2px 4px; border-top:3px solid var(--n1); display:flex; justify-content:space-between; align-items:center; margin-top:4px; }
+.bmob-net-lbl { font-size:13px; font-weight:700; color:var(--txt); }
+.bmob-net-val { font-size:18px; font-weight:700; }
+.bnet td { font-weight:700; font-size:13px; border-top:2px solid var(--bdr) !important; border-bottom:none !important; padding:8px 8px 4px; }
+.ok  { color:var(--ok); }
+.bad { color:var(--err); }
+.pbar-wrap { display:flex; align-items:center; gap:5px; justify-content:flex-end; }
+.pbar { width:44px; height:4px; background:var(--bdr); border-radius:2px; overflow:hidden; flex-shrink:0; }
+.pbar-fill { height:100%; border-radius:2px; transition:width .3s; }
+
+/* ─── S2: Card tracker ──────────────────────────────────────────────────── */
+.cards-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.cards-tbl th { padding:5px 8px; text-align:left; white-space:nowrap; }
+.cards-tbl th:not(:first-child) { text-align:right; }
+.cards-tbl td { padding:4px 8px; border-bottom:1px solid var(--bdr); vertical-align:middle; }
+.cards-tbl td:not(:first-child) { text-align:right; }
+.cards-tbl tr:last-child td { border-bottom:none; }
+.cards-tbl input[type="text"]   { width:130px; font-size:12px; padding:3px 6px; }
+.cards-tbl input[type="number"] { width:110px; font-size:12px; padding:3px 6px; text-align:right; }
+.cards-tbl select               { font-size:12px; padding:3px 5px; }
+.cnet td { font-weight:700; font-size:13px; border-top:2px solid var(--bdr) !important; border-bottom:none !important; padding-top:8px; }
+.btn-del  { color:var(--err); border-color:transparent; background:transparent; font-size:13px; line-height:1; padding:3px 6px; }
+.btn-del:hover { background:var(--err-bg); border-color:var(--err); border-radius:4px; }
+
+/* ─── S3: Personal Finance sub-tabs ─────────────────────────────────────── */
+.pf-subtabs { display:flex; gap:0; border-bottom:2px solid var(--bdr); margin-bottom:16px; }
+.pf-subtab {
+  font-size:12px; font-weight:500; padding:7px 16px;
+  border:none; border-bottom:2px solid transparent; margin-bottom:-2px;
+  background:none; color:var(--muted); cursor:pointer; font-family:var(--font);
+  transition:color 0.15s, border-color 0.15s;
+}
+.pf-subtab:hover  { color:var(--txt); }
+.pf-subtab.active { color:var(--gold); border-bottom-color:var(--gold); font-weight:600; }
+/* S6: investment sub-tabs + AI cards */
+.inv-subtabs { display:flex; gap:0; border-bottom:2px solid var(--bdr); margin-bottom:14px; flex-wrap:wrap; }
+.inv-subtab { font-size:12px; font-weight:500; padding:7px 16px; border:none; border-bottom:2px solid transparent; margin-bottom:-2px; background:none; color:var(--muted); cursor:pointer; font-family:var(--font); transition:color .15s, border-color .15s; }
+.inv-subtab:hover  { color:var(--txt); }
+.inv-subtab.active { color:var(--gold); border-bottom-color:var(--gold); font-weight:600; }
+.ai-card { background:var(--bg); border:1px solid var(--bdr); border-radius:6px; padding:14px; margin-top:12px; }
+.ai-output { font-size:13px; line-height:1.6; white-space:pre-wrap; color:var(--txt); }
+.ai-disclaimer { font-size:10px; color:var(--muted); font-style:italic; margin-top:10px; }
+.quick-prompt { font-size:11px; padding:4px 11px; border:1px solid var(--bdr); border-radius:14px; background:var(--card); color:var(--txt); cursor:pointer; font-family:var(--font); }
+.quick-prompt:hover { border-color:var(--gold); color:var(--gold); }
+.brief-row { display:flex; flex-wrap:wrap; gap:14px; font-size:12px; }
+
+/* ─── S3: Spending ───────────────────────────────────────────────────────── */
+.sp-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+.sp-filters select { font-size:12px; padding:4px 6px; }
+.sp-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.sp-tbl th { padding:5px 8px; text-align:left; white-space:nowrap; }
+.sp-tbl td { padding:3px 8px; border-bottom:1px solid var(--bdr); vertical-align:middle; }
+.sp-tbl tr:last-child td { border-bottom:none; }
+.sp-tbl input[type="text"]   { font-size:12px; padding:3px 5px; }
+.sp-tbl input[type="number"] { font-size:12px; padding:3px 5px; }
+.sp-tbl input[type="date"]   { font-size:11px; padding:2px 4px; }
+.sp-tbl select               { font-size:11px; padding:2px 4px; }
+
+/* ─── S3: Wealth ─────────────────────────────────────────────────────────── */
+.wl-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.wl-tbl th { padding:5px 8px; text-align:left; white-space:nowrap; }
+.wl-tbl th:not(:first-child) { text-align:right; }
+.wl-tbl td { padding:4px 8px; border-bottom:1px solid var(--bdr); vertical-align:middle; }
+.wl-tbl tr:last-child td { border-bottom:none; }
+.wl-tbl input[type="text"]   { font-size:12px; padding:3px 5px; }
+.wl-tbl input[type="number"] { font-size:12px; padding:3px 5px; }
+.wl-tbl select               { font-size:12px; padding:3px 4px; }
+.wl-tot td { font-weight:700; border-top:2px solid var(--bdr) !important; border-bottom:none !important; padding-top:8px; }
+.nw-grid  { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; padding:8px 0; }
+.nw-item  { text-align:center; }
+.nw-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:4px; }
+.nw-val   { font-size:16px; font-weight:700; }
+.nw-big   { font-size:22px; }
+.amber-txt { color:var(--amber); }
+
+/* ─── S3: Plans ──────────────────────────────────────────────────────────── */
+.pl-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.pl-tbl th { padding:5px 8px; text-align:left; white-space:nowrap; }
+.pl-tbl td { padding:3px 8px; border-bottom:1px solid var(--bdr); vertical-align:middle; }
+.pl-tbl tr:last-child td { border-bottom:none; }
+.pl-tbl input[type="text"]   { font-size:12px; padding:3px 5px; }
+.pl-tbl input[type="number"] { font-size:12px; padding:3px 5px; }
+.pl-tbl input[type="date"]   { font-size:11px; padding:2px 4px; }
+.pl-tbl select               { font-size:11px; padding:2px 4px; }
+
+/* ─── S4: Investments ────────────────────────────────────────────────────── */
+.inv-portfolios { display:flex; gap:4px; flex-wrap:wrap; }
+.inv-port-tab {
+  font-size:12px; font-weight:500; padding:6px 14px;
+  border:1px solid var(--bdr); border-radius:4px;
+  background:var(--bg); color:var(--muted); cursor:pointer; transition:none;
+}
+.inv-port-tab.active { background:var(--n1); color:#fff; border-color:var(--n1); }
+.inv-port-tab:hover:not(.active) { color:var(--txt); }
+.inv-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.inv-tbl th { padding:5px 8px; text-align:right; white-space:nowrap; }
+.inv-tbl th:first-child,.inv-tbl th:nth-child(2),.inv-tbl th:nth-child(3) { text-align:left; }
+.inv-tbl td { padding:3px 8px; border-bottom:1px solid var(--bdr); vertical-align:middle; text-align:right; }
+.inv-tbl td:first-child,.inv-tbl td:nth-child(2),.inv-tbl td:nth-child(3) { text-align:left; }
+.inv-tbl tr:last-child td { border-bottom:none; }
+.inv-tbl input[type="text"]   { font-size:12px; padding:3px 5px; }
+.inv-tbl input[type="number"] { font-size:12px; padding:3px 5px; text-align:right; }
+.inv-tbl select               { font-size:11px; padding:2px 4px; }
+/* S5: market overview strip */
+.mkt-strip { display:flex; gap:8px; flex-wrap:wrap; }
+.mkt-tile { flex:1 1 130px; min-width:130px; background:var(--bg); border:1px solid var(--bdr); border-radius:6px; padding:8px 10px; }
+.mkt-name { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:3px; white-space:nowrap; }
+.mkt-level { font-size:15px; font-weight:700; }
+.mkt-chg { font-size:11px; font-weight:600; margin-top:2px; }
+.mkt-stale { font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--warn-c); background:var(--warn-bg); border-radius:3px; padding:1px 4px; margin-left:5px; }
+.inv-sum-grid  { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:10px; }
+.inv-sum-item  { text-align:center; }
+.inv-sum-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:3px; }
+.inv-sum-val   { font-size:16px; font-weight:700; }
+.inv-watch-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.inv-watch-tbl th { padding:5px 8px; text-align:left; white-space:nowrap; }
+.inv-watch-tbl td { padding:3px 8px; border-bottom:1px solid var(--bdr); vertical-align:middle; }
+.inv-watch-tbl tr:last-child td { border-bottom:none; }
+.inv-watch-tbl input[type="text"]   { font-size:12px; padding:3px 5px; }
+.inv-watch-tbl input[type="number"] { font-size:12px; padding:3px 5px; }
+.tag-buy   { font-size:10px; font-weight:600; background:var(--ok-bg);   color:var(--ok);   border-radius:3px; padding:2px 6px; }
+.tag-watch { font-size:10px; font-weight:600; background:var(--warn-bg); color:var(--warn-c); border-radius:3px; padding:2px 6px; }
+.tag-avoid { font-size:10px; font-weight:600; background:var(--err-bg);  color:var(--err);  border-radius:3px; padding:2px 6px; }
+/* S6B: signal cards */
+.sig-card { background:var(--bg); border:1px solid var(--bdr); border-radius:6px; padding:12px; margin-bottom:10px; }
+.sig-card.muted { opacity:.7; }
+.sig-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+.sig-ticker { font-size:14px; font-weight:700; }
+.dir-long  { font-size:10px; font-weight:700; text-transform:uppercase; background:var(--ok-bg);  color:var(--ok);  border-radius:3px; padding:2px 7px; }
+.dir-short { font-size:10px; font-weight:700; text-transform:uppercase; background:var(--err-bg); color:var(--err); border-radius:3px; padding:2px 7px; }
+.dir-none  { font-size:10px; font-weight:700; text-transform:uppercase; background:var(--bg); color:var(--muted); border:1px solid var(--bdr); border-radius:3px; padding:2px 7px; }
+.conf-high { font-size:10px; font-weight:600; background:var(--ok-bg);   color:var(--ok);     border-radius:10px; padding:2px 8px; }
+.conf-med  { font-size:10px; font-weight:600; background:var(--warn-bg); color:var(--warn-c);  border-radius:10px; padding:2px 8px; }
+.conf-low  { font-size:10px; font-weight:600; background:var(--err-bg);  color:var(--err);     border-radius:10px; padding:2px 8px; }
+.sig-metrics { display:flex; flex-wrap:wrap; gap:14px; font-size:11px; color:var(--muted); margin-bottom:6px; }
+.sig-levels { display:flex; flex-wrap:wrap; gap:14px; font-size:12px; margin-bottom:6px; }
+.sig-reason { font-size:12px; line-height:1.5; }
+.sig-time { font-size:10px; color:var(--muted); margin-top:6px; }
+.sig-stats { display:flex; flex-wrap:wrap; gap:14px; margin-bottom:10px; }
+.sig-stat { background:var(--bg); border:1px solid var(--bdr); border-radius:6px; padding:8px 12px; text-align:center; min-width:90px; }
+.sig-stat-lbl { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.sig-stat-val { font-size:15px; font-weight:700; }
+
+/* ─── Mobile responsive (≤ 520px) ──────────────────────────────────────── */
+@media (max-width: 520px) {
+  /* Content padding */
+  .content { padding: 12px 10px; }
+
+  /* Cards */
+  .card { padding: 12px 12px; }
+
+  /* Header — tighten right side so logo isn't squeezed */
+  .hdr { padding: 0 10px; height: 44px; }
+  .hdr-logo { font-size: 14px; }
+  .hdr-sub  { display: none; }
+  .hdr-right { gap: 5px; }
+  .sync-chip { font-size: 9px; padding: 2px 5px; }
+  .theme-btn { font-size: 14px; padding: 3px; }
+  .logout-btn { font-size: 10px; padding: 3px 7px; }
+
+  /* Tab bar — smaller tap targets so more tabs are visible */
+  .tab { font-size: 11px; padding: 8px 10px; }
+
+  /* PF sub-tabs */
+  .pf-subtabs { gap: 0; overflow-x: auto; flex-wrap: nowrap; }
+  .pf-subtab  { font-size: 11px; padding: 6px 10px; white-space: nowrap; }
+
+  /* Investment portfolio tabs */
+  .inv-portfolios { gap: 4px; }
+  .inv-port-tab   { font-size: 11px; padding: 5px 10px; }
+
+  /* Tables — horizontal scroll on mobile */
+  .sp-tbl, .wl-tbl, .pl-tbl {
+    display: block; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  }
+  .sp-tbl th, .sp-tbl td,
+  .wl-tbl th, .wl-tbl td,
+  .pl-tbl th, .pl-tbl td { padding: 4px 6px; font-size: 11px; }
+
+  /* Spending filters */
+  .sp-filters { gap: 5px; }
+  .sp-filters select { font-size: 11px; }
+
+  /* Net worth + portfolio summary grids — 2 columns on mobile */
+  .nw-grid     { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .inv-sum-grid{ grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .nw-val, .inv-sum-val { font-size: 14px; }
+  .nw-big { font-size: 18px; }
+
+  /* Market strip — 2 per row */
+  .mkt-strip { gap: 6px; }
+  .mkt-tile  { flex: 1 1 calc(50% - 6px); min-width: 0; padding: 7px 8px; }
+  .mkt-level { font-size: 13px; }
+
+  /* Signal cards */
+  .sig-card { padding: 10px 12px; }
+  .sig-stats { gap: 6px; }
+  .sig-stat  { min-width: 68px; padding: 6px 8px; }
+  .sig-stat-val { font-size: 13px; }
+
+  /* AI output */
+  .ai-card  { font-size: 12px; }
+  .ai-output{ font-size: 12px; line-height: 1.6; }
+
+  /* Version footer */
+  .ver-footer { flex-direction: column; gap: 4px; text-align: center; }
+
+  /* Login overlay — fill screen on mobile */
+  #loginOverlay { padding: 0; justify-content: flex-start; }
+  #loginOverlay > .card {
+    max-width: 100%; width: 100%; border-radius: 0;
+    min-height: 100dvh; min-height: 100vh;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .login-hdr { border-radius: 0; }
+  .login-body { padding: 28px 20px; }
+  .login-input { padding: 11px 12px; font-size: 14px; }
+  .login-btn   { padding: 12px; font-size: 14px; }
+}
+
+/* ─── S9: Login gate ─────────────────────────────────────────────────────── */
+#loginOverlay {
+  position:fixed; inset:0; z-index:9999;
+  background:var(--bg); display:flex; flex-direction:column;
+  align-items:center; justify-content:center; padding:24px;
+}
+.login-hdr {
+  background:var(--n1); color:#fff; border-radius:8px 8px 0 0;
+  padding:20px 24px 16px; text-align:center;
+}
+.login-hdr-logo { font-size:18px; font-weight:700; letter-spacing:.01em; }
+.login-hdr-sub  { font-size:11px; opacity:.6; margin-top:2px; }
+.login-accent   { height:3px; background:linear-gradient(90deg,var(--gold) 0%,transparent 60%); }
+.login-body     { padding:24px; }
+.login-label    { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; display:block; margin-bottom:6px; }
+.login-input    { width:100%; padding:9px 12px; font-size:13px; border:1px solid var(--bdr); border-radius:4px; background:var(--bg); color:var(--txt); box-sizing:border-box; margin-bottom:14px; }
+.login-input:focus { outline:none; border-color:var(--n2); }
+.login-btn      { width:100%; padding:10px; font-size:13px; font-weight:600; background:var(--n1); color:#fff; border:none; border-radius:4px; cursor:pointer; }
+.login-btn:hover { opacity:.9; }
+.login-err      { font-size:11px; color:var(--err); margin-bottom:12px; display:none; }
+.logout-btn     { font-size:11px; font-weight:500; background:transparent; border:1px solid rgba(255,255,255,.3); color:rgba(255,255,255,.8); border-radius:4px; padding:4px 10px; cursor:pointer; }
+.logout-btn:hover { background:rgba(255,255,255,.1); }
+</style>
+</head>
+<body>
+
+<!-- ─── Header ──────────────────────────────────────────────────────────── -->
+<header class="hdr">
+  <div class="hdr-left">
+    <div>
+      <div class="hdr-logo">Finance Hub</div>
+      <div class="hdr-sub">Project Kangaroo</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <span id="syncChip" class="sync-chip syncing">⟳ Connecting…</span>
+    <button class="theme-btn" onclick="toggleTheme()" title="Toggle dark mode">🌙</button>
+    <button class="logout-btn" onclick="logout()" title="Lock and log out">🔒 Lock</button>
+  </div>
+</header>
+<div class="accent-bar"></div>
+
+<!-- ─── Main Tab Bar ─────────────────────────────────────────────────────── -->
+<nav class="main-tabs" id="mainTabs">
+  <button class="tab active" onclick="showTab('personal-finance', this); initPersonalFinance()">Personal Finance</button>
+  <button class="tab" onclick="showTab('investments', this); initInvestments()">Investments</button>
+  <button class="tab" onclick="showTab('income', this); initIncome()">Income</button>
+  <button class="tab" onclick="showTab('tax', this); initTax()">Tax</button>
+  <button class="tab" onclick="showTab('settings', this); renderSettingsAccounts()">Settings</button>
+  <button class="tab" onclick="showTab('updates', this); initUpdates()">Updates</button>
+</nav>
+
+<!-- ─── Login Gate (S9) ──────────────────────────────────────────────────── -->
+<div id="loginOverlay">
+  <div class="card" style="width:100%; max-width:360px; padding:0; overflow:hidden;">
+    <div class="login-hdr">
+      <div class="login-hdr-logo">Finance Hub</div>
+      <div class="login-hdr-sub">Project Kangaroo</div>
+    </div>
+    <div class="login-accent"></div>
+    <div class="login-body" id="loginBody">
+      <!-- Rendered by renderLoginOverlay() after data loads -->
+      <p style="font-size:12px; color:var(--muted); text-align:center;">Loading…</p>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Tab Content ──────────────────────────────────────────────────────── -->
+<main class="content">
+
+  <!-- Personal Finance — Session 3 -->
+  <div id="tab-personal-finance" class="tab-panel">
+
+    <!-- PF Sub-tab bar -->
+    <nav class="pf-subtabs">
+      <button class="pf-subtab active" onclick="showPFTab('pf-budget',this)">Budget</button>
+      <button class="pf-subtab" onclick="showPFTab('pf-spending',this)">Spending</button>
+      <button class="pf-subtab" onclick="showPFTab('pf-wealth',this)">Wealth</button>
+      <button class="pf-subtab" onclick="showPFTab('pf-plans',this)">Plans</button>
+    </nav>
+
+    <!-- Budget sub-tab (Session 2 — unchanged) -->
+    <div id="pf-budget" class="pf-panel">
+
+      <!-- FX Rates Widget -->
+      <div class="fx-widget" id="fxWidget">
+        <span class="fx-lbl">⟳ Loading exchange rates…</span>
+      </div>
+
+      <!-- Monthly Budget -->
+      <div class="card">
+        <div class="budget-hdr">
+          <div class="card-title" style="margin-bottom:0">💰 Monthly Budget</div>
+          <div class="month-sel">
+            <label>Month:</label>
+            <select id="budgetMonth" onchange="renderBudget()"></select>
+          </div>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin:-6px 0 10px;">Budget &amp; Actual are entered in A$ (AUD). Variance displays in your selected base currency.</p>
+        <div id="budgetTableWrap"></div>
+      </div>
+
+      <!-- Card / Account Tracker -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div class="card-title" style="margin-bottom:0">💳 Cards &amp; Accounts</div>
+          <button class="btn btn-sm btn-primary" onclick="addCard()">+ Add Account</button>
+        </div>
+        <div id="cardsTableWrap"></div>
+      </div>
+
+    </div><!-- /pf-budget -->
+
+    <!-- Spending sub-tab -->
+    <div id="pf-spending" class="pf-panel" style="display:none">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div class="card-title" style="margin-bottom:0">💸 Transactions</div>
+          <button class="btn btn-sm btn-primary" onclick="addSpending()">+ Add Transaction</button>
+        </div>
+        <div class="sp-filters">
+          <select id="spFilterCard" onchange="renderSpending()"><option value="">All Accounts</option></select>
+          <select id="spFilterCat" onchange="renderSpending()">
+            <option value="">All Categories</option>
+            <option>Food &amp; Dining</option>
+            <option>Transport</option>
+            <option>Shopping</option>
+            <option>Entertainment</option>
+            <option>Health</option>
+            <option>Utilities</option>
+            <option>Travel</option>
+            <option>Other</option>
+          </select>
+          <select id="spFilterMonth" onchange="renderSpending()"><option value="">All Months</option></select>
+        </div>
+        <div id="spTableWrap"></div>
+      </div>
+      <div class="card" style="margin-top:12px;">
+        <div class="card-title">📊 Monthly Totals by Category</div>
+        <div id="spTotalsWrap"></div>
+      </div>
+    </div><!-- /pf-spending -->
+
+    <!-- Wealth sub-tab -->
+    <div id="pf-wealth" class="pf-panel" style="display:none">
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-title">💼 Net Worth</div>
+        <div id="nwSummary"></div>
+      </div>
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div class="card-title" style="margin-bottom:0">📈 Assets</div>
+          <button class="btn btn-sm btn-primary" onclick="addAsset()">+ Add Asset</button>
+        </div>
+        <div id="assetsWrap"></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div class="card-title" style="margin-bottom:0">📉 Liabilities</div>
+          <button class="btn btn-sm btn-primary" onclick="addLiability()">+ Add Liability</button>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin:-6px 0 10px;">Credit card balances are automatically included from your Cards tracker.</p>
+        <div id="liabsWrap"></div>
+      </div>
+    </div><!-- /pf-wealth -->
+
+    <!-- Plans sub-tab -->
+    <div id="pf-plans" class="pf-panel" style="display:none">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div class="card-title" style="margin-bottom:0">🎯 Big Spending Plans</div>
+          <button class="btn btn-sm btn-primary" onclick="addPlan()">+ Add Plan</button>
+        </div>
+        <div id="plansWrap"></div>
+      </div>
+    </div><!-- /pf-plans -->
+
+  </div><!-- /tab-personal-finance -->
+
+  <!-- Investments -->
+  <div id="tab-investments" class="tab-panel" style="display:none">
+
+    <!-- Morning Briefing (S6) — populated by loadMorningBriefing() -->
+    <div id="invBriefing" style="display:none"></div>
+
+    <!-- Investments sub-tabs (S6) -->
+    <nav class="inv-subtabs">
+      <button class="inv-subtab active" onclick="showInvSubTab('inv-portfolio', this)">📊 Portfolio</button>
+      <button class="inv-subtab" onclick="showInvSubTab('inv-report', this)">📝 Monthly Report</button>
+      <button class="inv-subtab" onclick="showInvSubTab('inv-strategy', this)">💡 Strategy</button>
+      <button class="inv-subtab" onclick="showInvSubTab('inv-signals', this)">🎯 Signals</button>
+    </nav>
+
+    <!-- Portfolio sub-tab (existing S4/S5 content) -->
+    <div id="inv-portfolio" class="inv-panel">
+
+    <!-- Market overview strip (S5) -->
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+        <div class="card-title" style="margin-bottom:0;">🌍 Market Overview</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span id="mktTimestamp" style="font-size:11px; color:var(--muted);">–</span>
+          <button class="btn" style="font-size:11px; padding:4px 10px;" onclick="renderMarketStrip(true)">↻ Refresh</button>
+        </div>
+      </div>
+      <div id="mktStrip" class="mkt-strip"></div>
+    </div>
+
+    <!-- Portfolio selector + summary -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="inv-portfolios">
+        <button class="inv-port-tab active" onclick="showInvPortfolio('idr', this)">🇮🇩 Indonesia (IDR)</button>
+        <button class="inv-port-tab" onclick="showInvPortfolio('usd', this)">🌐 Global (USD)</button>
+        <button class="inv-port-tab" onclick="showInvPortfolio('aud', this)">🇦🇺 Australia (AUD)</button>
+      </div>
+      <div id="invSummary" style="margin-top:14px; padding-top:12px; border-top:1px solid var(--bdr);"></div>
+    </div>
+
+    <!-- Holdings table -->
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+        <div class="card-title" style="margin-bottom:0;">📋 Holdings</div>
+        <div style="display:flex; gap:6px;">
+          <button id="refreshPricesBtn" class="btn" style="font-size:11px; padding:4px 10px;" onclick="refreshAllPrices()">💲 Refresh Prices</button>
+          <button class="btn" style="font-size:11px; padding:4px 10px;" onclick="addHolding()">+ Add</button>
+        </div>
+      </div>
+      <div id="invHoldings"></div>
+    </div>
+
+    <!-- Watchlist -->
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+        <div class="card-title" style="margin-bottom:0;">👁️ Watchlist</div>
+        <button class="btn" style="font-size:11px; padding:4px 10px;" onclick="addWatchItem()">+ Add</button>
+      </div>
+      <div id="invWatchlist"></div>
+    </div>
+
+    </div><!-- /inv-portfolio -->
+
+    <!-- Monthly Report sub-tab (S6) -->
+    <div id="inv-report" class="inv-panel" style="display:none">
+      <div class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+          <div class="card-title" style="margin-bottom:0;">📝 Monthly Investment Review</div>
+          <button id="genReportBtn" class="btn" style="font-size:11px; padding:5px 12px;" onclick="generateMonthlyReport()">✨ Generate Report</button>
+        </div>
+        <p style="font-size:11px; color:var(--muted); margin-bottom:10px;">Summarises this month's portfolio performance, top movers, and FX impact using your live holdings data. Saved per month so it persists.</p>
+        <div id="invReportOutput"></div>
+      </div>
+    </div>
+
+    <!-- Strategy sub-tab (S6) -->
+    <div id="inv-strategy" class="inv-panel" style="display:none">
+      <div class="card">
+        <div class="card-title">💡 Strategy &amp; Q&amp;A</div>
+        <p style="font-size:11px; color:var(--muted); margin-bottom:10px;">Ask about your portfolio or market conditions. Your live holdings and watchlist are sent as context.</p>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+          <button class="quick-prompt" onclick="quickStrategy('Should I rebalance?')">Should I rebalance?</button>
+          <button class="quick-prompt" onclick="quickStrategy(&quot;What's my concentration risk?&quot;)">What's my concentration risk?</button>
+          <button class="quick-prompt" onclick="quickStrategy('Suggest 3 ideas for my AUD portfolio')">Suggest 3 ideas for my AUD portfolio</button>
+        </div>
+        <textarea id="stratInput" rows="2" placeholder="Ask about your portfolio or market conditions" style="width:100%; box-sizing:border-box; resize:vertical;"></textarea>
+        <div style="margin-top:8px;">
+          <button class="btn" style="font-size:11px; padding:5px 12px;" onclick="askStrategy()">Ask</button>
+        </div>
+        <div id="invStrategyOutput"></div>
+      </div>
+    </div>
+
+    <!-- Signals sub-tab (S6B) -->
+    <div id="inv-signals" class="inv-panel" style="display:none">
+
+      <!-- 1. Signal Watchlist -->
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <div class="card-title" style="margin-bottom:0;">🎯 Signal Watchlist</div>
+          <button class="btn" style="font-size:11px; padding:4px 10px;" onclick="addSignalWatch()">+ Add</button>
+        </div>
+        <p style="font-size:11px; color:var(--muted); margin-bottom:10px;">Tickers scanned for short-term (1 day–2 week) signals. Stocks use the Yahoo Finance ticker as-is; crypto uses the CoinGecko ID.</p>
+        <div id="sigWatchlist"></div>
+      </div>
+
+      <!-- 2. Signal Brief -->
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+          <div class="card-title" style="margin-bottom:0;">📡 Signal Brief</div>
+          <button id="genSignalsBtn" class="btn" style="font-size:11px; padding:5px 12px;" onclick="generateSignals()">✨ Generate Signals</button>
+        </div>
+        <div id="sigNewsWarn"></div>
+        <div id="sigBrief"></div>
+      </div>
+
+      <!-- 3. Trade Log -->
+      <div class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <div class="card-title" style="margin-bottom:0;">📒 Trade Log</div>
+          <button class="btn" style="font-size:11px; padding:4px 10px;" onclick="addTrade()">+ Add</button>
+        </div>
+        <div id="sigTradeStats"></div>
+        <div id="sigTradeLog"></div>
+      </div>
+
+    </div><!-- /inv-signals -->
+
+  </div>
+
+  <!-- Income -->
+  <div id="tab-income" class="tab-panel" style="display:none">
+
+    <!-- Financial Stress Score -->
+    <div id="stressScoreCard" class="card" style="margin-bottom:14px; padding:16px;">
+      <div style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:10px;">Financial Stress Score</div>
+      <div id="stressScoreBody" style="color:var(--muted); font-size:12px;">Loading…</div>
+    </div>
+
+    <!-- Income Log -->
+    <div class="card" style="margin-bottom:14px; padding:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div class="section-heading" style="margin:0;">Income Log</div>
+        <button class="btn" style="background:var(--n1);color:#fff;" onclick="addIncome()">+ Add Income</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="inv-tbl" style="width:100%;" id="incomeTable">
+          <thead><tr>
+            <th>Date</th><th>Source</th><th>Amount</th><th>Currency</th><th>Type</th><th>AUD Value</th><th>Post to Budget</th><th></th>
+          </tr></thead>
+          <tbody id="incomeTbody"></tbody>
+        </table>
+      </div>
+      <div id="incomeMonthlyTotal" style="margin-top:10px; font-size:12px; color:var(--muted);"></div>
+    </div>
+
+    <!-- Multi-Source YTD Summary -->
+    <div class="card" style="padding:16px;">
+      <div class="section-heading" style="margin-bottom:10px;">YTD Income by Source</div>
+      <div id="incomeSummary" style="color:var(--muted); font-size:12px;">No income entries yet.</div>
+    </div>
+
+  </div>
+
+  <!-- Tax -->
+  <div id="tab-tax" class="tab-panel" style="display:none">
+
+    <!-- Tax Estimator -->
+    <div class="card" style="margin-bottom:14px; padding:16px;">
+      <div class="section-heading" style="margin-bottom:4px;">Australian Tax Estimator</div>
+      <p style="font-size:11px; color:var(--muted); margin-bottom:12px;">Based on 485 temporary visa — only Australian-sourced income assessed. Foreign income from Indonesia is disregarded. FY Jul–Jun. Resident tax rates apply.</p>
+      <div class="settings-grid" style="margin-bottom:12px;">
+        <div class="settings-field">
+          <label>Tax Year</label>
+          <select id="taxFY" onchange="renderTaxEstimator()">
+            <option value="2026">FY2025–26</option>
+            <option value="2027">FY2026–27</option>
+          </select>
+        </div>
+        <div class="settings-field">
+          <label>AUS-Sourced Income YTD (AUD)</label>
+          <input type="number" id="taxIncomeInput" min="0" step="100" placeholder="Auto from Income log" oninput="renderTaxEstimator()">
+        </div>
+        <div class="settings-field">
+          <label>PAYG Withheld YTD (AUD)</label>
+          <input type="number" id="taxPaygInput" min="0" step="100" placeholder="From payslip" oninput="renderTaxEstimator()">
+        </div>
+      </div>
+      <div id="taxEstimatorOutput" style="font-size:13px;"></div>
+    </div>
+
+    <!-- Deduction Tracker -->
+    <div class="card" style="padding:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div class="section-heading" style="margin:0;">Tax Deduction Tracker</div>
+        <button class="btn" style="background:var(--n1);color:#fff;" onclick="addDeduction()">+ Add Deduction</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="inv-tbl" style="width:100%;">
+          <thead><tr>
+            <th>Description</th><th>Category</th><th>Amount (AUD)</th><th></th>
+          </tr></thead>
+          <tbody id="deductionTbody"></tbody>
+        </table>
+      </div>
+      <div id="deductionTotal" style="margin-top:10px; font-size:12px; color:var(--muted);"></div>
+    </div>
+
+  </div>
+
+  <!-- Settings -->
+  <div id="tab-settings" class="tab-panel" style="display:none">
+
+    <div class="card">
+      <div class="card-title">⚙️ General Settings</div>
+
+      <div class="section-heading">Display Currency</div>
+      <div class="currency-toggle" id="currencyToggle">
+        <button class="currency-btn active" onclick="setCurrency('AUD', this)">AUD</button>
+        <button class="currency-btn" onclick="setCurrency('IDR', this)">IDR</button>
+        <button class="currency-btn" onclick="setCurrency('USD', this)">USD</button>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:6px;">All monetary values are stored in AUD and converted for display using live FX rates.</p>
+
+      <div class="section-heading" style="margin-top:16px;">Financial Year</div>
+      <div class="settings-grid">
+        <div class="settings-field">
+          <label>FY Start Month</label>
+          <select id="fyStartMonth" onchange="saveSetting('fyStartMonth', this.value)">
+            <option value="1">January</option>
+            <option value="2">February</option>
+            <option value="3">March</option>
+            <option value="4">April</option>
+            <option value="5">May</option>
+            <option value="6">June</option>
+            <option value="7" selected>July (AUS default)</option>
+            <option value="8">August</option>
+            <option value="9">September</option>
+            <option value="10">October</option>
+            <option value="11">November</option>
+            <option value="12">December</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-heading" style="margin-top:16px;">Pay &amp; Salary</div>
+      <div class="settings-grid">
+        <div class="settings-field">
+          <label>Next Pay Date</label>
+          <input type="date" id="nextPayDate" onchange="saveSetting('nextPayDate', this.value)">
+        </div>
+        <div class="settings-field">
+          <label>Monthly Salary (AUD gross)</label>
+          <input type="number" id="monthlySalary" placeholder="e.g. 5000" min="0" step="100"
+                 onchange="saveSetting('monthlySalary', parseFloat(this.value) || 0)">
+        </div>
+      </div>
+
+      <div class="section-heading" style="margin-top:16px;">Account Names</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">These mirror your Cards &amp; Accounts in Personal Finance. Edit names there to update everywhere.</p>
+      <div id="settingsAccountsWrap"></div>
+
+      <div class="section-heading" style="margin-top:16px;">API Keys</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Required for Session 6B signal features. Free tier at newsapi.org (100 req/day).</p>
+      <div class="settings-field">
+        <label>NewsAPI Key (optional — for signal news fetch)</label>
+        <input type="text" id="newsApiKey" placeholder="Paste your NewsAPI key here" maxlength="100"
+               onchange="saveSetting('newsApiKey', this.value)">
+      </div>
+
+      <div class="section-heading" style="margin-top:16px;">Market Data</div>
+      <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+        <input type="checkbox" id="dailySnapshotToggle" style="width:auto;" onchange="toggleDailySnapshot(this.checked)">
+        Enable Daily Market Snapshot at 5am
+      </label>
+      <p id="snapshotNote" style="font-size:11px; color:var(--muted); margin-top:6px;">Fetches market indices + your holdings each morning and shows a briefing at the top of the Investments tab.</p>
+
+      <div class="section-heading" style="margin-top:16px;">🔒 Change Password</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Requires your current password to update.</p>
+      <div class="settings-grid">
+        <div class="settings-field">
+          <label>Current Password</label>
+          <input type="password" id="pwCurrent" placeholder="Current password" autocomplete="current-password">
+        </div>
+        <div class="settings-field">
+          <label>New Password</label>
+          <input type="password" id="pwNew" placeholder="New password" autocomplete="new-password">
+        </div>
+        <div class="settings-field">
+          <label>Confirm New Password</label>
+          <input type="password" id="pwConfirm" placeholder="Confirm new password" autocomplete="new-password">
+        </div>
+      </div>
+      <div id="pwMsg" style="font-size:11px; margin-bottom:8px; display:none;"></div>
+      <button class="btn" onclick="changePassword()">Update Password</button>
+
+      <div class="section-heading" style="margin-top:16px; color:var(--err);">Danger Zone</div>
+      <p style="font-size:11px; color:var(--muted); margin-bottom:10px;">Permanently deletes all local and cloud data. This cannot be undone.</p>
+      <button class="btn" style="background:var(--err);color:#fff;font-weight:600;" onclick="confirmResetData()">🗑 Reset All Data</button>
+    </div>
+
+    <!-- Reset confirmation modal -->
+    <div id="resetModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9999; align-items:center; justify-content:center;">
+      <div style="background:var(--card); border:1px solid var(--bdr); border-radius:8px; padding:24px; max-width:360px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,.25);">
+        <div style="font-size:15px; font-weight:700; color:var(--err); margin-bottom:8px;">⚠ Reset All Data?</div>
+        <p style="font-size:13px; color:var(--txt); line-height:1.6; margin-bottom:16px;">This will erase every entry across all tabs — budget, spending, investments, income, tax, signals — and delete the Supabase record. There is no undo.</p>
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+          <button class="btn" style="background:var(--card);border:1px solid var(--bdr);" onclick="document.getElementById('resetModal').style.display='none'">Cancel</button>
+          <button class="btn" style="background:var(--err);color:#fff;font-weight:600;" onclick="resetAllData()">Yes, delete everything</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ver-footer">
+      <span id="versionDisplay">Finance Hub v1.1 — Login Gate + Password Management</span>
+      <span id="lastSavedDisplay" style="color:var(--muted)">–</span>
+    </div>
+  </div>
+
+  <!-- Updates -->
+  <div id="tab-updates" class="tab-panel" style="display:none">
+
+    <div class="card">
+      <div class="card-title">📋 Build Plan — 9 Sessions</div>
+      <ul class="session-list">
+        <li class="session-item">
+          <span class="session-badge done">S1</span>
+          <div>
+            <div class="session-name">Foundation Shell ✅</div>
+            <div class="session-desc">App shell, Supabase sync, design system, Settings tab, all tabs stubbed.</div>
+          </div>
+        </li>
+        <li class="session-item">
+          <span class="session-badge done">S2</span>
+          <div>
+            <div class="session-name">Personal Finance: Budget + Cards + FX</div>
+            <div class="session-desc">Monthly budget (income/expense rows), card/account tracker (3 debit + 1 credit), live FX rates via Frankfurter API.</div>
+          </div>
+        </li>
+        <li class="session-item">
+          <span class="session-badge done">S3</span>
+          <div>
+            <div class="session-name">Spending Tracker + Wealth Snapshot + Plans</div>
+            <div class="session-desc">Spending log per card/category, wealth overview (assets − liabilities in AUD), big spending planner with savings calculator.</div>
+          </div>
+        </li>
+        <li class="session-item">
+          <span class="session-badge done">S4</span>
+          <div>
+            <div class="session-name">Investment Core: Holdings + Watchlist</div>
+            <div class="session-desc">3 portfolios (IDR/USD/AUD), holdings table with P&amp;L, portfolio summary, watchlist. Manual prices for now.</div>
+          </div>
+        </li>
+        <li class="session-item">
+          <span class="session-badge done">S5</span>
+          <div>
+            <div class="session-name">Live Market Data [Opus]</div>
+            <div class="session-desc">Yahoo Finance for stocks (ASX .AX / IDX .JK / NYSE), CoinGecko for crypto, market overview strip (indices).</div>
+          </div>
+        </li>
+        <li class="session-item">
+          <span class="session-badge done">S6</span>
+          <div>
+            <div class="session-name">Investment Intelligence [Opus]</div>
+            <div class="session-desc">Monthly AI report, strategy Q&amp;A, and 5am scheduled market snapshot written to Supabase.</div>
+          </div>
+        </li>
+        <li class="session-item">
+          <span class="session-badge done">S6B</span>
+          <div>
+            <div class="session-name">AI Signal Portfolio [Opus]</div>
+            <div class="session-desc">Short-term trade signals (1 day–2 weeks) for US stocks/crypto. Computes RSI/SMA/volume, fetches news, Claude generates signal cards. Trade log with win rate tracking.</div>
+          </div>
+        </li>
+        <li class="session-item">
+          <span class="session-badge done">S7</span>
+          <div>
+            <div class="session-name">Income + Tax + Financial Stress Score</div>
+            <div class="session-desc">Income log (multi-source, multi-currency), ATO tax estimator (FY Jul–Jun, 485 visa), PAYG reconciliation, deduction tracker, stress score.</div>
+          </div>
+        </li>
+        <li class="session-item">
+          <span class="session-badge done">S8</span>
+          <div>
+            <div class="session-name">Polish + QA + Netlify Deploy</div>
+            <div class="session-desc">Cross-tab data linkages, feature request form, export/import, full QA pass, Netlify deployment.</div>
+          </div>
+        </li>
+        <li class="session-item">
+          <span class="session-badge done">S9</span>
+          <div>
+            <div class="session-name">Security: Login Gate</div>
+            <div class="session-desc">Full-screen password overlay, SHA-256 hashing via Web Crypto API, sessionStorage session token, logout button, change password in Settings.</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <div class="card-title">🗒️ Version History</div>
+      <div style="font-size:12px;">
+        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
+          <strong>v1.1</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
+          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
+            <li>Session 9 — Login gate added; app is now password-protected</li>
+            <li>Full-screen overlay rendered before any tab content; blocked until authenticated</li>
+            <li>First-launch flow: create password; subsequent opens: enter password</li>
+            <li>SHA-256 hashing via browser Web Crypto API — no library, no backend</li>
+            <li>Session token stored in sessionStorage (expires on tab close, re-auth required each browser session)</li>
+            <li>🔒 Lock button in nav header; Change Password section in Settings tab</li>
+          </ul>
+        </div>
+        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
+          <strong>v1.0</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
+          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
+            <li>Session 8 — Polish + QA pass; initial complete build — ready for Netlify</li>
+            <li>Cross-tab linkages verified: Post to Budget, card liabilities in Wealth, FX rates in investments, stress score, tax income auto-populate</li>
+            <li>Feature Request form: submit/delete requests stored in appData.featureRequests; rendered on Updates tab</li>
+            <li>Export JSON: downloads full appData backup as dated .json file</li>
+            <li>Import JSON: parses backup, runs migrate(), reloads; rejects malformed files</li>
+            <li>Reset All Data: confirmation modal → clears Supabase + localStorage → reloads</li>
+            <li>Settings: Danger Zone section with Reset All Data button</li>
+            <li>migrate() schemaVersion bumped to 9; featureRequests[] seeded</li>
+            <li>Dark mode QA: all new components use CSS variables — no hardcoded colors</li>
+            <li>sbGet()/sbUpsert() verified identical to Efficiency Rule — no drift</li>
+            <li>S8 badge → done; Updates tab footer updated to v1.0</li>
+          </ul>
+        </div>
+        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
+          <strong>v0.7</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
+          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
+            <li>Session 7 — Income tab and Tax tab fully implemented (placeholders replaced)</li>
+            <li>Income Log: add/edit/delete entries (Date, Source, Amount, Currency, Type); sorted date descending; monthly AUD total; "Post to Budget" button posts to matching budget row</li>
+            <li>Financial Stress Score: Score = daily salary accrual / daily burn rate; GREEN ≥1.5 / AMBER 0.8–1.5 / RED &lt;0.8; shows days until pay, daily burn, projected net at pay day; reads nextPayDate + monthlySalary from Settings + 30d spending from Spending tab</li>
+            <li>YTD Income Summary: grouped by source and by type for current FY; AUD total + % share</li>
+            <li>Tax Estimator: ATO FY2026 resident brackets + 2% Medicare levy; PAYG withheld field; estimated refund/owing card; 485 visa note (foreign income disregarded)</li>
+            <li>Tax Deduction Tracker: add/edit/delete deductions (Description, Category, Amount); total auto-reduces taxable income in estimator</li>
+            <li>New data keys: income[], deductions[], taxState{}; seeded in migrate()</li>
+            <li>New functions: initIncome, renderStressScore, renderIncomeTable, addIncome, updIncome, deleteIncome, postIncomeToBudget, renderIncomeSummary, currentFY, inFY, initTax, renderTaxEstimator, renderDeductionTable, addDeduction, updDeduction, deleteDeduction</li>
+            <li>Tab buttons updated to call initIncome() and initTax() on click</li>
+          </ul>
+        </div>
+        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
+          <strong>v0.6B</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
+          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
+            <li>Session 6B — new "Signals" sub-tab inside Investments (existing sub-tabs untouched)</li>
+            <li>Signal Watchlist: separate scan list (Ticker/ID, Name, Type Stock/Crypto, Exchange); stored in appData.signalWatchlist</li>
+            <li>Signal Brief: "Generate Signals" fetches 30-day OHLCV (Yahoo), computes RSI(14) / 20-day SMA / price-vs-SMA% / volume ratio, fetches 3 headlines (NewsAPI), sends to Claude proxy → signal cards (direction badge, entry/stop/target, confidence chip, reasoning); saved to appData.signalHistory[date]</li>
+            <li>Trade Log: log trades from a signal (or manually) — entry/exit, dates, status (Open/Closed/Stopped Out), auto P&amp;L %; win rate / avg P&amp;L / accuracy stats; stored in appData.signalTrades</li>
+            <li>NewsAPI key input already in Settings; empty-key warning shown in Signal Brief</li>
+            <li>New functions: generateSignals, computeRSI, computeSMA, fetchOHLCV, fetchHeadlines, renderSignalBrief, renderSignalCard, renderSignalWatchlist + CRUD, renderTradeLog + CRUD + stats</li>
+            <li>migrate() seeds signalWatchlist[], signalHistory{}, signalTrades[]; S5/S6 fetch + report + strategy functions untouched</li>
+          </ul>
+        </div>
+        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
+          <strong>v0.6</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
+          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
+            <li>Session 6 — Investment Intelligence added; Investments tab now has sub-tabs: Portfolio | Monthly Report | Strategy</li>
+            <li>Monthly Report: Generate Report button collects portfolio totals, per-holding P&amp;L, best/worst, total return %, FX impact → window.cowork.askClaude() → styled card; saved to appData.reports[monthKey]</li>
+            <li>Strategy: free-text Q&amp;A + quick prompts (rebalance / concentration risk / AUD ideas); holdings + watchlist sent as context; "not financial advice" disclaimer</li>
+            <li>Morning Briefing card (top of Investments): renders today's snapshot if present; "Refresh now" button if &gt;12h stale</li>
+            <li>Settings: "Enable Daily Market Snapshot at 5am" toggle; writes snapshot to appData.marketSnapshot.daily[date] (persisted to Supabase)</li>
+            <li>New functions: showInvSubTab, generateMonthlyReport, renderMonthlyReport, askStrategy, quickStrategy, gatherPortfolioData, loadMorningBriefing, refreshMorningBriefing, toggleDailySnapshot, askCoworkAI</li>
+            <li>migrate() updated: lazy seeds reports{}, portfolioHistory{}, marketSnapshot.daily{}</li>
+            <li>Session 5 fetchStockPrice / refreshAllPrices / renderMarketStrip left unchanged</li>
+          </ul>
+        </div>
+        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
+          <strong>v0.5</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
+          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
+            <li>Session 5 — Live market data added to Investments tab</li>
+            <li>Market Overview strip: ASX 200, Jakarta Composite, S&amp;P 500, Dow Jones, Bitcoin — level + day change, green/red coded, refresh + timestamp</li>
+            <li>Stock prices via Yahoo Finance v8 (ASX .AX / IDX .JK / NYSE as-is)</li>
+            <li>Crypto prices via CoinGecko (symbol→id lookup table, usd/aud/idr)</li>
+            <li>Refresh Prices button: loops all holdings + watchlist, updates currentPrice, saves</li>
+            <li>On fetch error: keeps last known price, marks stale</li>
+            <li>migrate() updated: lazy seeds marketSnapshot{}</li>
+          </ul>
+        </div>
+        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
+          <strong>v0.4</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
+          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
+            <li>Session 4 — Investments tab built</li>
+            <li>3 portfolios: Indonesia (IDR), Global (USD), Australia (AUD) with tab selector</li>
+            <li>Holdings table: Ticker, Name, Type, Qty, Avg Buy, Current Price, Mkt Value, P&amp;L, P&amp;L %</li>
+            <li>Portfolio summary card: Total Cost, Market Value, P&amp;L, P&amp;L %, Holdings count</li>
+            <li>Watchlist: Ticker, Name, Tag (Buy/Watch/Avoid), Current Price, Target Price, Notes</li>
+            <li>All fields inline-editable; data stored per portfolio in appData.portfolios</li>
+            <li>migrate() updated: lazy seeds portfolios{} and watchlist[]</li>
+          </ul>
+        </div>
+        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
+          <strong>v0.3</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
+          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
+            <li>Session 3 — Personal Finance tab restructured with sub-tabs: Budget | Spending | Wealth | Plans</li>
+            <li>Spending sub-tab: transaction log with inline editing, filters by card/category/month, monthly totals by category</li>
+            <li>Wealth sub-tab: Assets and Liabilities tables, Net Worth grid (AUD-converted), monthly net worth auto-snapshot</li>
+            <li>Plans sub-tab: big-ticket spending planner with auto-calculated months left and required monthly saving</li>
+          </ul>
+        </div>
+        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
+          <strong>v0.2</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
+          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
+            <li>Session 2 — Personal Finance tab built</li>
+            <li>Live FX rates widget: Frankfurter API (AUD→IDR, AUD→USD), cached + offline fallback</li>
+            <li>Monthly budget table: 3 income + 9 expense categories, budget/actual/variance/% bar</li>
+            <li>Month selector (±3 months), values stored in AUD, variance displays in base currency</li>
+            <li>Card/Account tracker: add, edit, remove accounts; AUD/IDR/USD support</li>
+            <li>Net total across accounts (assets − credit liabilities) in base currency</li>
+            <li>setCurrency now re-renders budget and cards live when base currency changes</li>
+          </ul>
+        </div>
+        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
+          <strong>v0.1</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
+          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
+            <li>Session 1 Foundation — app shell built</li>
+            <li>Project Kangaroo design system applied (CSS variables, dark mode, accent bar)</li>
+            <li>Supabase cloud sync wired (USER_ID: michael-finance-hub)</li>
+            <li>All 6 tabs stubbed with placeholder cards</li>
+            <li>Settings tab: currency toggle, FY month, pay date, salary, account names, NewsAPI key field</li>
+            <li>Updates tab: full 9-session build plan</li>
+            <li>initData(), save(), pushToCloud(), migrate() operational</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bug Report -->
+    <div class="card" style="margin-top:12px;">
+      <div class="card-title">🐛 Report a Bug</div>
+      <p style="font-size:11px; color:var(--muted); margin-bottom:12px;">Fill in what's broken and what should happen. Generates a ready-to-send prompt for Claude.</p>
+      <div class="settings-field" style="margin-bottom:8px;">
+        <label>What I see (what is broken)</label>
+        <textarea id="bugSee" rows="3" placeholder="e.g. Personal Finance → Budget, the variance column shows A$A$ instead of A$..." maxlength="600" style="width:100%;box-sizing:border-box;resize:vertical;font-size:12px;"></textarea>
+      </div>
+      <div class="settings-field" style="margin-bottom:12px;">
+        <label>What should happen</label>
+        <textarea id="bugShould" rows="2" placeholder="e.g. It should show A$ 500 with a single symbol." maxlength="400" style="width:100%;box-sizing:border-box;resize:vertical;font-size:12px;"></textarea>
+      </div>
+      <button class="btn" style="background:var(--n1);color:#fff;" onclick="generateBugPrompt()">Generate Prompt</button>
+      <div id="bugPromptOut" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- Add Feature -->
+    <div class="card" style="margin-top:12px;">
+      <div class="card-title">✨ Request a Feature</div>
+      <p style="font-size:11px; color:var(--muted); margin-bottom:12px;">Describe what you want added. Generates a ready-to-send prompt for Claude.</p>
+      <div class="settings-field" style="margin-bottom:8px;">
+        <label>Feature title</label>
+        <input type="text" id="featTitle" placeholder="e.g. Add a net worth chart over time" maxlength="80" style="width:100%;box-sizing:border-box;">
+      </div>
+      <div class="settings-field" style="margin-bottom:12px;">
+        <label>What it should do</label>
+        <textarea id="featDesc" rows="3" placeholder="e.g. Show a line chart in the Wealth tab with monthly net worth snapshots from appData.nwHistory..." maxlength="600" style="width:100%;box-sizing:border-box;resize:vertical;font-size:12px;"></textarea>
+      </div>
+      <button class="btn" style="background:var(--n1);color:#fff;" onclick="generateFeaturePrompt()">Generate Prompt</button>
+      <div id="featPromptOut" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- Export / Import -->
+    <div class="card" style="margin-top:12px;">
+      <div class="card-title">📦 Data Backup</div>
+      <p style="font-size:11px; color:var(--muted); margin-bottom:10px;">Export a full JSON backup before any Netlify deployment. Import restores all data from a backup file.</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn" style="background:var(--n1);color:#fff;" onclick="exportData()">⬇ Export JSON</button>
+        <label class="btn" style="background:var(--card);border:1px solid var(--bdr);cursor:pointer;margin:0;">
+          ⬆ Import JSON<input type="file" accept=".json" style="display:none;" onchange="importData(this)">
+        </label>
+      </div>
+    </div>
+
+    <div class="ver-footer">
+      <span>Finance Hub v1.1</span>
+      <span>Session 9 of 9 complete — login gate active</span>
+    </div>
+  </div>
+
+</main>
+
+<!-- ─── JavaScript ────────────────────────────────────────────────────────── -->
+<script>
+// ─── Supabase config (verbatim from Efficiency Rule) ──────────────────────
+const SUPABASE_URL = 'https://tbnkoilqtyuykyqmwzpy.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRibmtvaWxxdHl1eWt5cW13enB5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTAyNzAsImV4cCI6MjA5NTM2NjI3MH0.wQWkCdCT_sSGcm2aSVCjvX6sXaD0HjGURfdYMREtKHQ';
+const USER_ID = 'michael-finance-hub';
+const SB_HEADERS = {
+  'apikey': SUPABASE_KEY,
+  'Authorization': 'Bearer ' + SUPABASE_KEY,
+  'Content-Type': 'application/json'
+};
+
+async function sbGet() {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/reading_state?user_id=eq.${USER_ID}&select=data,updated_at`, { headers: SB_HEADERS });
+  if (!r.ok) throw new Error('GET ' + r.status);
+  const rows = await r.json();
+  return rows.length ? rows[0] : null;
+}
+
+async function sbUpsert(d) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/reading_state`, {
+    method: 'POST',
+    headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates' },
+    body: JSON.stringify({ user_id: USER_ID, data: d, updated_at: new Date().toISOString() })
+  });
+  if (!r.ok) throw new Error('UPSERT ' + r.status);
+}
+
+// ─── App state ────────────────────────────────────────────────────────────
+let appData = {};
+
+// ─── initData — seeds default structure, never overwrites existing keys ───
+function initData() {
+  return {
+    schemaVersion: 1,
+    lastBackup: null,
+    settings: {
+      baseCurrency: 'AUD',
+      fyStartMonth: 7,
+      nextPayDate: '',
+      monthlySalary: 0,
+      acct1Name: 'ANZ Everyday',
+      acct2Name: 'ANZ Savings',
+      acct3Name: 'Bank 3',
+      acct4Name: 'Credit Card',
+      newsApiKey: '',
+      dailySnapshotEnabled: false
+    }
+    // Future sessions will add keys here via migrate():
+    // s2: budget, cards, rates
+    // s3: spending, assets, liabilities, plans
+    // s4: portfolios, watchlist
+    // s5: marketSnapshot
+    // s6: reports, signals
+    // s6b: signalWatchlist, signalHistory, signalTrades
+    // s7: income, deductions
+    // s8: featureRequests
+  };
+}
+
+// ─── migrate — forward-compatible schema evolution ────────────────────────
+function migrate(d) {
+  const defaults = initData();
+  // Ensure all top-level keys from defaults exist
+  for (const key of Object.keys(defaults)) {
+    if (d[key] === undefined) d[key] = defaults[key];
+  }
+  // Ensure all settings keys exist
+  for (const key of Object.keys(defaults.settings)) {
+    if (d.settings[key] === undefined) d.settings[key] = defaults.settings[key];
+  }
+  // S3: lazy seed
+  if (!Array.isArray(d.spending))    d.spending    = [];
+  if (!Array.isArray(d.assets))      d.assets      = [];
+  if (!Array.isArray(d.liabilities)) d.liabilities = [];
+  if (!Array.isArray(d.plans))       d.plans       = [];
+  if (!d.nwHistory || typeof d.nwHistory !== 'object') d.nwHistory = {};
+  // S4: lazy seed
+  if (!d.portfolios || typeof d.portfolios !== 'object') d.portfolios = { idr: { holdings: [] }, usd: { holdings: [] }, aud: { holdings: [] } };
+  ['idr','usd','aud'].forEach(k => {
+    if (!d.portfolios[k]) d.portfolios[k] = { holdings: [] };
+    if (!Array.isArray(d.portfolios[k].holdings)) d.portfolios[k].holdings = [];
+  });
+  if (!Array.isArray(d.watchlist)) d.watchlist = [];
+  // S5: lazy seed market snapshot cache
+  if (!d.marketSnapshot || typeof d.marketSnapshot !== 'object') d.marketSnapshot = { indices: {}, lastFetched: null };
+  if (!d.marketSnapshot.indices || typeof d.marketSnapshot.indices !== 'object') d.marketSnapshot.indices = {};
+  // S6: daily snapshots, AI reports, portfolio history
+  if (!d.marketSnapshot.daily || typeof d.marketSnapshot.daily !== 'object') d.marketSnapshot.daily = {};
+  if (!d.reports || typeof d.reports !== 'object') d.reports = {};
+  if (!d.portfolioHistory || typeof d.portfolioHistory !== 'object') d.portfolioHistory = {};
+  // S6B: signals — watchlist, history (by date), trade log
+  if (!Array.isArray(d.signalWatchlist)) d.signalWatchlist = [];
+  if (!d.signalHistory || typeof d.signalHistory !== 'object') d.signalHistory = {};
+  if (!Array.isArray(d.signalTrades)) d.signalTrades = [];
+  // S7: income log, deductions, tax state
+  if (!Array.isArray(d.income)) d.income = [];
+  if (!Array.isArray(d.deductions)) d.deductions = [];
+  if (!d.taxState || typeof d.taxState !== 'object') d.taxState = { paygYTD: 0 };
+  // S8: feature requests
+  if (!Array.isArray(d.featureRequests)) d.featureRequests = [];
+  d.schemaVersion = 9;
+  return d;
+}
+
+// ─── save — write to localStorage + push to cloud ────────────────────────
+function save() {
+  appData.lastBackup = new Date().toISOString();
+  localStorage.setItem('financeHub_data', JSON.stringify(appData));
+  updateLastSaved();
+  pushToCloud();
+}
+
+// ─── pushToCloud — async write to Supabase ────────────────────────────────
+async function pushToCloud() {
+  setSyncChip('syncing', '⟳ Saving…');
+  try {
+    await sbUpsert(appData);
+    setSyncChip('ok', '☁ Synced');
+  } catch (e) {
+    console.error('pushToCloud:', e);
+    setSyncChip('err', '⚠ Offline');
+  }
+}
+
+// ─── store — unified read/write accessor (used by future sessions) ────────
+function store(key, value) {
+  if (value === undefined) {
+    // Read
+    return getNestedKey(appData, key);
+  } else {
+    // Write
+    setNestedKey(appData, key, value);
+    save();
+  }
+}
+
+function getNestedKey(obj, path) {
+  return path.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), obj);
+}
+function setNestedKey(obj, path, value) {
+  const keys = path.split('.');
+  let cur = obj;
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (!cur[keys[i]]) cur[keys[i]] = {};
+    cur = cur[keys[i]];
+  }
+  cur[keys[keys.length - 1]] = value;
+}
+
+// ─── saveSetting — shorthand for settings fields ──────────────────────────
+function saveSetting(key, value) {
+  appData.settings[key] = value;
+  save();
+}
+
+// ─── loadApp — init on page load ─────────────────────────────────────────
+async function loadApp() {
+  // Apply theme immediately to avoid flash
+  document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light');
+
+  // Load from localStorage first (instant)
+  const local = localStorage.getItem('financeHub_data');
+  if (local) {
+    try { appData = JSON.parse(local); } catch { appData = initData(); }
+  } else {
+    appData = initData();
+  }
+  appData = migrate(appData);
+  renderSettings();
+
+  // Then try cloud (async — takes the newer copy)
+  setSyncChip('syncing', '⟳ Connecting…');
+  try {
+    const cloud = await sbGet();
+    if (cloud && cloud.data) {
+      const cloudTime = new Date(cloud.updated_at || 0);
+      const localTime = new Date(appData.lastBackup || 0);
+      if (cloudTime > localTime) {
+        appData = migrate(cloud.data);
+        localStorage.setItem('financeHub_data', JSON.stringify(appData));
+        renderSettings(); // re-render with cloud data
+      }
+    }
+    setSyncChip('ok', '☁ Synced');
+  } catch (e) {
+    console.error('loadApp cloud:', e);
+    setSyncChip('err', '⚠ Offline');
+  }
+}
+
+// ─── renderSettings — populate settings tab fields ────────────────────────
+function renderSettings() {
+  const s = appData.settings;
+  const $id = (id) => document.getElementById(id);
+
+  // Currency toggle
+  document.querySelectorAll('.currency-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent === s.baseCurrency);
+  });
+
+  if ($id('fyStartMonth')) $id('fyStartMonth').value = s.fyStartMonth || 7;
+  if ($id('nextPayDate'))  $id('nextPayDate').value  = s.nextPayDate  || '';
+  if ($id('monthlySalary')) $id('monthlySalary').value = s.monthlySalary || '';
+  if ($id('newsApiKey'))  $id('newsApiKey').value  = s.newsApiKey || '';
+  if ($id('dailySnapshotToggle')) $id('dailySnapshotToggle').checked = !!s.dailySnapshotEnabled;
+  renderSettingsAccounts();
+  updateLastSaved();
+}
+
+function renderSettingsAccounts() {
+  const wrap = document.getElementById('settingsAccountsWrap');
+  if (!wrap) return;
+  const cards = appData.cards || [];
+  if (!cards.length) {
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--muted);">No accounts set up yet. Add them in Personal Finance → Cards &amp; Accounts.</p>';
+    return;
+  }
+  wrap.innerHTML = `<div class="settings-grid">${cards.map(c => `
+    <div class="settings-field">
+      <label>${c.type === 'Credit' ? '💳' : '🏦'} ${escHtml(c.name)} <span style="font-size:10px;color:var(--muted)">(${c.type} · ${c.currency})</span></label>
+      <input type="text" value="${escHtml(c.name)}" maxlength="40" placeholder="${escHtml(c.name)}"
+        onchange="updCardName('${c.id}', this.value)">
+    </div>`).join('')}</div>`;
+}
+
+function updCardName(id, name) {
+  const c = (appData.cards || []).find(x => x.id === id);
+  if (!c) return;
+  c.name = name;
+  save();
+  renderCards();  // sync Personal Finance tab immediately
+}
+
+// ─── setCurrency ──────────────────────────────────────────────────────────
+function setCurrency(cur, btn) {
+  document.querySelectorAll('.currency-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  appData.settings.baseCurrency = cur;
+  save();
+  // S2+: refresh currency-sensitive views when base currency changes
+  if (appData.budget && document.getElementById('budgetTableWrap')) renderBudget();
+  if (appData.cards  && document.getElementById('cardsTableWrap'))  renderCards();
+}
+
+// ─── Tab navigation ───────────────────────────────────────────────────────
+function showTab(tabId, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tabId).style.display = '';
+  btn.classList.add('active');
+}
+
+// ─── Theme toggle ─────────────────────────────────────────────────────────
+function toggleTheme() {
+  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+}
+
+// ─── Sync chip ────────────────────────────────────────────────────────────
+function setSyncChip(state, text) {
+  const chip = document.getElementById('syncChip');
+  if (!chip) return;
+  chip.className = 'sync-chip ' + state;
+  chip.textContent = text;
+}
+
+// ─── Last saved display ───────────────────────────────────────────────────
+function updateLastSaved() {
+  const el = document.getElementById('lastSavedDisplay');
+  if (!el) return;
+  if (appData.lastBackup) {
+    const d = new Date(appData.lastBackup);
+    el.textContent = 'Last saved: ' + d.toLocaleTimeString();
+  } else {
+    el.textContent = 'Not yet saved';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// S2 — PERSONAL FINANCE: BUDGET + CARDS + FX RATES
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── S2: Helpers ──────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function toAUD(amount, currency) {
+  if (!currency || currency === 'AUD') return amount;
+  const r = appData.rates || {};
+  if (currency === 'IDR') return amount / (r.AUD_IDR || 10500);
+  if (currency === 'USD') return amount / (r.AUD_USD || 0.635);
+  return amount;
+}
+function toBase(amount, fromCurrency) {
+  const base = (appData.settings && appData.settings.baseCurrency) || 'AUD';
+  const aud  = toAUD(amount, fromCurrency || 'AUD');
+  const r    = appData.rates || {};
+  if (base === 'AUD') return aud;
+  if (base === 'IDR') return aud * (r.AUD_IDR || 10500);
+  if (base === 'USD') return aud * (r.AUD_USD || 0.635);
+  return aud;
+}
+function fmtMoney(amount, currency) {
+  const c = currency || (appData.settings && appData.settings.baseCurrency) || 'AUD';
+  if (isNaN(amount)) return '–';
+  if (c === 'IDR') return 'Rp ' + Math.round(amount).toLocaleString('id-ID');
+  if (c === 'USD') return 'US$ ' + Math.abs(amount).toFixed(2);
+  return 'A$ ' + Math.abs(amount).toFixed(2);
+}
+function baseSym() {
+  const c = (appData.settings && appData.settings.baseCurrency) || 'AUD';
+  return c === 'IDR' ? 'Rp' : c === 'USD' ? 'US$' : 'A$';
+}
+
+// ─── S2: FX Rates ─────────────────────────────────────────────────────────
+async function fetchFX() {
+  const FX_URL = 'https://api.frankfurter.app/latest?from=AUD&to=IDR,USD';
+  const candidates = [FX_URL, 'https://corsproxy.io/?' + encodeURIComponent(FX_URL)];
+  for (const url of candidates) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) continue;
+      const j = await r.json();
+      if (!j.rates || typeof j.rates.IDR !== 'number') continue;
+      if (!appData.rates) appData.rates = {};
+      appData.rates.AUD_IDR     = j.rates.IDR;
+      appData.rates.AUD_USD     = j.rates.USD;
+      appData.rates.lastFetched = new Date().toISOString();
+      save();
+      renderFXWidget(false);
+      if (appData.cards && document.getElementById('cardsTableWrap').innerHTML.trim()) renderCards();
+      return; // success — stop trying
+    } catch (e) { /* try next candidate */ }
+  }
+  console.warn('FX fetch failed (direct + proxy)');
+  renderFXWidget(true);
+}
+function renderFXWidget(offline) {
+  const el = document.getElementById('fxWidget');
+  if (!el) return;
+  const r   = appData.rates || {};
+  const idr = r.AUD_IDR ? r.AUD_IDR.toLocaleString('id-ID', { maximumFractionDigits: 0 }) : '–';
+  const usd = r.AUD_USD ? r.AUD_USD.toFixed(4) : '–';
+  const ts  = r.lastFetched
+    ? new Date(r.lastFetched).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : '–';
+  el.innerHTML = `
+    <div class="fx-pair">
+      <span class="fx-lbl">1 AUD =</span>
+      <span class="fx-val">${idr}&thinsp;IDR</span>
+    </div>
+    <div class="fx-pair">
+      <span class="fx-lbl">1 AUD =</span>
+      <span class="fx-val">${usd}&thinsp;USD</span>
+    </div>
+    <span class="fx-ts">${offline ? '<span class="fx-offline">⚠ Offline — cached</span>&nbsp;<a href="#" onclick="fetchFX();return false;" style="font-size:10px;color:var(--muted);">retry</a>&nbsp;' : ''}Updated ${ts}</span>`;
+}
+
+// ─── S2: Budget ────────────────────────────────────────────────────────────
+const INC_CATS = ['salary', 'sideIncome', 'otherIncome'];
+const EXP_CATS = ['rent', 'groceries', 'transport', 'dining', 'subscriptions', 'shopping', 'healthcare', 'savings', 'other'];
+const CAT_LBL  = {
+  salary: 'Salary', sideIncome: 'Side Income', otherIncome: 'Other Income',
+  rent: 'Rent', groceries: 'Groceries', transport: 'Transport', dining: 'Dining',
+  subscriptions: 'Subscriptions', shopping: 'Shopping', healthcare: 'Healthcare',
+  savings: 'Savings', other: 'Other'
+};
+function nowMonthKey() {
+  // Cycle runs 15th–14th. Before the 15th we're still in last month's cycle.
+  const d = new Date();
+  const ref = d.getDate() < 15
+    ? new Date(d.getFullYear(), d.getMonth() - 1, 1)
+    : new Date(d.getFullYear(), d.getMonth(), 1);
+  return ref.getFullYear() + '-' + String(ref.getMonth() + 1).padStart(2, '0');
+}
+function seedMonth(key) {
+  if (!appData.budget) appData.budget = {};
+  if (!appData.budget[key]) {
+    // Carry forward budget amounts (not actuals) from the previous cycle
+    const [y, m] = key.split('-').map(Number);
+    const prevDate = new Date(y, m - 2, 1);
+    const prevKey  = prevDate.getFullYear() + '-' + String(prevDate.getMonth() + 1).padStart(2, '0');
+    const prev     = appData.budget[prevKey];
+    const inc = {}; INC_CATS.forEach(k => inc[k] = { budget: prev?.income?.[k]?.budget   || 0, actual: 0 });
+    const exp = {}; EXP_CATS.forEach(k => exp[k] = { budget: prev?.expenses?.[k]?.budget || 0, actual: 0 });
+    appData.budget[key] = { income: inc, expenses: exp };
+  }
+}
+function buildMonthOpts() {
+  const sel = document.getElementById('budgetMonth');
+  if (!sel) return;
+  const prev   = sel.value;
+  const curKey = nowMonthKey();
+  const [cy, cm] = curKey.split('-').map(Number);
+  sel.innerHTML = '';
+  for (let i = -3; i <= 2; i++) {
+    const d   = new Date(cy, cm - 1 + i, 1);
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    // Label: "15 May – 14 Jun '26"
+    const start = new Date(d.getFullYear(), d.getMonth(), 15);
+    const end   = new Date(d.getFullYear(), d.getMonth() + 1, 14);
+    const fmt = dt => dt.toLocaleString('default', { day: 'numeric', month: 'short' });
+    const yr  = String(end.getFullYear()).slice(2);
+    const lbl = `${fmt(start)} – ${fmt(end)} '${yr}`;
+    const o   = document.createElement('option');
+    o.value = key; o.textContent = lbl;
+    if (key === (prev || curKey)) o.selected = true;
+    sel.appendChild(o);
+  }
+  if (!sel.value || !sel.querySelector(`option[value="${sel.value}"]`)) {
+    const opt = sel.querySelector(`option[value="${curKey}"]`);
+    if (opt) opt.selected = true;
+  }
+}
+// Compute income actuals from the income log for a given cycle month key.
+// Cycle: 15th of mk-month to 14th of next month.
+function computeIncomeActuals(mk) {
+  const [y, m] = mk.split('-').map(Number);
+  const start = new Date(y, m - 1, 15);
+  const end   = new Date(y, m, 14, 23, 59, 59);
+  const result = {};
+  INC_CATS.forEach(k => result[k] = 0);
+  (store('income') || []).forEach(e => {
+    if (!e.date) return;
+    const d = new Date(e.date);
+    if (d >= start && d <= end) {
+      const budKey = INCOME_TYPE_BUDGET_MAP[e.type] || 'otherIncome';
+      result[budKey] = (result[budKey] || 0) + toAUD(parseFloat(e.amount) || 0, e.currency || 'AUD');
+    }
+  });
+  return result;
+}
+
+function renderBudget() {
+  const sel  = document.getElementById('budgetMonth');
+  const mk   = (sel && sel.value) ? sel.value : nowMonthKey();
+  const wrap = document.getElementById('budgetTableWrap');
+  if (!wrap) return;
+  seedMonth(mk);
+  const b       = appData.budget[mk];
+  const base    = (appData.settings && appData.settings.baseCurrency) || 'AUD';
+  const sym     = baseSym();
+  // Income actuals derived from the income log (Issue 8)
+  const incActs = computeIncomeActuals(mk);
+
+  // Compute totals (income actuals from log; expense actuals from manual entry)
+  let tIB = 0, tIA = 0, tEB = 0, tEA = 0;
+  INC_CATS.forEach(k => { tIB += b.income[k].budget || 0; tIA += incActs[k] || 0; });
+  EXP_CATS.forEach(k => { tEB += b.expenses[k].budget || 0; tEA += b.expenses[k].actual || 0; });
+
+  // brow: shared row builder. Income uses inverted variance (more = green).
+  function brow(key, sec) {
+    const e   = b[sec][key];
+    const bud = e.budget || 0;
+    const act = sec === 'income' ? (incActs[key] || 0) : (e.actual || 0);
+    const vrn = sec === 'income' ? act - bud : bud - act;  // income: surplus is positive/green
+    const pct = bud > 0 ? Math.min(150, (act / bud) * 100) : 0;
+    const col = pct > 100
+      ? (sec === 'income' ? 'var(--ok)' : 'var(--err)')
+      : pct > 80 ? 'var(--amber)' : 'var(--ok)';
+    const incomeActualAttr = sec === 'income'
+      ? '' // read-only for income (derived from income log)
+      : `<input type="number" min="0" step="10" value="${act || ''}" placeholder="0"
+              onchange="saveBudRow('${mk}','${sec}','${key}','actual',parseFloat(this.value)||0)">`;
+    const actualCell = sec === 'income'
+      ? `<td style="text-align:right;color:var(--muted);">${fmtMoney(act, 'AUD')}</td>`
+      : `<td>${incomeActualAttr}</td>`;
+    return `
+      <tr>
+        <td>${CAT_LBL[key]}</td>
+        <td><input type="number" min="0" step="10" value="${bud || ''}" placeholder="0"
+              onchange="saveBudRow('${mk}','${sec}','${key}','budget',parseFloat(this.value)||0)"></td>
+        ${actualCell}
+        <td class="${vrn >= 0 ? 'ok' : 'bad'}">${fmtMoney(toBase(vrn, 'AUD'), base)}</td>
+        <td><div class="pbar-wrap">
+          <div class="pbar"><div class="pbar-fill" style="width:${Math.min(100, pct).toFixed(0)}%;background:${col}"></div></div>
+          <span>${Math.round(pct)}%</span>
+        </div></td>
+      </tr>`;
+  }
+
+  // bmobRow: mobile card version with same logic
+  function bmobRow(key, sec) {
+    const e   = b[sec][key];
+    const bud = e.budget || 0;
+    const act = sec === 'income' ? (incActs[key] || 0) : (e.actual || 0);
+    const vrn = sec === 'income' ? act - bud : bud - act;
+    const pct = bud > 0 ? Math.min(150, (act / bud) * 100) : 0;
+    const col = pct > 100
+      ? (sec === 'income' ? 'var(--ok)' : 'var(--err)')
+      : pct > 80 ? 'var(--amber)' : 'var(--ok)';
+    const vrnSign = vrn >= 0 ? '+' : '';
+    const actualInput = sec === 'income'
+      ? `<div class="bmob-field">
+          <span class="bmob-lbl">Actual A$ <span style="font-size:9px">(auto)</span></span>
+          <div style="padding:9px 10px;font-size:15px;text-align:right;border:1px solid var(--bdr);border-radius:4px;background:var(--bg);color:var(--muted);">${fmtMoney(act,'AUD')}</div>
+         </div>`
+      : `<div class="bmob-field">
+          <span class="bmob-lbl">Actual A$</span>
+          <input type="number" inputmode="decimal" min="0" step="10" value="${act || ''}" placeholder="0"
+            onchange="saveBudRow('${mk}','${sec}','${key}','actual',parseFloat(this.value)||0)">
+         </div>`;
+    return `
+      <div class="bmob-row">
+        <div class="bmob-cat">${CAT_LBL[key]}</div>
+        <div class="bmob-inputs">
+          <div class="bmob-field">
+            <span class="bmob-lbl">Expected A$</span>
+            <input type="number" inputmode="decimal" min="0" step="10" value="${bud || ''}" placeholder="0"
+              onchange="saveBudRow('${mk}','${sec}','${key}','budget',parseFloat(this.value)||0)">
+          </div>
+          ${actualInput}
+        </div>
+        <div class="bmob-bar-row">
+          <div class="pbar"><div class="pbar-fill" style="width:${Math.min(100,pct).toFixed(0)}%;background:${col}"></div></div>
+          <span class="bmob-pct">${Math.round(pct)}%</span>
+          <span class="bmob-vrn ${vrn >= 0 ? 'ok' : 'bad'}">${vrnSign}${fmtMoney(toBase(vrn,'AUD'),base)}</span>
+        </div>
+      </div>`;
+  }
+
+  const netVrn = tIA - tEA;
+
+  // Desktop table (hidden on mobile via CSS)
+  const desktopHTML = `
+    <div class="budget-desktop-wrap">
+    <table class="budget-tbl">
+      <thead><tr>
+        <th style="width:155px;text-align:left">Category</th>
+        <th>Expected (A$)</th>
+        <th>Actual (A$)</th>
+        <th>Variance (${sym})</th>
+        <th style="width:88px">% Used</th>
+      </tr></thead>
+      <tbody>
+        <tr><td colspan="5" class="bsec">Income <span style="font-size:9px;font-weight:400;color:var(--muted)">(auto from Income tab)</span></td></tr>
+        ${INC_CATS.map(k => brow(k, 'income')).join('')}
+        <tr class="btot">
+          <td>Total Income</td>
+          <td>${fmtMoney(tIB, 'AUD')}</td>
+          <td style="color:var(--muted)">${fmtMoney(tIA, 'AUD')}</td>
+          <td class="${(tIA - tIB) >= 0 ? 'ok' : 'bad'}">${fmtMoney(toBase(tIA - tIB, 'AUD'), base)}</td>
+          <td></td>
+        </tr>
+        <tr><td colspan="5" class="bsec">Expenses</td></tr>
+        ${EXP_CATS.map(k => brow(k, 'expenses')).join('')}
+        <tr class="btot">
+          <td>Total Expenses</td>
+          <td>${fmtMoney(tEB, 'AUD')}</td>
+          <td>${fmtMoney(tEA, 'AUD')}</td>
+          <td class="${(tEB - tEA) >= 0 ? 'ok' : 'bad'}">${fmtMoney(toBase(tEB - tEA, 'AUD'), base)}</td>
+          <td></td>
+        </tr>
+        <tr class="bnet">
+          <td colspan="2">Net (Income − Expenses)</td>
+          <td class="${netVrn >= 0 ? 'ok' : 'bad'}">${fmtMoney(toBase(netVrn, 'AUD'), base)}</td>
+          <td colspan="2"></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>`;
+
+  // Mobile cards (hidden on desktop via CSS)
+  const mobileHTML = `
+    <div class="budget-mobile-wrap">
+    <div class="budget-mobile">
+      <div class="bmob-section">Income <span style="font-size:9px;font-weight:400">(auto from Income tab)</span></div>
+      ${INC_CATS.map(k => bmobRow(k,'income')).join('')}
+      <div class="bmob-total">
+        <span class="bmob-total-lbl">Total Income</span>
+        <div class="bmob-total-vals">
+          <div class="bmob-total-sub">${fmtMoney(tIA,'AUD')} of ${fmtMoney(tIB,'AUD')}</div>
+          <div class="bmob-total-vrn ${(tIA-tIB)>=0?'ok':'bad'}">${(tIA-tIB)>=0?'+':''}${fmtMoney(toBase(tIA-tIB,'AUD'),base)}</div>
+        </div>
+      </div>
+      <div class="bmob-section">Expenses</div>
+      ${EXP_CATS.map(k => bmobRow(k,'expenses')).join('')}
+      <div class="bmob-total">
+        <span class="bmob-total-lbl">Total Expenses</span>
+        <div class="bmob-total-vals">
+          <div class="bmob-total-sub">${fmtMoney(tEA,'AUD')} of ${fmtMoney(tEB,'AUD')}</div>
+          <div class="bmob-total-vrn ${(tEB-tEA)>=0?'ok':'bad'}">${(tEB-tEA)>=0?'+':''}${fmtMoney(toBase(tEB-tEA,'AUD'),base)}</div>
+        </div>
+      </div>
+      <div class="bmob-net">
+        <span class="bmob-net-lbl">Net</span>
+        <span class="bmob-net-val ${netVrn>=0?'ok':'bad'}">${netVrn>=0?'+':''}${fmtMoney(toBase(netVrn,'AUD'),base)}</span>
+      </div>
+    </div>
+    </div>`;
+
+  wrap.innerHTML = desktopHTML + mobileHTML;
+
+  // Note: resize listener no longer needed — CSS handles layout switching
+  if (window._budResizeRegistered) {
+    window._budResizeRegistered = false; // disable old listener (noop on next call)
+  }
+
+}
+function saveBudRow(mk, sec, key, field, val) {
+  seedMonth(mk);
+  appData.budget[mk][sec][key][field] = val;
+  save();
+  renderBudget();
+}
+
+// ─── S2: Card tracker ──────────────────────────────────────────────────────
+function seedCards() {
+  if (!appData.cards || !Array.isArray(appData.cards) || !appData.cards.length) {
+    appData.cards = [
+      { id: 'c1', name: 'ANZ Everyday', type: 'Debit',  currency: 'AUD', balance: 0 },
+      { id: 'c2', name: 'ANZ Savings',  type: 'Debit',  currency: 'AUD', balance: 0 },
+      { id: 'c3', name: 'Bank 3',       type: 'Debit',  currency: 'AUD', balance: 0 },
+      { id: 'c4', name: 'Credit Card',  type: 'Credit', currency: 'AUD', balance: 0 }
+    ];
+  }
+}
+function renderCards() {
+  const wrap = document.getElementById('cardsTableWrap');
+  if (!wrap) return;
+  seedCards();
+  const base = (appData.settings && appData.settings.baseCurrency) || 'AUD';
+  const sym  = baseSym();
+  let netAUD = 0;
+
+  const rows = appData.cards.map((c, i) => {
+    const bal    = c.balance || 0;
+    const audVal = toAUD(bal, c.currency);
+    const dispV  = toBase(bal, c.currency);
+    netAUD      += c.type === 'Credit' ? -audVal : audVal;
+    const negDisp = c.type === 'Credit' ? -dispV : dispV;
+    const cls    = negDisp < 0 ? 'bad' : '';
+    return `
+      <tr>
+        <td><input type="text" value="${escHtml(c.name)}" maxlength="40"
+              onchange="updCard(${i},'name',this.value)"></td>
+        <td style="text-align:center">
+          <select onchange="updCard(${i},'type',this.value)">
+            <option value="Debit"  ${c.type === 'Debit'  ? 'selected' : ''}>Debit</option>
+            <option value="Credit" ${c.type === 'Credit' ? 'selected' : ''}>Credit</option>
+          </select>
+        </td>
+        <td style="text-align:center">
+          <select onchange="updCard(${i},'currency',this.value)">
+            <option value="AUD" ${c.currency === 'AUD' ? 'selected' : ''}>AUD</option>
+            <option value="IDR" ${c.currency === 'IDR' ? 'selected' : ''}>IDR</option>
+            <option value="USD" ${c.currency === 'USD' ? 'selected' : ''}>USD</option>
+          </select>
+        </td>
+        <td><input type="number" step="0.01" value="${bal || ''}" placeholder="0"
+              onchange="updCard(${i},'balance',parseFloat(this.value)||0)"></td>
+        <td class="${cls}">${c.type === 'Credit'
+          ? `<span style="color:var(--err)">−${fmtMoney(dispV, base)}</span>`
+          : fmtMoney(dispV, base)}</td>
+        <td><button class="btn btn-del" onclick="delCard(${i})" title="Remove account">✕</button></td>
+      </tr>`;
+  }).join('');
+
+  const netDisp = toBase(netAUD, 'AUD');
+  wrap.innerHTML = `
+    <table class="cards-tbl">
+      <thead><tr>
+        <th>Account Name</th>
+        <th style="text-align:center">Type</th>
+        <th style="text-align:center">Currency</th>
+        <th style="text-align:right">Balance (native)</th>
+        <th style="text-align:right">Value (${sym})</th>
+        <th style="width:32px"></th>
+      </tr></thead>
+      <tbody>
+        ${rows}
+        <tr class="cnet">
+          <td colspan="4" style="text-align:left">Net Total (assets − credit liabilities)</td>
+          <td class="${netDisp < 0 ? 'bad' : 'ok'}">${fmtMoney(netDisp, base)}</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>`;
+}
+function updCard(i, field, val) {
+  seedCards();
+  appData.cards[i][field] = val;
+  save();
+  renderCards();
+}
+function addCard() {
+  seedCards();
+  appData.cards.push({ id: 'c' + Date.now(), name: 'New Account', type: 'Debit', currency: 'AUD', balance: 0 });
+  save();
+  renderCards();
+}
+function delCard(i) {
+  seedCards();
+  if (appData.cards.length <= 1) { alert('Keep at least one account.'); return; }
+  if (!confirm('Remove "' + escHtml(appData.cards[i].name) + '"?')) return;
+  appData.cards.splice(i, 1);
+  save();
+  renderCards();
+}
+
+// ─── S3: constants ────────────────────────────────────────────────────────
+const SP_CATS     = ['Food & Dining','Transport','Shopping','Entertainment','Health','Utilities','Travel','Other'];
+const ASSET_TYPES = ['Stocks','Crypto','Property','Superannuation','Cash','Other'];
+const PLAN_PRI    = ['High','Med','Low'];
+const PLAN_STAT   = ['Not Started','Saving','Ready','Completed'];
+
+// ─── S3: showPFTab — switch Personal Finance sub-tabs ─────────────────────
+function showPFTab(id, el) {
+  document.querySelectorAll('.pf-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.pf-subtab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).style.display = '';
+  el.classList.add('active');
+  if (id === 'pf-spending') { populateSpendingFilters(); renderSpending(); }
+  if (id === 'pf-wealth')   renderWealth();
+  if (id === 'pf-plans')    renderPlans();
+}
+
+// ─── S3: spending ─────────────────────────────────────────────────────────
+function spUID() { return 's' + Date.now() + Math.random().toString(36).slice(2, 6); }
+
+function populateSpendingFilters() {
+  const cf = document.getElementById('spFilterCard');
+  if (!cf) return;
+  const curC = cf.value;
+  cf.innerHTML = '<option value="">All Accounts</option>';
+  (appData.cards || []).forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id; o.textContent = c.name;
+    if (String(c.id) === String(curC)) o.selected = true;
+    cf.appendChild(o);
+  });
+  const mf = document.getElementById('spFilterMonth');
+  if (!mf) return;
+  const curM = mf.value;
+  const months = [...new Set((appData.spending || []).map(s => s.date ? s.date.slice(0, 7) : '').filter(Boolean))].sort().reverse();
+  mf.innerHTML = '<option value="">All Months</option>';
+  months.forEach(m => {
+    const o = document.createElement('option');
+    o.value = m; o.textContent = m;
+    if (m === curM) o.selected = true;
+    mf.appendChild(o);
+  });
+}
+
+function renderSpending() {
+  const wrap = document.getElementById('spTableWrap');
+  if (!wrap) return;
+  if (!appData.spending) appData.spending = [];
+  const filterCard  = (document.getElementById('spFilterCard')  || {}).value || '';
+  const filterCat   = (document.getElementById('spFilterCat')   || {}).value || '';
+  const filterMonth = (document.getElementById('spFilterMonth') || {}).value || '';
+
+  let rows = [...appData.spending].sort((a, b) => (b.date || '') < (a.date || '') ? -1 : 1);
+  if (filterCard)  rows = rows.filter(r => String(r.cardId) === String(filterCard));
+  if (filterCat)   rows = rows.filter(r => r.category === filterCat);
+  if (filterMonth) rows = rows.filter(r => (r.date || '').slice(0, 7) === filterMonth);
+
+  if (!rows.length) {
+    wrap.innerHTML = '<p style="text-align:center;color:var(--muted);padding:20px 0;font-size:12px;">No transactions. Click + Add Transaction to start.</p>';
+    renderSpendingTotals([]);
+    return;
+  }
+
+  const cardOptsFull = (appData.cards || []).map(c =>
+    `<option value="${c.id}">${escHtml(c.name)}</option>`).join('');
+  const catOptsFull = SP_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
+
+  const trs = rows.map(r => {
+    const cardSel = (`<option value="">—</option>` + cardOptsFull)
+      .replace(`value="${r.cardId}"`, `value="${r.cardId}" selected`);
+    const catSel = (`<option value="">—</option>` + catOptsFull)
+      .replace(`value="${r.category}"`, `value="${r.category}" selected`);
+    const curSel = ['AUD','IDR','USD'].map(c =>
+      `<option value="${c}" ${r.currency === c ? 'selected' : ''}>${c}</option>`).join('');
+    return `<tr>
+      <td><input type="date" value="${escHtml(r.date||'')}"
+            onchange="updSpending('${r.id}','date',this.value)"></td>
+      <td><input type="text" value="${escHtml(r.description||'')}" maxlength="60" style="width:140px;"
+            onchange="updSpending('${r.id}','description',this.value)"></td>
+      <td><input type="number" value="${r.amount||0}" style="width:90px;text-align:right;"
+            onchange="updSpending('${r.id}','amount',+this.value)"></td>
+      <td><select onchange="updSpending('${r.id}','currency',this.value)">${curSel}</select></td>
+      <td><select onchange="updSpending('${r.id}','category',this.value)">${catSel}</select></td>
+      <td><select onchange="updSpending('${r.id}','cardId',this.value)">${cardSel}</select></td>
+      <td><button class="btn-del" onclick="deleteSpending('${r.id}')">×</button></td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `<div style="overflow-x:auto;"><table class="sp-tbl">
+    <thead><tr>
+      <th>Date</th><th>Description</th><th>Amount</th><th>Ccy</th>
+      <th>Category</th><th>Account</th><th></th>
+    </tr></thead>
+    <tbody>${trs}</tbody>
+  </table></div>`;
+  renderSpendingTotals(rows);
+}
+
+function renderSpendingTotals(rows) {
+  const wrap = document.getElementById('spTotalsWrap');
+  if (!wrap) return;
+  const byMonth = {};
+  rows.forEach(r => {
+    if (!r.date) return;
+    const mk = r.date.slice(0, 7);
+    if (!byMonth[mk]) byMonth[mk] = {};
+    const cat = r.category || 'Other';
+    byMonth[mk][cat] = (byMonth[mk][cat] || 0) + toAUD(r.amount || 0, r.currency || 'AUD');
+  });
+  const months = Object.keys(byMonth).sort().reverse();
+  if (!months.length) {
+    wrap.innerHTML = '<p style="color:var(--muted);font-size:12px;padding:8px 0;">No data yet.</p>';
+    return;
+  }
+  const allCats = [...new Set(rows.map(r => r.category || 'Other'))].sort();
+  const sym = baseSym();
+  const base = (appData.settings && appData.settings.baseCurrency) || 'AUD';
+  const html = months.map(mk => {
+    const mData = byMonth[mk];
+    const total = Object.values(mData).reduce((a, b) => a + b, 0);
+    const catRows = allCats.filter(c => mData[c]).map(c =>
+      `<tr><td style="padding-left:20px;color:var(--muted)">${c}</td>
+           <td style="text-align:right">${sym}${fmtMoney(toBase(mData[c], 'AUD'))}</td></tr>`
+    ).join('');
+    return `<tr style="font-weight:700;border-top:1px solid var(--bdr)">
+      <td>${mk}</td><td style="text-align:right">${sym}${fmtMoney(toBase(total, 'AUD'))}</td></tr>${catRows}`;
+  }).join('');
+  wrap.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead><tr>
+      <th style="text-align:left;padding:4px 8px;">Month / Category</th>
+      <th style="text-align:right;padding:4px 8px;">Total (${base})</th>
+    </tr></thead>
+    <tbody>${html}</tbody>
+  </table>`;
+}
+
+function addSpending() {
+  if (!appData.spending) appData.spending = [];
+  appData.spending.unshift({
+    id: spUID(), date: new Date().toISOString().slice(0, 10),
+    description: '', amount: 0, currency: 'AUD', category: 'Other', cardId: ''
+  });
+  save();
+  populateSpendingFilters();
+  renderSpending();
+}
+
+function updSpending(id, field, val) {
+  const entry = (appData.spending || []).find(s => s.id === id);
+  if (!entry) return;
+  entry[field] = val;
+  save();
+  if (['amount','currency','category','date'].includes(field)) {
+    renderSpendingTotals([...appData.spending]);
+    if (field === 'date') populateSpendingFilters();
+  }
+}
+
+function deleteSpending(id) {
+  appData.spending = (appData.spending || []).filter(s => s.id !== id);
+  save();
+  populateSpendingFilters();
+  renderSpending();
+}
+
+// ─── S3: wealth ────────────────────────────────────────────────────────────
+function wlUID() { return 'w' + Date.now() + Math.random().toString(36).slice(2, 6); }
+
+function renderWealth() {
+  if (!appData.assets)      appData.assets      = [];
+  if (!appData.liabilities) appData.liabilities = [];
+  if (!appData.nwHistory)   appData.nwHistory   = {};
+
+  const base = (appData.settings && appData.settings.baseCurrency) || 'AUD';
+
+  // Auto: liquid assets = debit card balances
+  const debitCards = (appData.cards || []).filter(c => c.type !== 'Credit');
+  const liquidAUD  = debitCards.reduce((s, c) => s + toAUD(c.balance || 0, c.currency || 'AUD'), 0);
+
+  // Auto: non-liquid = investment portfolio market values
+  const portfolioAUD = (() => {
+    const port = store('portfolios') || {};
+    const ccy  = { idr:'IDR', usd:'USD', aud:'AUD' };
+    let total = 0;
+    ['idr','usd','aud'].forEach(k => {
+      (port[k]?.holdings || []).forEach(h => {
+        total += toAUD((h.currentPrice || 0) * (h.qty || 0), ccy[k]);
+      });
+    });
+    return total;
+  })();
+
+  // Manual assets (existing user-entered entries)
+  const manualAssetsAUD = appData.assets.reduce((s, a) => s + toAUD(a.value || 0, a.currency || 'AUD'), 0);
+
+  const totalAssetsAUD = liquidAUD + portfolioAUD + manualAssetsAUD;
+  const manualLiabAUD  = appData.liabilities.reduce((s, l) => s + toAUD(l.value || 0, l.currency || 'AUD'), 0);
+  const cardLiabAUD    = (appData.cards || []).filter(c => c.type === 'Credit')
+                           .reduce((s, c) => s + toAUD(c.balance || 0, c.currency || 'AUD'), 0);
+  const totalLiabAUD   = manualLiabAUD + cardLiabAUD;
+  const netWorthAUD    = totalAssetsAUD - totalLiabAUD;
+
+  // Snapshot current month
+  const mk     = new Date().toISOString().slice(0, 7);
+  const lastMk = (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); })();
+  appData.nwHistory[mk] = netWorthAUD;
+  save();
+
+  const lastNW = appData.nwHistory[lastMk];
+  const delta  = lastNW != null ? netWorthAUD - lastNW : null;
+
+  // Net worth summary
+  const nwSummary = document.getElementById('nwSummary');
+  if (nwSummary) {
+    const deltaHtml = delta != null
+      ? `<div class="nw-item"><div class="nw-label">vs Last Month</div>
+           <div class="nw-val ${delta >= 0 ? 'ok' : 'bad'}">${delta >= 0 ? '▲' : '▼'} ${fmtMoney(Math.abs(toBase(delta, 'AUD')), base)}</div></div>`
+      : `<div class="nw-item"><div class="nw-label">vs Last Month</div><div class="nw-val" style="color:var(--muted)">—</div></div>`;
+    nwSummary.innerHTML = `<div class="nw-grid">
+      <div class="nw-item"><div class="nw-label">💧 Liquid (Accounts)</div>
+        <div class="nw-val ok">${fmtMoney(toBase(liquidAUD, 'AUD'), base)}</div></div>
+      <div class="nw-item"><div class="nw-label">📈 Investments</div>
+        <div class="nw-val ok">${fmtMoney(toBase(portfolioAUD, 'AUD'), base)}</div></div>
+      <div class="nw-item"><div class="nw-label">Total Assets</div>
+        <div class="nw-val ok">${fmtMoney(toBase(totalAssetsAUD, 'AUD'), base)}</div></div>
+      <div class="nw-item"><div class="nw-label">Total Liabilities</div>
+        <div class="nw-val bad">${fmtMoney(toBase(totalLiabAUD, 'AUD'), base)}</div></div>
+      <div class="nw-item"><div class="nw-label">Net Worth</div>
+        <div class="nw-val nw-big ${netWorthAUD >= 0 ? 'ok' : 'bad'}">${fmtMoney(toBase(netWorthAUD, 'AUD'), base)}</div></div>
+      ${deltaHtml}
+    </div>`;
+  }
+
+  // Assets table (auto: liquid accounts + investments; manual: user entries)
+  const assetsWrap = document.getElementById('assetsWrap');
+  if (assetsWrap) {
+    // Auto rows: debit cards (liquid)
+    const liquidRows = debitCards.map(c =>
+      `<tr style="opacity:0.75;">
+        <td>${escHtml(c.name)} <span style="font-size:10px;color:var(--muted)">(account)</span></td>
+        <td>💧 Liquid</td>
+        <td style="text-align:right">${fmtMoney(c.balance||0, c.currency)}</td>
+        <td>${c.currency}</td>
+        <td style="text-align:right">${fmtMoney(toBase(c.balance||0, c.currency||'AUD'), base)}</td>
+        <td></td>
+      </tr>`).join('');
+
+    // Auto rows: investment portfolios
+    const portLabels = { idr: '🇮🇩 Indonesia', usd: '🌐 Global', aud: '🇦🇺 Australia' };
+    const portCcy    = { idr: 'IDR', usd: 'USD', aud: 'AUD' };
+    const port       = store('portfolios') || {};
+    const investRows = ['idr','usd','aud'].map(k => {
+      const mv = (port[k]?.holdings || []).reduce((s,h) => s + (h.currentPrice||0)*(h.qty||0), 0);
+      if (!mv) return '';
+      const ccy = portCcy[k];
+      return `<tr style="opacity:0.75;">
+        <td>${portLabels[k]} portfolio <span style="font-size:10px;color:var(--muted)">(investments)</span></td>
+        <td>📈 Investment</td>
+        <td style="text-align:right">${fmtMoney(mv, ccy)}</td>
+        <td>${ccy}</td>
+        <td style="text-align:right">${fmtMoney(toBase(mv, ccy), base)}</td>
+        <td></td>
+      </tr>`;
+    }).join('');
+
+    // Manual asset rows
+    const typeOptsFull = ASSET_TYPES.map(t => `<option value="${t}">${t}</option>`).join('');
+    const manualRows = appData.assets.map(a => {
+      const tSel = typeOptsFull.replace(`value="${a.type}"`, `value="${a.type}" selected`);
+      const cSel = ['AUD','IDR','USD'].map(c =>
+        `<option value="${c}" ${a.currency === c ? 'selected' : ''}>${c}</option>`).join('');
+      return `<tr>
+        <td><input type="text" value="${escHtml(a.name||'')}" maxlength="50" style="width:130px;"
+              onchange="updAsset('${a.id}','name',this.value)"></td>
+        <td><select onchange="updAsset('${a.id}','type',this.value)">${tSel}</select></td>
+        <td><input type="number" value="${a.value||0}" style="width:110px;text-align:right;"
+              onchange="updAsset('${a.id}','value',+this.value)"></td>
+        <td><select onchange="updAsset('${a.id}','currency',this.value)">${cSel}</select></td>
+        <td style="text-align:right">${fmtMoney(toBase(a.value||0, a.currency||'AUD'), base)}</td>
+        <td><button class="btn-del" onclick="deleteAsset('${a.id}')">×</button></td>
+      </tr>`;
+    }).join('');
+
+    assetsWrap.innerHTML = `<table class="wl-tbl">
+      <thead><tr><th>Name</th><th>Type</th><th>Value</th><th>Ccy</th><th>${base}</th><th></th></tr></thead>
+      <tbody>
+        ${liquidRows}
+        ${investRows}
+        ${manualRows || '<tr><td colspan="6" style="text-align:center;color:var(--muted);font-size:12px;padding:8px;">No manual assets. Click + Add Asset to add property, vehicles, etc.</td></tr>'}
+      </tbody>
+      <tfoot><tr class="wl-tot">
+        <td colspan="4">Total Assets</td>
+        <td style="text-align:right">${fmtMoney(toBase(totalAssetsAUD, 'AUD'), base)}</td>
+        <td></td>
+      </tr></tfoot>
+    </table>`;
+  }
+
+  // Liabilities table
+  const liabsWrap = document.getElementById('liabsWrap');
+  if (liabsWrap) {
+    const manualRows = appData.liabilities.map(l => {
+      const cSel = ['AUD','IDR','USD'].map(c =>
+        `<option value="${c}" ${l.currency === c ? 'selected' : ''}>${c}</option>`).join('');
+      return `<tr>
+        <td><input type="text" value="${escHtml(l.name||'')}" maxlength="50" style="width:160px;"
+              onchange="updLiability('${l.id}','name',this.value)"></td>
+        <td><input type="number" value="${l.value||0}" style="width:110px;text-align:right;"
+              onchange="updLiability('${l.id}','value',+this.value)"></td>
+        <td><select onchange="updLiability('${l.id}','currency',this.value)">${cSel}</select></td>
+        <td style="text-align:right">${fmtMoney(toBase(l.value||0, l.currency||'AUD'), base)}</td>
+        <td><button class="btn-del" onclick="deleteLiability('${l.id}')">×</button></td>
+      </tr>`;
+    }).join('');
+    const autoRows = (appData.cards || []).filter(c => c.type === 'Credit').map(c =>
+      `<tr style="opacity:0.75;">
+        <td>${escHtml(c.name)} <span style="font-size:10px;color:var(--muted)">(credit card)</span></td>
+        <td style="text-align:right">${fmtMoney(c.balance||0, c.currency)}</td>
+        <td>${c.currency}</td>
+        <td style="text-align:right">${fmtMoney(toBase(c.balance||0, c.currency||'AUD'), base)}</td>
+        <td></td>
+      </tr>`
+    ).join('');
+    const noLiabs = !appData.liabilities.length && !(appData.cards||[]).some(c => c.type === 'Credit');
+    liabsWrap.innerHTML = noLiabs
+      ? '<p style="text-align:center;color:var(--muted);padding:16px 0;font-size:12px;">No liabilities. Click + Add Liability to start.</p>'
+      : `<table class="wl-tbl">
+          <thead><tr><th>Name</th><th style="text-align:right">Value</th><th>Ccy</th><th style="text-align:right">${base}</th><th></th></tr></thead>
+          <tbody>${manualRows}${autoRows}</tbody>
+          <tfoot><tr class="wl-tot">
+            <td colspan="3">Total Liabilities</td>
+            <td style="text-align:right">${fmtMoney(toBase(totalLiabAUD, 'AUD'), base)}</td>
+            <td></td>
+          </tr></tfoot>
+        </table>`;
+  }
+}
+
+function addAsset() {
+  if (!appData.assets) appData.assets = [];
+  appData.assets.push({ id: wlUID(), name: 'New Asset', type: 'Other', value: 0, currency: 'AUD' });
+  save(); renderWealth();
+}
+function updAsset(id, field, val) {
+  const a = (appData.assets || []).find(x => x.id === id);
+  if (!a) return; a[field] = val; save(); renderWealth();
+}
+function deleteAsset(id) {
+  appData.assets = (appData.assets || []).filter(x => x.id !== id);
+  save(); renderWealth();
+}
+function addLiability() {
+  if (!appData.liabilities) appData.liabilities = [];
+  appData.liabilities.push({ id: wlUID(), name: 'New Liability', value: 0, currency: 'AUD' });
+  save(); renderWealth();
+}
+function updLiability(id, field, val) {
+  const l = (appData.liabilities || []).find(x => x.id === id);
+  if (!l) return; l[field] = val; save(); renderWealth();
+}
+function deleteLiability(id) {
+  appData.liabilities = (appData.liabilities || []).filter(x => x.id !== id);
+  save(); renderWealth();
+}
+
+// ─── S3: plans ─────────────────────────────────────────────────────────────
+function plUID() { return 'p' + Date.now() + Math.random().toString(36).slice(2, 6); }
+
+function monthsBetween(from, to) {
+  const a = new Date(from), b = new Date(to);
+  return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+}
+
+function renderPlans() {
+  const wrap = document.getElementById('plansWrap');
+  if (!wrap) return;
+  if (!appData.plans) appData.plans = [];
+
+  if (!appData.plans.length) {
+    wrap.innerHTML = '<p style="text-align:center;color:var(--muted);padding:20px 0;font-size:12px;">No plans yet. Click + Add Plan to start.</p>';
+    return;
+  }
+
+  const sym   = baseSym();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const rows = appData.plans.map(p => {
+    const months = p.targetDate ? monthsBetween(today, p.targetDate) : 0;
+    const monthsDisp = months > 0 ? months
+      : months === 0 ? '0'
+      : `<span class="bad">Overdue</span>`;
+    const req     = (months > 0 && (p.target || 0) > 0) ? (p.target / months) : 0;
+    const reqDisp = req > 0 ? `${sym}${fmtMoney(req)}/mo` : '—';
+    const priSel  = PLAN_PRI.map(v =>
+      `<option value="${v}" ${p.priority === v ? 'selected' : ''}>${v}</option>`).join('');
+    const statSel = PLAN_STAT.map(v =>
+      `<option value="${v}" ${p.status === v ? 'selected' : ''}>${v}</option>`).join('');
+    const priCls  = p.priority === 'High' ? 'bad' : p.priority === 'Low' ? 'ok' : 'amber-txt';
+
+    return `<tr>
+      <td><input type="text" value="${escHtml(p.name||'')}" maxlength="60" style="width:130px;"
+            onchange="updPlan('${p.id}','name',this.value)"></td>
+      <td><input type="number" value="${p.target||0}" style="width:95px;text-align:right;"
+            onchange="updPlan('${p.id}','target',+this.value)"></td>
+      <td><input type="date" value="${p.targetDate||''}"
+            onchange="updPlan('${p.id}','targetDate',this.value)"></td>
+      <td><select onchange="updPlan('${p.id}','priority',this.value)">${priSel}</select></td>
+      <td style="text-align:center">${monthsDisp}</td>
+      <td style="text-align:right">${reqDisp}</td>
+      <td><select onchange="updPlan('${p.id}','status',this.value)">${statSel}</select></td>
+      <td><input type="text" value="${escHtml(p.notes||'')}" maxlength="100" placeholder="Notes…" style="width:120px;font-size:11px;"
+            onchange="updPlan('${p.id}','notes',this.value)"></td>
+      <td><button class="btn-del" onclick="deletePlan('${p.id}')">×</button></td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `<div style="overflow-x:auto;"><table class="pl-tbl">
+    <thead><tr>
+      <th>Name</th><th>Target (A$)</th><th>Target Date</th><th>Priority</th>
+      <th>Months Left</th><th>Req. Monthly</th><th>Status</th><th>Notes</th><th></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+function addPlan() {
+  if (!appData.plans) appData.plans = [];
+  const nextYear = new Date(); nextYear.setFullYear(nextYear.getFullYear() + 1);
+  appData.plans.push({
+    id: plUID(), name: 'New Plan', target: 0,
+    targetDate: nextYear.toISOString().slice(0, 10),
+    priority: 'Med', notes: '', status: 'Not Started'
+  });
+  save(); renderPlans();
+}
+function updPlan(id, field, val) {
+  const p = (appData.plans || []).find(x => x.id === id);
+  if (!p) return; p[field] = val; save(); renderPlans();
+}
+function deletePlan(id) {
+  appData.plans = (appData.plans || []).filter(x => x.id !== id);
+  save(); renderPlans();
+}
+
+// ─── S2: initPersonalFinance — called on load and on PF tab click ──────────
+function initPersonalFinance() {
+  // S3: lazy seed
+  if (!appData.spending)    appData.spending    = [];
+  if (!appData.assets)      appData.assets      = [];
+  if (!appData.liabilities) appData.liabilities = [];
+  if (!appData.plans)       appData.plans       = [];
+  if (!appData.nwHistory)   appData.nwHistory   = {};
+
+  if (!appData.rates) appData.rates = { AUD_IDR: null, AUD_USD: null, lastFetched: null };
+  buildMonthOpts();
+  if (appData.rates.AUD_IDR) renderFXWidget(false);   // show cached instantly
+  renderBudget();
+  renderCards();
+  // Fetch fresh FX only if stale (>1 hour) or never fetched
+  const r = appData.rates;
+  if (!r.lastFetched || (Date.now() - new Date(r.lastFetched).getTime()) > 3_600_000) {
+    fetchFX();
+  }
+  // S3: pre-populate spending filters so they're ready when tab is clicked
+  populateSpendingFilters();
+}
+
+// ─── S4: Investments ──────────────────────────────────────────────────────
+let activePortfolio = 'idr';
+const PORT_CURRENCIES = { idr: 'IDR', usd: 'USD', aud: 'AUD' };
+const HOLD_TYPES  = ['Stock', 'ETF', 'Crypto', 'Mutual Fund'];
+const WATCH_TAGS  = ['Buy', 'Watch', 'Avoid'];
+
+// ─── S5: Live market data ───────────────────────────────────────────────
+// CoinGecko symbol → id lookup. Extend as needed.
+const COINGECKO_IDS = {
+  BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana', BNB: 'binancecoin',
+  XRP: 'ripple', ADA: 'cardano', DOGE: 'dogecoin', DOT: 'polkadot',
+  MATIC: 'matic-network', AVAX: 'avalanche-2', LINK: 'chainlink',
+  LTC: 'litecoin', USDT: 'tether', USDC: 'usd-coin'
+};
+// Map portfolio key → Yahoo exchange suffix + currency code for crypto
+const PORT_YF_SUFFIX = { idr: '.JK', aud: '.AX', usd: '' };
+const PORT_CG_CCY    = { idr: 'idr', usd: 'usd', aud: 'aud' };
+// Market overview indices: [yahoo symbol, display name]
+const MKT_INDICES = [
+  ['^AXJO',  'ASX 200'],
+  ['^JKSE',  'Jakarta Composite'],
+  ['^GSPC',  'S&P 500'],
+  ['^DJI',   'Dow Jones'],
+  ['BTC-USD','Bitcoin (USD)']
+];
+
+// Fetch a single stock/index quote from Yahoo Finance v8.
+// marketKey: 'idr'|'usd'|'aud' (controls exchange suffix). Pass '' to use ticker as-is.
+// Returns { price, prevClose } or throws.
+async function fetchStockPrice(ticker, marketKey) {
+  let sym = (ticker || '').trim().toUpperCase();
+  if (!sym) throw new Error('empty ticker');
+  // Append exchange suffix only if ticker has none already
+  if (marketKey && PORT_YF_SUFFIX[marketKey] && !sym.includes('.') && !sym.includes('-')) {
+    sym += PORT_YF_SUFFIX[marketKey];
+  }
+  const base = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=1d`;
+  const candidates = [base, 'https://corsproxy.io/?' + encodeURIComponent(base)];
+  for (const url of candidates) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) continue;
+      const j = await r.json();
+      const meta = j?.chart?.result?.[0]?.meta;
+      if (!meta || typeof meta.regularMarketPrice !== 'number') continue;
+      return { price: meta.regularMarketPrice, prevClose: (typeof meta.chartPreviousClose === 'number' ? meta.chartPreviousClose : meta.previousClose) };
+    } catch (e) { /* try next candidate */ }
+  }
+  throw new Error('YF ' + sym + ' unavailable');
+}
+
+// Fetch crypto price from CoinGecko. ccy: 'usd'|'aud'|'idr'. Returns number price.
+async function fetchCryptoPrice(ticker, ccy) {
+  const id = COINGECKO_IDS[(ticker || '').trim().toUpperCase()];
+  if (!id) throw new Error('no coingecko id');
+  const base = `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd,aud,idr`;
+  const candidates = [base, 'https://corsproxy.io/?' + encodeURIComponent(base)];
+  for (const url of candidates) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) continue;
+      const j = await r.json();
+      const row = j[id];
+      const v = row && row[(ccy || 'usd').toLowerCase()];
+      if (typeof v === 'number') return v;
+    } catch (e) { /* try next candidate */ }
+  }
+  throw new Error('CG ' + id + ' unavailable');
+}
+
+// Render the market overview strip. force=true bypasses 5-min cache.
+async function renderMarketStrip(force) {
+  const el = document.getElementById('mktStrip');
+  if (!el) return;
+  const snap = store('marketSnapshot') || { indices: {}, lastFetched: null };
+  const fresh = snap.lastFetched && (Date.now() - new Date(snap.lastFetched).getTime() < 5 * 60 * 1000);
+  // Fetch unless we have a fresh cache and weren't forced
+  if (force || !fresh) {
+    await Promise.all(MKT_INDICES.map(async ([sym, name]) => {
+      try {
+        const q = await fetchStockPrice(sym, '');
+        snap.indices[sym] = { name, level: q.price, prevClose: q.prevClose, stale: false };
+      } catch (e) {
+        if (snap.indices[sym]) snap.indices[sym].stale = true;
+        else snap.indices[sym] = { name, level: null, prevClose: null, stale: true };
+      }
+    }));
+    snap.lastFetched = new Date().toISOString();
+    store('marketSnapshot', snap);
+    save();
+  }
+  el.innerHTML = MKT_INDICES.map(([sym, name]) => {
+    const d = snap.indices[sym];
+    if (!d || d.level == null) {
+      return `<div class="mkt-tile"><div class="mkt-name">${escHtml(name)}<span class="mkt-stale">no data</span></div><div class="mkt-level">–</div></div>`;
+    }
+    const chg = (d.prevClose != null) ? d.level - d.prevClose : 0;
+    const chgPct = (d.prevClose) ? (chg / d.prevClose * 100) : 0;
+    const cls = chg >= 0 ? 'ok' : 'err';
+    const sign = chg >= 0 ? '+' : '';
+    const lvl = d.level.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    const staleBadge = d.stale ? '<span class="mkt-stale">stale</span>' : '';
+    return `<div class="mkt-tile">
+      <div class="mkt-name">${escHtml(name)}${staleBadge}</div>
+      <div class="mkt-level">${lvl}</div>
+      <div class="mkt-chg" style="color:var(--${cls})">${sign}${chg.toLocaleString(undefined,{maximumFractionDigits:2})} (${sign}${chgPct.toFixed(2)}%)</div>
+    </div>`;
+  }).join('');
+  const ts = document.getElementById('mktTimestamp');
+  if (ts && snap.lastFetched) {
+    ts.textContent = 'Updated ' + new Date(snap.lastFetched).toLocaleString();
+  }
+}
+
+// Refresh prices for every holding (all portfolios) + watchlist items.
+async function refreshAllPrices() {
+  const btn = document.getElementById('refreshPricesBtn');
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Refreshing…'; }
+  const p = store('portfolios') || {};
+  let ok = 0, stale = 0;
+  // Holdings: price currency follows the portfolio
+  for (const key of ['idr', 'usd', 'aud']) {
+    const holdings = (p[key] && p[key].holdings) ? p[key].holdings : [];
+    for (const h of holdings) {
+      if (!h.ticker) continue;
+      try {
+        if (h.type === 'Crypto') h.currentPrice = await fetchCryptoPrice(h.ticker, PORT_CG_CCY[key]);
+        else                     h.currentPrice = (await fetchStockPrice(h.ticker, key)).price;
+        ok++;
+      } catch (e) { stale++; } // keep last known price
+    }
+  }
+  store('portfolios', p);
+  // Watchlist: no portfolio context — crypto if in lookup, else US stock
+  const items = store('watchlist') || [];
+  for (const w of items) {
+    if (!w.ticker) continue;
+    const isCrypto = !!COINGECKO_IDS[(w.ticker || '').trim().toUpperCase()];
+    try {
+      if (isCrypto) w.currentPrice = await fetchCryptoPrice(w.ticker, 'usd');
+      else          w.currentPrice = (await fetchStockPrice(w.ticker, 'usd')).price;
+      ok++;
+    } catch (e) { stale++; }
+  }
+  store('watchlist', items);
+  save();
+  renderHoldings();
+  renderPortfolioSummary();
+  renderWatchlist();
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+  const ts = document.getElementById('mktTimestamp');
+  if (ts) ts.textContent = `Prices updated · ${ok} ok${stale ? ', ' + stale + ' stale' : ''} · ` + new Date().toLocaleTimeString();
+}
+
+// ─── S6: AI reports, strategy Q&A, morning briefing ───────────────────────
+function showInvSubTab(id, el) {
+  document.querySelectorAll('.inv-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.inv-subtab').forEach(t => t.classList.remove('active'));
+  const panel = document.getElementById(id);
+  if (panel) panel.style.display = '';
+  el.classList.add('active');
+  if (id === 'inv-report') renderMonthlyReport();
+  if (id === 'inv-signals') { renderSignalWatchlist(); renderSignalBrief(); renderTradeLog(); }
+}
+
+// Date/month helpers
+function todayKey() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function monthKeyNow() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
+function monthLabel(key) { const [y,m] = key.split('-').map(Number); return new Date(y, m-1, 1).toLocaleString('en-AU', { month:'long', year:'numeric' }); }
+function prevMonthKey(key) { const [y,m] = key.split('-').map(Number); const d = new Date(y, m-2, 1); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
+
+// Supabase Edge Function that proxies to the Anthropic API (avoids browser CORS block).
+const CLAUDE_PROXY_URL = 'https://tbnkoilqtyuykyqmwzpy.supabase.co/functions/v1/smooth-action';
+
+// Call Claude via the Supabase Edge Function proxy. Works in any browser (no Cowork needed).
+async function askCoworkAI(prompt, dataArr) {
+  const r = await fetch(CLAUDE_PROXY_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'apikey': SUPABASE_KEY
+    },
+    body: JSON.stringify({ prompt, data: dataArr || [] })
+  });
+  if (!r.ok) {
+    let detail = '';
+    try { detail = (await r.json()).error || ''; } catch (e) { detail = await r.text().catch(() => ''); }
+    throw new Error('AI request failed (' + r.status + ')' + (detail ? ': ' + detail : ''));
+  }
+  const j = await r.json();
+  return j.text || '';
+}
+
+// Build a rich snapshot of all portfolios for the AI prompts.
+function gatherPortfolioData() {
+  const port = store('portfolios') || {};
+  const rates = appData.rates || {};
+  const result = { portfolios: {}, combined: { audCost: 0, audValue: 0 } };
+  let best = null, worst = null;
+  ['idr','usd','aud'].forEach(k => {
+    const ccy = PORT_CURRENCIES[k];
+    const holdings = (port[k] && port[k].holdings) ? port[k].holdings : [];
+    let cost = 0, mv = 0; const hs = [];
+    holdings.forEach(h => {
+      const c = (h.avgBuyPrice||0) * (h.qty||0);
+      const m = (h.currentPrice||0) * (h.qty||0);
+      const pnl = m - c; const pct = c > 0 ? pnl/c*100 : 0;
+      cost += c; mv += m;
+      const rec = { ticker: h.ticker, name: h.name, type: h.type, qty: h.qty, cost: +c.toFixed(2), marketValue: +m.toFixed(2), pnl: +pnl.toFixed(2), pnlPct: +pct.toFixed(1), currency: ccy };
+      hs.push(rec);
+      if (h.ticker && c > 0) {
+        if (!best  || pct > best.pnlPct)  best  = rec;
+        if (!worst || pct < worst.pnlPct) worst = rec;
+      }
+    });
+    const audCost = toAUD(cost, ccy), audValue = toAUD(mv, ccy);
+    result.portfolios[k] = { currency: ccy, totalCost: +cost.toFixed(2), marketValue: +mv.toFixed(2), pnl: +(mv-cost).toFixed(2), pnlPct: cost>0 ? +((mv-cost)/cost*100).toFixed(1) : 0, audCost: +audCost.toFixed(2), audValue: +audValue.toFixed(2), holdings: hs };
+    result.combined.audCost += audCost; result.combined.audValue += audValue;
+  });
+  result.combined.audCost = +result.combined.audCost.toFixed(2);
+  result.combined.audValue = +result.combined.audValue.toFixed(2);
+  result.combined.audPnl = +(result.combined.audValue - result.combined.audCost).toFixed(2);
+  result.combined.audPnlPct = result.combined.audCost > 0 ? +(result.combined.audPnl / result.combined.audCost * 100).toFixed(1) : 0;
+  result.bestPerformer = best; result.worstPerformer = worst;
+  result.rates = { AUD_IDR: rates.AUD_IDR, AUD_USD: rates.AUD_USD };
+  return result;
+}
+
+async function generateMonthlyReport() {
+  const out = document.getElementById('invReportOutput');
+  const btn = document.getElementById('genReportBtn');
+  const mk = monthKeyNow();
+  const data = gatherPortfolioData();
+  const hist = store('portfolioHistory') || {};
+  data.month = monthLabel(mk);
+  data.baseCurrency = appData.settings.baseCurrency;
+  data.lastMonth = hist[prevMonthKey(mk)] || null;
+  if (out) out.innerHTML = '<p style="color:var(--muted); font-size:12px;">⏳ Generating report…</p>';
+  if (btn) btn.disabled = true;
+  const prompt = `You are a finance analyst. Given this portfolio data for ${data.month}, write a concise monthly investment review: performance summary, top movers, FX impact on AUD value, and 2–3 plain-language observations. Keep it under 300 words. Be direct, no fluff.`;
+  try {
+    const text = await askCoworkAI(prompt, [data]);
+    const reports = store('reports') || {};
+    reports[mk] = { text, generatedAt: new Date().toISOString(), audValue: data.combined.audValue };
+    store('reports', reports); // store() → save() → pushToCloud() → sbUpsert()
+    hist[mk] = { audCost: data.combined.audCost, audValue: data.combined.audValue, audPnl: data.combined.audPnl };
+    store('portfolioHistory', hist);
+    renderMonthlyReport();
+  } catch (e) {
+    if (out) out.innerHTML = `<p style="color:var(--err); font-size:12px;">${escHtml(e.message)}</p>`;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function renderMonthlyReport() {
+  const out = document.getElementById('invReportOutput');
+  if (!out) return;
+  const mk = monthKeyNow();
+  const r = (store('reports') || {})[mk];
+  if (!r) { out.innerHTML = '<p style="color:var(--muted); font-size:12px;">No report yet for ' + monthLabel(mk) + '. Click Generate Report.</p>'; return; }
+  out.innerHTML = `<div class="ai-card">
+    <div style="font-size:11px; color:var(--muted); margin-bottom:8px;">Generated ${new Date(r.generatedAt).toLocaleString()}</div>
+    <div class="ai-output">${escHtml(r.text)}</div>
+  </div>`;
+}
+
+async function askStrategy() {
+  const input = document.getElementById('stratInput');
+  const out = document.getElementById('invStrategyOutput');
+  const q = ((input && input.value) || '').trim();
+  if (!q) { if (out) out.innerHTML = '<p style="color:var(--muted); font-size:12px;">Type a question or pick a quick prompt above.</p>'; return; }
+  const data = gatherPortfolioData();
+  data.baseCurrency = appData.settings.baseCurrency;
+  data.watchlist = (store('watchlist') || []).map(w => ({ ticker: w.ticker, name: w.name, tag: w.tag, currentPrice: w.currentPrice, targetPrice: w.targetPrice }));
+  if (out) out.innerHTML = '<p style="color:var(--muted); font-size:12px;">⏳ Thinking…</p>';
+  const prompt = `You are a portfolio analyst. Here is the user's current portfolio and watchlist data (JSON). Answer this question directly and concisely, referencing their actual holdings where relevant: "${q}". Keep it under 250 words, no fluff.`;
+  try {
+    const text = await askCoworkAI(prompt, [data]);
+    if (out) out.innerHTML = `<div class="ai-card"><div class="ai-output">${escHtml(text)}</div><div class="ai-disclaimer">This is AI-generated analysis, not financial advice.</div></div>`;
+  } catch (e) {
+    if (out) out.innerHTML = `<p style="color:var(--err); font-size:12px;">${escHtml(e.message)}</p>`;
+  }
+}
+
+function quickStrategy(q) {
+  const input = document.getElementById('stratInput');
+  if (input) input.value = q;
+  askStrategy();
+}
+
+// Morning briefing: render today's snapshot if present (written by the 5am task or manual refresh).
+function loadMorningBriefing() {
+  const el = document.getElementById('invBriefing');
+  if (!el) return;
+  const snap = store('marketSnapshot') || {};
+  const daily = (snap.daily && snap.daily[todayKey()]) || null;
+  if (!daily) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+  const stale = (Date.now() - new Date(daily.generatedAt).getTime()) > 12 * 3.6e6;
+  const idxHtml = (daily.indices || []).map(i => {
+    if (i.level == null) return `<span><strong>${escHtml(i.name)}</strong> –</span>`;
+    const chg = i.prevClose != null ? i.level - i.prevClose : 0;
+    const pct = i.prevClose ? chg / i.prevClose * 100 : 0;
+    const cls = chg >= 0 ? 'ok' : 'err'; const sign = chg >= 0 ? '+' : '';
+    return `<span><strong>${escHtml(i.name)}</strong> ${i.level.toLocaleString(undefined,{maximumFractionDigits:2})} <span style="color:var(--${cls})">${sign}${pct.toFixed(2)}%</span></span>`;
+  }).join('');
+  el.innerHTML = `<div class="card" style="margin-bottom:12px; border-left:3px solid var(--gold);">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+      <div class="card-title" style="margin-bottom:0;">☀️ Morning Briefing</div>
+      <span style="font-size:11px; color:var(--muted);">${new Date(daily.generatedAt).toLocaleString()}${stale ? ' <span class="mkt-stale">stale</span>' : ''}</span>
+    </div>
+    <div class="brief-row">${idxHtml || '<span style="color:var(--muted)">No index data</span>'}</div>
+    ${daily.portfolioAudValue != null ? `<div style="margin-top:8px; font-size:12px;">Total portfolio value: <strong>A$ ${daily.portfolioAudValue.toFixed(2)}</strong></div>` : ''}
+    ${stale ? '<button class="btn" style="margin-top:10px; font-size:11px; padding:4px 10px;" onclick="refreshMorningBriefing()">↻ Refresh now</button>' : ''}
+  </div>`;
+}
+
+// Manually build today's snapshot: fetch indices + refresh holdings, then persist to Supabase via store()/save().
+async function refreshMorningBriefing() {
+  const indices = [];
+  await Promise.all(MKT_INDICES.map(async ([sym, name]) => {
+    try { const q = await fetchStockPrice(sym, ''); indices.push({ sym, name, level: q.price, prevClose: q.prevClose }); }
+    catch (e) { indices.push({ sym, name, level: null, prevClose: null }); }
+  }));
+  await refreshAllPrices(); // reuse S5 pipeline, unchanged
+  const data = gatherPortfolioData();
+  const snap = store('marketSnapshot') || { indices: {}, lastFetched: null };
+  if (!snap.daily) snap.daily = {};
+  const ordered = MKT_INDICES.map(([sym, name]) => indices.find(i => i.sym === sym) || { sym, name, level: null, prevClose: null });
+  snap.daily[todayKey()] = { generatedAt: new Date().toISOString(), indices: ordered, portfolioAudValue: data.combined.audValue };
+  store('marketSnapshot', snap); // store() → save() → pushToCloud() → sbUpsert()
+  loadMorningBriefing();
+}
+
+// Settings toggle: enable/disable the daily snapshot preference.
+function toggleDailySnapshot(checked) {
+  saveSetting('dailySnapshotEnabled', checked);
+  const note = document.getElementById('snapshotNote');
+  if (checked) {
+    if (note) note.textContent = 'Daily snapshot enabled. Use the "Refresh now" button in the Investments tab each morning — automatic 5am scheduling requires the Cowork desktop app.';
+  } else if (note) {
+    note.textContent = 'Daily snapshot disabled.';
+  }
+}
+
+// ─── S6B: short-term signals (RSI/SMA/volume + news + AI) ─────────────────
+function SIG_UID() { return 'sig' + Date.now() + Math.random().toString(36).slice(2, 5); }
+
+// 20-day simple moving average of the last `period` values.
+function computeSMA(values, period) {
+  if (!values || values.length < period) return null;
+  const slice = values.slice(-period);
+  return slice.reduce((a, b) => a + b, 0) / period;
+}
+
+// 14-day Wilder's RSI over a close-price series.
+function computeRSI(closes, period) {
+  period = period || 14;
+  if (!closes || closes.length < period + 1) return null;
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const ch = closes[i] - closes[i - 1];
+    if (ch >= 0) gains += ch; else losses -= ch;
+  }
+  let avgGain = gains / period, avgLoss = losses / period;
+  for (let i = period + 1; i < closes.length; i++) {
+    const ch = closes[i] - closes[i - 1];
+    const g = ch > 0 ? ch : 0, l = ch < 0 ? -ch : 0;
+    avgGain = (avgGain * (period - 1) + g) / period;
+    avgLoss = (avgLoss * (period - 1) + l) / period;
+  }
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  return 100 - (100 / (1 + rs));
+}
+
+// Map a signal-watchlist item to a Yahoo symbol. Crypto uses CoinGecko id → symbol → SYM-USD.
+function yfSymbolForSignal(item) {
+  if (item.type === 'Crypto') {
+    const id = (item.ticker || '').trim().toLowerCase();
+    const sym = Object.keys(COINGECKO_IDS).find(k => COINGECKO_IDS[k] === id);
+    return (sym || (item.ticker || '').toUpperCase()) + '-USD';
+  }
+  return (item.ticker || '').trim().toUpperCase();
+}
+
+// Fetch ~30 days of daily closes + volumes from Yahoo Finance.
+async function fetchOHLCV(yfSymbol) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yfSymbol)}?interval=1d&range=1mo`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('OHLCV ' + r.status);
+  const j = await r.json();
+  const res = j && j.chart && j.chart.result && j.chart.result[0];
+  if (!res || !res.indicators || !res.indicators.quote) throw new Error('no data');
+  const q = res.indicators.quote[0];
+  const cRaw = q.close || [], vRaw = q.volume || [];
+  const closes = [], vols = [];
+  for (let i = 0; i < cRaw.length; i++) {
+    if (cRaw[i] != null) { closes.push(cRaw[i]); vols.push(vRaw[i] != null ? vRaw[i] : 0); }
+  }
+  return { closes, vols, price: (res.meta && res.meta.regularMarketPrice) || (closes.length ? closes[closes.length - 1] : null) };
+}
+
+// Fetch up to 3 recent headlines from NewsAPI. Returns [] if no key or on error.
+async function fetchHeadlines(query, key) {
+  if (!key) return [];
+  try {
+    const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&sortBy=publishedAt&pageSize=3&apiKey=${encodeURIComponent(key)}`;
+    const r = await fetch(url);
+    if (!r.ok) return [];
+    const j = await r.json();
+    return (j.articles || []).slice(0, 3).map(a => ({ title: a.title, source: a.source && a.source.name, publishedAt: a.publishedAt }));
+  } catch (e) { return []; }
+}
+
+async function generateSignals() {
+  const list = store('signalWatchlist') || [];
+  const btn = document.getElementById('genSignalsBtn');
+  const brief = document.getElementById('sigBrief');
+  if (!list.length) { if (brief) brief.innerHTML = '<p style="color:var(--muted); font-size:12px;">Add tickers to the Signal Watchlist above first.</p>'; return; }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Scanning…'; }
+  if (brief) brief.innerHTML = '<p style="color:var(--muted); font-size:12px;">⏳ Fetching data and analysing…</p>';
+  const key = (appData.settings && appData.settings.newsApiKey) || '';
+  const dk = todayKey();
+  const results = [];
+  for (const item of list) {
+    if (!item.ticker) continue;
+    const yf = yfSymbolForSignal(item);
+    const sig = { id: SIG_UID(), watchId: item.id, ticker: item.ticker, name: item.name, type: item.type, yfSymbol: yf, generatedAt: new Date().toISOString() };
+    try {
+      const { closes, vols, price } = await fetchOHLCV(yf);
+      const sma20 = computeSMA(closes, 20);
+      const rsi = computeRSI(closes, 14);
+      const vol5 = computeSMA(vols, 5);
+      const todayVol = vols.length ? vols[vols.length - 1] : 0;
+      const volRatio = vol5 ? todayVol / vol5 : null;
+      const vsSma = (sma20 && price) ? (price - sma20) / sma20 * 100 : null;
+      const headlines = await fetchHeadlines(item.ticker, key);
+      sig.metrics = {
+        price: price,
+        rsi: rsi != null ? +rsi.toFixed(1) : null,
+        sma20: sma20 != null ? +sma20.toFixed(4) : null,
+        vsSma20Pct: vsSma != null ? +vsSma.toFixed(2) : null,
+        volumeRatio: volRatio != null ? +volRatio.toFixed(2) : null
+      };
+      sig.headlines = headlines;
+      const prompt = `You are a quantitative trader. Analyse this data for ${item.ticker} and determine if there is a high-conviction short-term opportunity (1 day to 2 weeks). Data: RSI(14)=${sig.metrics.rsi}, price vs 20-day SMA=${sig.metrics.vsSma20Pct}%, volume ratio (today vs 5-day avg)=${sig.metrics.volumeRatio}, recent headlines=${JSON.stringify(headlines.map(h => h.title))}. If yes: state Direction (Long/Short), Entry Zone, Stop-Loss, Target, Time Horizon, Confidence (High/Med/Low), and a 2-sentence reasoning. If no clear opportunity: state 'No signal'. Be specific and direct.`;
+      const text = await askCoworkAI(prompt, [sig.metrics, { headlines }]);
+      sig.analysis = text;
+      sig.noSignal = /no signal/i.test((text || '').slice(0, 60));
+    } catch (e) {
+      sig.error = e.message;
+      sig.analysis = 'Data unavailable: ' + e.message;
+      sig.noSignal = true;
+    }
+    results.push(sig);
+  }
+  const hist = store('signalHistory') || {};
+  hist[dk] = results;
+  store('signalHistory', hist); // store() → save() → pushToCloud()
+  if (btn) { btn.disabled = false; btn.textContent = '✨ Generate Signals'; }
+  renderSignalBrief();
+}
+
+function renderSignalBrief() {
+  const warn = document.getElementById('sigNewsWarn');
+  if (warn) {
+    const key = (appData.settings && appData.settings.newsApiKey) || '';
+    warn.innerHTML = key ? '' : '<p style="font-size:11px; color:var(--warn-c); background:var(--warn-bg); border-radius:4px; padding:6px 10px; margin-bottom:10px;">⚠️ Signal news fetch disabled — add NewsAPI key in Settings (free at newsapi.org)</p>';
+  }
+  const el = document.getElementById('sigBrief');
+  if (!el) return;
+  const hist = store('signalHistory') || {};
+  const keys = Object.keys(hist).sort();
+  if (!keys.length) { el.innerHTML = '<p style="color:var(--muted); font-size:12px;">No signals yet. Click Generate Signals.</p>'; return; }
+  const latest = keys[keys.length - 1];
+  const sigs = hist[latest] || [];
+  el.innerHTML = `<p style="font-size:11px; color:var(--muted); margin-bottom:8px;">Latest scan: ${new Date(latest).toLocaleDateString()} · ${sigs.length} ticker${sigs.length !== 1 ? 's' : ''}</p>` + (sigs.length ? sigs.map(renderSignalCard).join('') : '<p style="color:var(--muted); font-size:12px;">No tickers scanned.</p>');
+}
+
+function renderSignalCard(sig) {
+  const m = sig.metrics || {};
+  const txt = sig.analysis || '';
+  let dirCls = 'dir-none', dirLbl = 'No signal';
+  if (!sig.noSignal) {
+    if (/\bshort\b/i.test(txt)) { dirCls = 'dir-short'; dirLbl = 'Short'; }
+    else if (/\blong\b/i.test(txt)) { dirCls = 'dir-long'; dirLbl = 'Long'; }
+    else { dirCls = 'dir-long'; dirLbl = 'Signal'; }
+  }
+  let confHtml = '';
+  const cm = txt.match(/confidence[:\s]*\b(high|med|medium|low)\b/i);
+  if (cm) {
+    const c = cm[1].toLowerCase();
+    const cls = c[0] === 'h' ? 'conf-high' : c[0] === 'l' ? 'conf-low' : 'conf-med';
+    const lbl = c[0] === 'h' ? 'High' : c[0] === 'l' ? 'Low' : 'Med';
+    confHtml = `<span class="${cls}">${lbl} conf</span>`;
+  }
+  const metricsHtml = `<div class="sig-metrics">
+    <span>RSI(14): <strong>${m.rsi != null ? m.rsi : '–'}</strong></span>
+    <span>vs 20SMA: <strong>${m.vsSma20Pct != null ? (m.vsSma20Pct > 0 ? '+' : '') + m.vsSma20Pct + '%' : '–'}</strong></span>
+    <span>Vol ratio: <strong>${m.volumeRatio != null ? m.volumeRatio : '–'}</strong></span>
+    <span>Price: <strong>${m.price != null ? m.price.toLocaleString(undefined, { maximumFractionDigits: 4 }) : '–'}</strong></span>
+  </div>`;
+  const headHtml = (sig.headlines && sig.headlines.length)
+    ? `<div style="font-size:10px; color:var(--muted); margin-top:6px;">📰 ${sig.headlines.map(h => escHtml(h.title || '')).join(' · ')}</div>` : '';
+  return `<div class="sig-card${sig.noSignal ? ' muted' : ''}">
+    <div class="sig-head">
+      <span class="sig-ticker">${escHtml(sig.ticker || '')}</span>
+      <span style="font-size:11px; color:var(--muted);">${escHtml(sig.name || '')}</span>
+      <span class="${dirCls}">${dirLbl}</span>
+      ${confHtml}
+      ${!sig.noSignal ? `<button class="btn" style="font-size:10px; padding:2px 8px; margin-left:auto;" onclick="logTradeFromSignal('${sig.id}')">+ Log trade</button>` : ''}
+    </div>
+    ${metricsHtml}
+    <div class="sig-reason" style="white-space:pre-wrap;">${escHtml(txt)}</div>
+    ${headHtml}
+    <div class="sig-time">Signal ID ${sig.id} · ${new Date(sig.generatedAt).toLocaleString()}</div>
+  </div>`;
+}
+
+// ── Signal watchlist CRUD ──
+function renderSignalWatchlist() {
+  const el = document.getElementById('sigWatchlist');
+  if (!el) return;
+  const items = store('signalWatchlist') || [];
+  if (!items.length) { el.innerHTML = '<p style="color:var(--muted); font-size:12px;">No signal tickers yet. Click + Add.</p>'; return; }
+  el.innerHTML = `<div style="overflow-x:auto;"><table class="inv-watch-tbl">
+    <thead><tr><th>Ticker / ID</th><th>Name</th><th>Type</th><th>Exchange</th><th></th></tr></thead>
+    <tbody>${items.map(renderSigWatchRow).join('')}</tbody></table></div>`;
+}
+function renderSigWatchRow(w) {
+  const typeOpts = ['Stock','Crypto'].map(t => `<option${w.type === t ? ' selected' : ''}>${t}</option>`).join('');
+  const exOpts = ['NYSE','NASDAQ','Crypto'].map(t => `<option${w.exchange === t ? ' selected' : ''}>${t}</option>`).join('');
+  return `<tr>
+    <td><input type="text" value="${escHtml(w.ticker || '')}" style="width:90px" onchange="updSignalWatch('${w.id}','ticker',this.value)"></td>
+    <td><input type="text" value="${escHtml(w.name || '')}" style="width:120px" onchange="updSignalWatch('${w.id}','name',this.value)"></td>
+    <td><select onchange="updSignalWatch('${w.id}','type',this.value)">${typeOpts}</select></td>
+    <td><select onchange="updSignalWatch('${w.id}','exchange',this.value)">${exOpts}</select></td>
+    <td><button class="btn" style="font-size:10px; padding:2px 6px; background:var(--err-bg); color:var(--err); border:none;" onclick="deleteSignalWatch('${w.id}')">✕</button></td>
+  </tr>`;
+}
+function addSignalWatch() {
+  const items = store('signalWatchlist') || [];
+  items.push({ id: SIG_UID(), ticker: '', name: '', type: 'Stock', exchange: 'NYSE' });
+  store('signalWatchlist', items);
+  renderSignalWatchlist();
+}
+function updSignalWatch(id, field, val) {
+  const items = store('signalWatchlist') || [];
+  const w = items.find(x => x.id === id);
+  if (w) { w[field] = val; store('signalWatchlist', items); }
+}
+function deleteSignalWatch(id) {
+  store('signalWatchlist', (store('signalWatchlist') || []).filter(w => w.id !== id));
+  renderSignalWatchlist();
+}
+
+// ── Trade log ──
+function computeTradePnl(t) {
+  if (!t.entryPrice || !t.exitPrice) return null;
+  const raw = (t.exitPrice - t.entryPrice) / t.entryPrice * 100;
+  return t.direction === 'Short' ? -raw : raw;
+}
+function renderTradeLog() {
+  renderTradeStats();
+  const el = document.getElementById('sigTradeLog');
+  if (!el) return;
+  const trades = store('signalTrades') || [];
+  if (!trades.length) { el.innerHTML = '<p style="color:var(--muted); font-size:12px;">No trades logged yet. Use "+ Log trade" on a signal card, or + Add.</p>'; return; }
+  el.innerHTML = `<div style="overflow-x:auto;"><table class="inv-watch-tbl">
+    <thead><tr><th>Ticker</th><th>Dir</th><th>Entry</th><th>Date In</th><th>Exit</th><th>Date Out</th><th>P&amp;L %</th><th>Status</th><th>Signal</th><th></th></tr></thead>
+    <tbody>${trades.map(renderTradeRow).join('')}</tbody></table></div>`;
+}
+function renderTradeRow(t) {
+  const pnl = computeTradePnl(t);
+  const pnlCls = pnl == null ? '' : pnl >= 0 ? 'ok' : 'err';
+  const dirOpts = ['Long','Short'].map(s => `<option${t.direction === s ? ' selected' : ''}>${s}</option>`).join('');
+  const statusOpts = ['Open','Closed','Stopped Out'].map(s => `<option${t.status === s ? ' selected' : ''}>${s}</option>`).join('');
+  return `<tr>
+    <td><input type="text" value="${escHtml(t.ticker || '')}" style="width:70px" onchange="updTrade('${t.id}','ticker',this.value)"></td>
+    <td><select onchange="updTrade('${t.id}','direction',this.value)">${dirOpts}</select></td>
+    <td><input type="number" step="any" value="${t.entryPrice || 0}" style="width:80px" onchange="updTrade('${t.id}','entryPrice',+this.value)"></td>
+    <td><input type="date" value="${t.dateEntered || ''}" onchange="updTrade('${t.id}','dateEntered',this.value)"></td>
+    <td><input type="number" step="any" value="${t.exitPrice || 0}" style="width:80px" onchange="updTrade('${t.id}','exitPrice',+this.value)"></td>
+    <td><input type="date" value="${t.dateExited || ''}" onchange="updTrade('${t.id}','dateExited',this.value)"></td>
+    <td style="color:var(--${pnlCls})">${pnl == null ? '–' : (pnl >= 0 ? '+' : '') + pnl.toFixed(1) + '%'}</td>
+    <td><select onchange="updTrade('${t.id}','status',this.value)">${statusOpts}</select></td>
+    <td style="font-size:10px; color:var(--muted)">${escHtml(t.signalId || '')}</td>
+    <td><button class="btn" style="font-size:10px; padding:2px 6px; background:var(--err-bg); color:var(--err); border:none;" onclick="deleteTrade('${t.id}')">✕</button></td>
+  </tr>`;
+}
+function addTrade(sig) {
+  const trades = store('signalTrades') || [];
+  const base = { id: SIG_UID(), ticker: '', direction: 'Long', entryPrice: 0, dateEntered: todayKey(), exitPrice: 0, dateExited: '', status: 'Open', signalId: '' };
+  if (sig && sig.id) {
+    base.ticker = sig.ticker || '';
+    base.signalId = sig.id;
+    if (/\bshort\b/i.test(sig.analysis || '')) base.direction = 'Short';
+  }
+  trades.push(base);
+  store('signalTrades', trades);
+  renderTradeLog();
+}
+function updTrade(id, field, val) {
+  const trades = store('signalTrades') || [];
+  const t = trades.find(x => x.id === id);
+  if (t) { t[field] = val; store('signalTrades', trades); renderTradeStats(); }
+}
+function deleteTrade(id) {
+  store('signalTrades', (store('signalTrades') || []).filter(t => t.id !== id));
+  renderTradeLog();
+}
+function logTradeFromSignal(sigId) {
+  const hist = store('signalHistory') || {};
+  let found = null;
+  Object.keys(hist).forEach(k => (hist[k] || []).forEach(s => { if (s.id === sigId) found = s; }));
+  addTrade(found || { id: sigId });
+  const el = document.getElementById('sigTradeLog');
+  if (el) el.scrollIntoView({ behavior: 'smooth' });
+}
+function renderTradeStats() {
+  const el = document.getElementById('sigTradeStats');
+  if (!el) return;
+  const trades = store('signalTrades') || [];
+  const closed = trades.filter(t => t.status === 'Closed' || t.status === 'Stopped Out');
+  const pnls = closed.map(computeTradePnl).filter(v => v != null);
+  const wins = pnls.filter(v => v > 0).length;
+  const winRate = pnls.length ? wins / pnls.length * 100 : 0;
+  const avg = pnls.length ? pnls.reduce((a, b) => a + b, 0) / pnls.length : 0;
+  const hitTarget = closed.filter(t => t.status === 'Closed' && (computeTradePnl(t) || 0) > 0).length;
+  const accuracy = closed.length ? hitTarget / closed.length * 100 : 0;
+  el.innerHTML = `<div class="sig-stats">
+    <div class="sig-stat"><div class="sig-stat-lbl">Win Rate</div><div class="sig-stat-val">${winRate.toFixed(0)}%</div></div>
+    <div class="sig-stat"><div class="sig-stat-lbl">Avg P&amp;L</div><div class="sig-stat-val" style="color:var(--${avg >= 0 ? 'ok' : 'err'})">${avg >= 0 ? '+' : ''}${avg.toFixed(1)}%</div></div>
+    <div class="sig-stat"><div class="sig-stat-lbl">Accuracy</div><div class="sig-stat-val">${accuracy.toFixed(0)}%</div></div>
+    <div class="sig-stat"><div class="sig-stat-lbl">Closed</div><div class="sig-stat-val">${closed.length}</div></div>
+  </div>`;
+}
+
+function initInvestments() {
+  // Lazy seed — also done in migrate(), this is a safety net
+  const p = store('portfolios') || { idr: { holdings: [] }, usd: { holdings: [] }, aud: { holdings: [] } };
+  ['idr','usd','aud'].forEach(k => {
+    if (!p[k]) p[k] = { holdings: [] };
+    if (!Array.isArray(p[k].holdings)) p[k].holdings = [];
+  });
+  store('portfolios', p);
+  if (!store('watchlist')) store('watchlist', []);
+  // Reset to IDR tab on each open
+  activePortfolio = 'idr';
+  document.querySelectorAll('.inv-port-tab').forEach((b, i) => b.classList.toggle('active', i === 0));
+  renderPortfolioSummary();
+  renderHoldings();
+  renderWatchlist();
+  renderMarketStrip(false); // fetch on load (uses 5-min cache)
+  // S6: reset to Portfolio sub-tab, show morning briefing if present
+  document.querySelectorAll('.inv-panel').forEach(p => p.style.display = (p.id === 'inv-portfolio') ? '' : 'none');
+  document.querySelectorAll('.inv-subtab').forEach((t, i) => t.classList.toggle('active', i === 0));
+  loadMorningBriefing();
+}
+
+function showInvPortfolio(key, btn) {
+  activePortfolio = key;
+  document.querySelectorAll('.inv-port-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderPortfolioSummary();
+  renderHoldings();
+}
+
+function renderPortfolioSummary() {
+  const el = document.getElementById('invSummary');
+  if (!el) return;
+  const currency = PORT_CURRENCIES[activePortfolio];
+  const port = store('portfolios') || {};
+  const holdings = (port[activePortfolio] && port[activePortfolio].holdings) ? port[activePortfolio].holdings : [];
+  let totalCost = 0, totalMV = 0;
+  holdings.forEach(h => {
+    totalCost += (h.avgBuyPrice || 0) * (h.qty || 0);
+    totalMV   += (h.currentPrice || 0) * (h.qty || 0);
+  });
+  const totalPnL    = totalMV - totalCost;
+  const totalPnLPct = totalCost > 0 ? (totalPnL / totalCost * 100) : 0;
+  const pnlCls  = totalPnL >= 0 ? 'ok' : 'err';
+  const pnlSign = totalPnL >= 0 ? '+' : '';
+  el.innerHTML = `
+    <div class="inv-sum-grid">
+      <div class="inv-sum-item">
+        <div class="inv-sum-label">Total Cost</div>
+        <div class="inv-sum-val">${fmtMoney(totalCost, currency)}</div>
+      </div>
+      <div class="inv-sum-item">
+        <div class="inv-sum-label">Market Value</div>
+        <div class="inv-sum-val">${fmtMoney(totalMV, currency)}</div>
+      </div>
+      <div class="inv-sum-item">
+        <div class="inv-sum-label">P&amp;L</div>
+        <div class="inv-sum-val" style="color:var(--${pnlCls})">${pnlSign}${fmtMoney(totalPnL, currency)}</div>
+      </div>
+      <div class="inv-sum-item">
+        <div class="inv-sum-label">P&amp;L %</div>
+        <div class="inv-sum-val" style="color:var(--${pnlCls})">${pnlSign}${totalPnLPct.toFixed(1)}%</div>
+      </div>
+      <div class="inv-sum-item">
+        <div class="inv-sum-label">Holdings</div>
+        <div class="inv-sum-val">${holdings.length}</div>
+      </div>
+    </div>`;
+}
+
+function renderHoldings() {
+  const el = document.getElementById('invHoldings');
+  if (!el) return;
+  const currency = PORT_CURRENCIES[activePortfolio];
+  const port = store('portfolios') || {};
+  const holdings = (port[activePortfolio] && port[activePortfolio].holdings) ? port[activePortfolio].holdings : [];
+  if (!holdings.length) {
+    el.innerHTML = '<p style="color:var(--muted); font-size:12px; padding:4px 0;">No holdings yet. Click + Add to get started.</p>';
+    return;
+  }
+  const sym = currency === 'IDR' ? 'Rp' : currency === 'USD' ? 'US$' : 'A$';
+  el.innerHTML = `<div style="overflow-x:auto;">
+    <table class="inv-tbl">
+      <thead><tr>
+        <th style="text-align:left">Ticker</th>
+        <th style="text-align:left">Name</th>
+        <th style="text-align:left">Type</th>
+        <th>Qty</th><th>Avg Buy (${sym})</th><th>Current (${sym})</th>
+        <th>Mkt Value</th><th>P&amp;L</th><th>P&amp;L %</th><th></th>
+      </tr></thead>
+      <tbody>${holdings.map(h => renderHoldingRow(h, currency)).join('')}</tbody>
+    </table></div>`;
+}
+
+function renderHoldingRow(h, currency) {
+  const mv       = (h.currentPrice || 0) * (h.qty || 0);
+  const cost     = (h.avgBuyPrice  || 0) * (h.qty || 0);
+  const pnl      = mv - cost;
+  const pnlPct   = cost > 0 ? (pnl / cost * 100) : 0;
+  const pnlCls   = pnl >= 0 ? 'ok' : 'err';
+  const pnlSign  = pnl >= 0 ? '+' : '';
+  const typeOpts = HOLD_TYPES.map(t => `<option${h.type === t ? ' selected' : ''}>${escHtml(t)}</option>`).join('');
+  return `<tr>
+    <td><input type="text" value="${escHtml(h.ticker || '')}" style="width:65px" onchange="updHolding('${h.id}','ticker',this.value)"></td>
+    <td><input type="text" value="${escHtml(h.name || '')}" style="width:110px" onchange="updHolding('${h.id}','name',this.value)"></td>
+    <td><select onchange="updHolding('${h.id}','type',this.value)">${typeOpts}</select></td>
+    <td><input type="number" value="${h.qty || 0}" min="0" step="any" style="width:68px" onchange="updHolding('${h.id}','qty',+this.value)"></td>
+    <td><input type="number" value="${h.avgBuyPrice || 0}" min="0" step="any" style="width:90px" onchange="updHolding('${h.id}','avgBuyPrice',+this.value)"></td>
+    <td><input type="number" value="${h.currentPrice || 0}" min="0" step="any" style="width:90px" onchange="updHolding('${h.id}','currentPrice',+this.value)"></td>
+    <td>${fmtMoney(mv, currency)}</td>
+    <td style="color:var(--${pnlCls})">${pnlSign}${fmtMoney(pnl, currency)}</td>
+    <td style="color:var(--${pnlCls})">${pnlSign}${pnlPct.toFixed(1)}%</td>
+    <td><button class="btn" style="font-size:10px;padding:2px 6px;background:var(--err-bg);color:var(--err);border:none;" onclick="deleteHolding('${h.id}')">✕</button></td>
+  </tr>`;
+}
+
+function addHolding() {
+  const p = store('portfolios');
+  if (!p[activePortfolio]) p[activePortfolio] = { holdings: [] };
+  if (!Array.isArray(p[activePortfolio].holdings)) p[activePortfolio].holdings = [];
+  p[activePortfolio].holdings.push({ id: Date.now().toString(), ticker: '', name: '', type: 'Stock', qty: 0, avgBuyPrice: 0, currentPrice: 0 });
+  store('portfolios', p);
+  save();
+  renderHoldings();
+  renderPortfolioSummary();
+}
+
+function updHolding(id, field, val) {
+  const p = store('portfolios');
+  const h = (p[activePortfolio].holdings || []).find(x => x.id === id);
+  if (h) { h[field] = val; store('portfolios', p); save(); }
+  renderPortfolioSummary();
+}
+
+function deleteHolding(id) {
+  const p = store('portfolios');
+  p[activePortfolio].holdings = (p[activePortfolio].holdings || []).filter(h => h.id !== id);
+  store('portfolios', p);
+  save();
+  renderHoldings();
+  renderPortfolioSummary();
+}
+
+function renderWatchlist() {
+  const el = document.getElementById('invWatchlist');
+  if (!el) return;
+  const items = store('watchlist') || [];
+  if (!items.length) {
+    el.innerHTML = '<p style="color:var(--muted); font-size:12px; padding:4px 0;">No watchlist items yet. Click + Add to get started.</p>';
+    return;
+  }
+  el.innerHTML = `<div style="overflow-x:auto;">
+    <table class="inv-watch-tbl">
+      <thead><tr>
+        <th>Ticker</th><th>Name</th><th>Tag</th>
+        <th>Current Price</th><th>Target Price</th><th>Notes</th><th></th>
+      </tr></thead>
+      <tbody>${items.map(w => renderWatchRow(w)).join('')}</tbody>
+    </table></div>`;
+}
+
+function renderWatchRow(w) {
+  const tagOpts = WATCH_TAGS.map(t => `<option${w.tag === t ? ' selected' : ''}>${escHtml(t)}</option>`).join('');
+  const tagCls  = w.tag === 'Buy' ? 'tag-buy' : w.tag === 'Avoid' ? 'tag-avoid' : 'tag-watch';
+  return `<tr>
+    <td><input type="text" value="${escHtml(w.ticker || '')}" style="width:65px" onchange="updWatchItem('${w.id}','ticker',this.value)"></td>
+    <td><input type="text" value="${escHtml(w.name || '')}" style="width:100px" onchange="updWatchItem('${w.id}','name',this.value)"></td>
+    <td><select onchange="updWatchItem('${w.id}','tag',this.value)">${tagOpts}</select></td>
+    <td><input type="number" value="${w.currentPrice || 0}" min="0" step="any" style="width:85px" onchange="updWatchItem('${w.id}','currentPrice',+this.value)"></td>
+    <td><input type="number" value="${w.targetPrice || 0}" min="0" step="any" style="width:85px" onchange="updWatchItem('${w.id}','targetPrice',+this.value)"></td>
+    <td><input type="text" value="${escHtml(w.notes || '')}" style="width:130px" onchange="updWatchItem('${w.id}','notes',this.value)"></td>
+    <td><button class="btn" style="font-size:10px;padding:2px 6px;background:var(--err-bg);color:var(--err);border:none;" onclick="deleteWatchItem('${w.id}')">✕</button></td>
+  </tr>`;
+}
+
+function addWatchItem() {
+  const items = store('watchlist') || [];
+  items.push({ id: Date.now().toString(), ticker: '', name: '', tag: 'Watch', currentPrice: 0, targetPrice: 0, notes: '' });
+  store('watchlist', items);
+  save();
+  renderWatchlist();
+}
+
+function updWatchItem(id, field, val) {
+  const items = store('watchlist') || [];
+  const w = items.find(x => x.id === id);
+  if (w) { w[field] = val; store('watchlist', items); save(); }
+}
+
+function deleteWatchItem(id) {
+  const items = (store('watchlist') || []).filter(w => w.id !== id);
+  store('watchlist', items);
+  save();
+  renderWatchlist();
+}
+
+// ─── S7: Income Tab ───────────────────────────────────────────────────────
+
+const INCOME_TYPES = ['Salary','Freelance','Dividend','Other'];
+const INCOME_TYPE_BUDGET_MAP = { Salary: 'salary', Freelance: 'sideIncome', Dividend: 'otherIncome', Other: 'otherIncome' };
+const DEDUCTION_CATS = ['Work-from-home','Professional fees','Self-education','Donations','Investment expenses','Other'];
+
+function initIncome() {
+  if (!Array.isArray(store('income'))) store('income', []);
+  if (!Array.isArray(store('deductions'))) store('deductions', []);
+  renderStressScore();
+  renderIncomeTable();
+  renderIncomeSummary();
+}
+
+// ── Financial Stress Score ────────────────────────────────────────────────
+function renderStressScore() {
+  const el = document.getElementById('stressScoreBody');
+  if (!el) return;
+  const settings = appData.settings || {};
+  const nextPayStr = settings.nextPayDate;
+  const salary = parseFloat(settings.monthlySalary) || 0;
+
+  if (!nextPayStr) {
+    el.innerHTML = '<span style="color:var(--muted);">Set your Next Pay Date in Settings to enable this score.</span>';
+    return;
+  }
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const nextPay = new Date(nextPayStr); nextPay.setHours(0,0,0,0);
+  const daysUntilPay = Math.max(0, Math.round((nextPay - today) / 86400000));
+
+  // Daily burn = average daily spending over last 30 days
+  const spending = store('spending') || [];
+  const rates = appData.rates || {};
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+  let totalSpend30 = 0;
+  spending.forEach(s => {
+    const d = new Date(s.date);
+    if (d >= cutoff) totalSpend30 += toAUD(parseFloat(s.amount) || 0, s.currency || 'AUD');
+  });
+  const dailyBurn = totalSpend30 / 30;
+
+  // Estimated balance at next pay = (daily salary accrual × days) − projected spend
+  const dailySalaryAccrual = salary / 30;
+  const projectedBalance = (dailySalaryAccrual - dailyBurn) * daysUntilPay;
+
+  let score, color, label;
+  if (dailyBurn <= 0) {
+    el.innerHTML = '<span style="color:var(--muted);">No spending data in the last 30 days. Add entries in the Spending tab to enable this score.</span>';
+    return;
+  }
+  score = daysUntilPay / (dailyBurn > 0 ? 1 : 1); // ratio of days until pay vs daily burn as AUD
+  // Score = days of runway = days until pay / (daily burn / daily accrual)
+  score = daysUntilPay > 0 ? (dailySalaryAccrual / dailyBurn) : 0;
+
+  if (score >= 1.5)      { color = 'var(--ok)';    label = "You're comfortable"; }
+  else if (score >= 0.8) { color = 'var(--amber)';  label = 'Keep an eye on spending'; }
+  else                   { color = 'var(--err)';    label = 'Tight until next pay'; }
+
+  el.innerHTML = `
+    <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+      <div style="text-align:center;">
+        <div style="font-size:32px; font-weight:700; color:${color};">${score.toFixed(2)}</div>
+        <div style="font-size:11px; color:${color}; font-weight:600;">${label}</div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 24px; font-size:12px;">
+        <div><span style="color:var(--muted);">Days until next pay</span><br><strong>${daysUntilPay}</strong></div>
+        <div><span style="color:var(--muted);">Daily burn rate (30d avg)</span><br><strong>${fmtMoney(toBase(dailyBurn,'AUD'), appData.settings.baseCurrency)}</strong></div>
+        <div><span style="color:var(--muted);">Daily salary accrual</span><br><strong>${fmtMoney(toBase(dailySalaryAccrual,'AUD'), appData.settings.baseCurrency)}</strong></div>
+        <div><span style="color:var(--muted);">Projected net by pay day</span><br><strong style="color:${projectedBalance>=0?'var(--ok)':'var(--err)'};">${projectedBalance>=0?'+':''}${fmtMoney(toBase(projectedBalance,'AUD'), appData.settings.baseCurrency)}</strong></div>
+      </div>
+    </div>`;
+}
+
+// ── Income Log ────────────────────────────────────────────────────────────
+function renderIncomeTable() {
+  const tbody = document.getElementById('incomeTbody');
+  const totalEl = document.getElementById('incomeMonthlyTotal');
+  if (!tbody) return;
+  const list = (store('income') || []).slice().sort((a,b) => b.date.localeCompare(a.date));
+  const base = appData.settings.baseCurrency || 'AUD';
+  // Monthly total (current month)
+  const mk = monthKeyNow ? monthKeyNow() : new Date().toISOString().slice(0,7);
+  let monthTotal = 0;
+  list.forEach(e => { if ((e.date||'').startsWith(mk)) monthTotal += toAUD(parseFloat(e.amount)||0, e.currency||'AUD'); });
+  if (totalEl) totalEl.textContent = `This month total: ${fmtMoney(toBase(monthTotal,'AUD'), base)}`;
+
+  if (!list.length) { tbody.innerHTML = `<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:16px;">No income entries yet — click + Add Income to start.</td></tr>`; return; }
+
+  const typeOpts = INCOME_TYPES.map(t => `<option value="${t}">${t}</option>`).join('');
+  tbody.innerHTML = list.map(e => {
+    const audVal = toAUD(parseFloat(e.amount)||0, e.currency||'AUD');
+    return `<tr>
+      <td><input type="date" value="${e.date||''}" style="font-size:11px;border:none;background:transparent;color:var(--txt);" onchange="updIncome('${e.id}','date',this.value)"></td>
+      <td><input type="text" value="${escHtml(e.source||'')}" maxlength="60" placeholder="e.g. KPMG" style="width:110px;font-size:11px;" onchange="updIncome('${e.id}','source',this.value)"></td>
+      <td><input type="number" min="0" step="0.01" value="${e.amount||''}" style="width:90px;font-size:11px;" onchange="updIncome('${e.id}','amount',parseFloat(this.value)||0)"></td>
+      <td><select style="font-size:11px;" onchange="updIncome('${e.id}','currency',this.value)">
+        <option value="AUD" ${(e.currency||'AUD')==='AUD'?'selected':''}>AUD</option>
+        <option value="IDR" ${e.currency==='IDR'?'selected':''}>IDR</option>
+        <option value="USD" ${e.currency==='USD'?'selected':''}>USD</option>
+      </select></td>
+      <td><select style="font-size:11px;" onchange="updIncome('${e.id}','type',this.value)">
+        ${INCOME_TYPES.map(t=>`<option value="${t}" ${e.type===t?'selected':''}>${t}</option>`).join('')}
+      </select></td>
+      <td style="text-align:right;">${fmtMoney(toBase(audVal,'AUD'), base)}</td>
+      <td style="text-align:center;"><button class="btn" style="font-size:10px;padding:3px 8px;" onclick="postIncomeToBudget('${e.id}')">Post</button></td>
+      <td><button class="btn-del" onclick="deleteIncome('${e.id}')">×</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function addIncome() {
+  const list = store('income') || [];
+  list.unshift({ id: 'inc_'+Date.now(), date: new Date().toISOString().slice(0,10), source: '', amount: 0, currency: 'AUD', type: 'Salary' });
+  store('income', list); save();
+  renderIncomeTable(); renderIncomeSummary(); renderStressScore();
+}
+function updIncome(id, field, val) {
+  const list = store('income') || [];
+  const idx = list.findIndex(e => e.id === id);
+  if (idx < 0) return;
+  list[idx][field] = val; store('income', list); save();
+  renderIncomeTable(); renderIncomeSummary();
+}
+function deleteIncome(id) {
+  store('income', (store('income')||[]).filter(e => e.id !== id)); save();
+  renderIncomeTable(); renderIncomeSummary(); renderStressScore();
+}
+
+function postIncomeToBudget(id) {
+  const entry = (store('income')||[]).find(e => e.id === id);
+  if (!entry) return;
+  const mk = (entry.date||'').slice(0,7);
+  if (!mk) return alert('Entry has no date — cannot post to budget.');
+  const budget = store('budget') || {};
+  if (!budget[mk]) budget[mk] = { income: {}, expenses: {} };
+  const row = INCOME_TYPE_BUDGET_MAP[entry.type] || 'otherIncome';
+  const audAmt = toAUD(parseFloat(entry.amount)||0, entry.currency||'AUD');
+  budget[mk].income[row] = (parseFloat(budget[mk].income[row])||0) + audAmt;
+  store('budget', budget); save();
+  alert(`Posted ${fmtMoney(audAmt,'AUD')} to ${row} row in Budget for ${mk}.`);
+}
+
+// ── Income YTD Summary ────────────────────────────────────────────────────
+function renderIncomeSummary() {
+  const el = document.getElementById('incomeSummary');
+  if (!el) return;
+  const list = store('income') || [];
+  const base = appData.settings.baseCurrency || 'AUD';
+  const fy = currentFY();
+  const fyList = list.filter(e => inFY(e.date, fy));
+  if (!fyList.length) { el.innerHTML = '<span style="color:var(--muted);">No income entries for this FY yet.</span>'; return; }
+
+  // Group by source
+  const bySource = {};
+  const byType = {};
+  fyList.forEach(e => {
+    const audAmt = toAUD(parseFloat(e.amount)||0, e.currency||'AUD');
+    const src = e.source || 'Unknown';
+    bySource[src] = (bySource[src]||0) + audAmt;
+    const t = e.type || 'Other';
+    byType[t] = (byType[t]||0) + audAmt;
+  });
+  const totalAUD = Object.values(bySource).reduce((a,b)=>a+b,0);
+
+  const srcRows = Object.entries(bySource).sort((a,b)=>b[1]-a[1]).map(([src,amt]) =>
+    `<tr><td>${escHtml(src)}</td><td style="text-align:right;">${fmtMoney(toBase(amt,'AUD'),base)}</td><td style="text-align:right;color:var(--muted);">${(amt/totalAUD*100).toFixed(1)}%</td></tr>`
+  ).join('');
+  const typeRows = Object.entries(byType).sort((a,b)=>b[1]-a[1]).map(([t,amt])=>
+    `<tr><td>${t}</td><td style="text-align:right;">${fmtMoney(toBase(amt,'AUD'),base)}</td></tr>`
+  ).join('');
+
+  el.innerHTML = `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; flex-wrap:wrap;">
+      <div>
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px;">By Source — FY${fy.start}–${String(fy.end).slice(2)}</div>
+        <table class="inv-tbl" style="width:100%;"><thead><tr><th>Source</th><th>YTD (${base})</th><th>%</th></tr></thead><tbody>${srcRows}</tbody>
+        <tfoot><tr style="font-weight:600;"><td>Total</td><td style="text-align:right;">${fmtMoney(toBase(totalAUD,'AUD'),base)}</td><td></td></tr></tfoot></table>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px;">By Type</div>
+        <table class="inv-tbl" style="width:100%;"><thead><tr><th>Type</th><th>YTD (${base})</th></tr></thead><tbody>${typeRows}</tbody></table>
+      </div>
+    </div>`;
+}
+
+// ── FY helpers ────────────────────────────────────────────────────────────
+function currentFY() {
+  const fyStart = parseInt(appData.settings.fyStartMonth) || 7;
+  const now = new Date();
+  const m = now.getMonth() + 1;
+  const y = now.getFullYear();
+  const start = m >= fyStart ? y : y - 1;
+  return { start, end: start + 1 };
+}
+function inFY(dateStr, fy) {
+  if (!dateStr) return false;
+  const fyStart = parseInt(appData.settings.fyStartMonth) || 7;
+  const d = new Date(dateStr);
+  const m = d.getMonth() + 1; const y = d.getFullYear();
+  if (m >= fyStart) return y === fy.start;
+  return y === fy.end;
+}
+
+// ─── S7: Tax Tab ──────────────────────────────────────────────────────────
+
+function initTax() {
+  if (!Array.isArray(store('deductions'))) store('deductions', []);
+  renderDeductionTable();
+  // Pre-fill income from income log
+  const fy = currentFY();
+  const list = store('income') || [];
+  const audIncome = (list.filter(e => inFY(e.date, fy))).reduce((s,e) => s + toAUD(parseFloat(e.amount)||0, e.currency||'AUD'), 0);
+  const incEl = document.getElementById('taxIncomeInput');
+  if (incEl && !incEl.value) incEl.value = audIncome.toFixed(0);
+  const paygEl = document.getElementById('taxPaygInput');
+  const ts = store('taxState') || {};
+  if (paygEl && ts.paygYTD) paygEl.value = ts.paygYTD;
+  renderTaxEstimator();
+}
+
+function renderTaxEstimator() {
+  const el = document.getElementById('taxEstimatorOutput');
+  if (!el) return;
+
+  const incomeRaw = parseFloat(document.getElementById('taxIncomeInput')?.value) || 0;
+  const paygRaw   = parseFloat(document.getElementById('taxPaygInput')?.value)   || 0;
+
+  // Save PAYG
+  const ts = store('taxState') || {};
+  ts.paygYTD = paygRaw; store('taxState', ts); save();
+
+  // Total deductions
+  const deductions = store('deductions') || [];
+  const totalDeductions = deductions.reduce((s,d) => s + (parseFloat(d.amount)||0), 0);
+  const taxableIncome = Math.max(0, incomeRaw - totalDeductions);
+
+  // ATO FY2026 resident tax brackets
+  let incomeTax = 0;
+  if (taxableIncome <= 18200)       incomeTax = 0;
+  else if (taxableIncome <= 45000)  incomeTax = (taxableIncome - 18200) * 0.19;
+  else if (taxableIncome <= 120000) incomeTax = 5092 + (taxableIncome - 45000) * 0.325;
+  else if (taxableIncome <= 180000) incomeTax = 29467 + (taxableIncome - 120000) * 0.37;
+  else                              incomeTax = 51667 + (taxableIncome - 180000) * 0.45;
+
+  const medicareLevy = taxableIncome * 0.02;
+  const totalTax = incomeTax + medicareLevy;
+  const netIncome = incomeRaw - totalTax;
+  const effectiveRate = incomeRaw > 0 ? (totalTax / incomeRaw * 100) : 0;
+  const marginalRate = taxableIncome <= 18200 ? 0 : taxableIncome <= 45000 ? 19 : taxableIncome <= 120000 ? 32.5 : taxableIncome <= 180000 ? 37 : 45;
+  const refundOwing = paygRaw - totalTax;
+
+  const fmt = v => fmtMoney(v, 'AUD');
+  const refColor = refundOwing >= 0 ? 'var(--ok)' : 'var(--err)';
+  const refLabel = refundOwing >= 0 ? '🎉 Estimated Refund' : '⚠ Estimated Owing';
+
+  el.innerHTML = `
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:14px;">
+      <div class="card" style="padding:12px;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Gross Income</div>
+        <div style="font-size:18px;font-weight:700;">${fmt(incomeRaw)}</div>
+      </div>
+      <div class="card" style="padding:12px;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Total Deductions</div>
+        <div style="font-size:18px;font-weight:700;color:var(--ok);">−${fmt(totalDeductions)}</div>
+      </div>
+      <div class="card" style="padding:12px;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Taxable Income</div>
+        <div style="font-size:18px;font-weight:700;">${fmt(taxableIncome)}</div>
+      </div>
+      <div class="card" style="padding:12px;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Income Tax</div>
+        <div style="font-size:18px;font-weight:700;color:var(--err);">${fmt(incomeTax)}</div>
+      </div>
+      <div class="card" style="padding:12px;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Medicare Levy (2%)</div>
+        <div style="font-size:18px;font-weight:700;color:var(--err);">${fmt(medicareLevy)}</div>
+      </div>
+      <div class="card" style="padding:12px;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Total Tax</div>
+        <div style="font-size:18px;font-weight:700;color:var(--err);">${fmt(totalTax)}</div>
+      </div>
+      <div class="card" style="padding:12px;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Net Income</div>
+        <div style="font-size:18px;font-weight:700;color:var(--ok);">${fmt(netIncome)}</div>
+      </div>
+      <div class="card" style="padding:12px;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Effective Rate</div>
+        <div style="font-size:18px;font-weight:700;">${effectiveRate.toFixed(1)}%</div>
+        <div style="font-size:10px;color:var(--muted);">Marginal: ${marginalRate}%</div>
+      </div>
+    </div>
+    <div class="card" style="padding:14px; border-left:4px solid ${refColor};">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">PAYG Withheld YTD: ${fmt(paygRaw)} &nbsp;|&nbsp; Tax Owed: ${fmt(totalTax)}</div>
+      <div style="font-size:18px;font-weight:700;color:${refColor};">${refLabel}: ${fmt(Math.abs(refundOwing))}</div>
+    </div>`;
+}
+
+// ── Deduction Tracker ─────────────────────────────────────────────────────
+function renderDeductionTable() {
+  const tbody = document.getElementById('deductionTbody');
+  const totalEl = document.getElementById('deductionTotal');
+  if (!tbody) return;
+  const list = store('deductions') || [];
+  const total = list.reduce((s,d) => s + (parseFloat(d.amount)||0), 0);
+  if (totalEl) totalEl.textContent = `Total deductions: ${fmtMoney(total, 'AUD')} — reduces taxable income by this amount.`;
+  if (!list.length) { tbody.innerHTML = `<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:16px;">No deductions yet.</td></tr>`; return; }
+  const catOpts = DEDUCTION_CATS.map(c=>`<option value="${c}">${c}</option>`).join('');
+  tbody.innerHTML = list.map(d => `<tr>
+    <td><input type="text" value="${escHtml(d.description||'')}" maxlength="80" placeholder="e.g. Home office setup" style="width:180px;font-size:11px;" onchange="updDeduction('${d.id}','description',this.value)"></td>
+    <td><select style="font-size:11px;" onchange="updDeduction('${d.id}','category',this.value)">
+      ${DEDUCTION_CATS.map(c=>`<option value="${c}" ${d.category===c?'selected':''}>${c}</option>`).join('')}
+    </select></td>
+    <td><input type="number" min="0" step="0.01" value="${d.amount||''}" style="width:100px;font-size:11px;" onchange="updDeduction('${d.id}','amount',parseFloat(this.value)||0)"></td>
+    <td><button class="btn-del" onclick="deleteDeduction('${d.id}')">×</button></td>
+  </tr>`).join('');
+}
+
+function addDeduction() {
+  const list = store('deductions') || [];
+  list.push({ id: 'ded_'+Date.now(), description: '', category: 'Work-from-home', amount: 0 });
+  store('deductions', list); save();
+  renderDeductionTable(); renderTaxEstimator();
+}
+function updDeduction(id, field, val) {
+  const list = store('deductions') || [];
+  const idx = list.findIndex(d => d.id === id);
+  if (idx < 0) return;
+  list[idx][field] = val; store('deductions', list); save();
+  renderDeductionTable(); renderTaxEstimator();
+}
+function deleteDeduction(id) {
+  store('deductions', (store('deductions')||[]).filter(d => d.id !== id)); save();
+  renderDeductionTable(); renderTaxEstimator();
+}
+
+/// ─── Bug Report + Feature Request prompt generators ────────────────────────
+
+const _PROMPT_HEADER = `Read /Users/michaelsutanto/Library/Mobile Documents/com~apple~CloudDocs/Realm Drive/AI for the World/Project Kangaroo/Reading/Artifact Efficiency Update Rule.md\nRead /Users/michaelsutanto/Library/Mobile Documents/com~apple~CloudDocs/Realm Drive/AI for the World/Project Kangaroo/Finance/Finance Hub Update Notes.md\n\n`;
+const _FILE_LINE = `File: /Users/michaelsutanto/Library/Mobile Documents/com~apple~CloudDocs/Realm Drive/AI for the World/Project Kangaroo/Finance/finance-hub.html\n\n`;
+const _BUG_RULES = `RULES:\n1. Grep for the broken function or section first — do not read the full file.\n2. Read only the targeted 30–60 lines for context.\n3. Edit only the broken block — nothing else.\n4. If the fix requires a user action you cannot perform, tell me EXACTLY what to do step by step before making any code change.\n5. After the fix, confirm what you changed and what to test in the browser to verify it works.\n6. Do NOT bump the version number for a bug fix.`;
+const _FEAT_RULES = `RULES:\n1. Read Update Notes to understand current architecture before adding anything.\n2. Grep for related functions first — do not read the full file.\n3. Add surgically — do not rewrite existing sections.\n4. Follow the surgical edit workflow from the Efficiency Rule.\n5. After building, confirm what was added and what to test.`;
+
+function generateBugPrompt() {
+  const see    = (document.getElementById('bugSee')?.value || '').trim();
+  const should = (document.getElementById('bugShould')?.value || '').trim();
+  if (!see) { alert('Please describe what you see.'); return; }
+  const prompt = _PROMPT_HEADER +
+    `BUG REPORT — Finance Hub\n` + _FILE_LINE +
+    `WHAT I SEE:\n${see}\n\n` +
+    `WHAT SHOULD HAPPEN:\n${should || '(not specified)'}\n\n` +
+    _BUG_RULES;
+  showPromptOutput('bugPromptOut', prompt);
+}
+
+function generateFeaturePrompt() {
+  const title = (document.getElementById('featTitle')?.value || '').trim();
+  const desc  = (document.getElementById('featDesc')?.value || '').trim();
+  if (!title) { alert('Please enter a feature title.'); return; }
+  const prompt = _PROMPT_HEADER +
+    `FEATURE REQUEST — Finance Hub\n` + _FILE_LINE +
+    `FEATURE TITLE:\n${title}\n\n` +
+    `WHAT IT SHOULD DO:\n${desc || '(not specified)'}\n\n` +
+    _FEAT_RULES;
+  showPromptOutput('featPromptOut', prompt);
+}
+
+function showPromptOutput(elId, text) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = `
+    <div style="background:var(--bg);border:1px solid var(--bdr);border-radius:4px;padding:10px;margin-top:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span style="font-size:11px;font-weight:600;color:var(--muted);">Ready to send</span>
+        <button class="btn" style="font-size:11px;padding:3px 10px;" onclick="
+          navigator.clipboard.writeText(${JSON.stringify(text)}).then(()=>{this.textContent='✓ Copied';setTimeout(()=>{this.textContent='Copy'},1500)});
+        ">Copy</button>
+      </div>
+      <pre style="font-size:10px;color:var(--txt);white-space:pre-wrap;word-break:break-word;margin:0;max-height:180px;overflow-y:auto;">${escHtml(text)}</pre>
+    </div>`;
+}
+
+// Legacy stubs (kept so migrate() doesn't error on old featureRequests data)
+function renderFeatureRequests() {
+  const el = document.getElementById('frList');
+  if (!el) return;
+  const list = store('featureRequests') || [];
+  if (!list.length) { el.innerHTML = '<p style="font-size:12px;color:var(--muted);">No requests yet.</p>'; return; }
+  el.innerHTML = list.map(fr => {
+    const badgeColor = fr.priority === 'Must have' ? 'var(--err)' : 'var(--amber)';
+    return `<div style="padding:8px 0; border-top:1px solid var(--bdr); display:flex; gap:10px; align-items:flex-start;">
+      <div style="flex:1;">
+        <div style="font-size:12px; font-weight:600;">${escHtml(fr.title)}
+          <span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${badgeColor};color:#fff;margin-left:6px;">${fr.priority}</span>
+        </div>
+        ${fr.description ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${escHtml(fr.description)}</div>` : ''}
+        <div style="font-size:10px;color:var(--muted);margin-top:2px;">${new Date(fr.submittedAt).toLocaleDateString()}</div>
+      </div>
+      <button class="btn-del" onclick="deleteFeatureRequest('${fr.id}')">×</button>
+    </div>`;
+  }).join('');
+}
+
+function deleteFeatureRequest(id) {
+  store('featureRequests', (store('featureRequests')||[]).filter(f => f.id !== id));
+  save(); renderFeatureRequests();
+}
+
+// Render on Updates tab open — hook into showTab
+const _origShowTab = typeof showTab === 'function' ? showTab : null;
+
+// ─── S8: Export / Import ──────────────────────────────────────────────────
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `finance-hub-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (!parsed || typeof parsed !== 'object') throw new Error('Invalid JSON');
+      appData = migrate(parsed);
+      save();
+      alert('✅ Data imported successfully. The page will reload.');
+      location.reload();
+    } catch (err) {
+      alert('Import failed: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+// ─── S8: Reset All Data ───────────────────────────────────────────────────
+
+function confirmResetData() {
+  const modal = document.getElementById('resetModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+async function resetAllData() {
+  document.getElementById('resetModal').style.display = 'none';
+  // Clear cloud
+  try {
+    await sbUpsert({});
+  } catch (e) { /* continue regardless */ }
+  // Clear localStorage
+  localStorage.removeItem('financeHub_data');
+  appData = migrate(initData());
+  save();
+  alert('All data has been reset.');
+  location.reload();
+}
+
+// ─── S8: Updates tab init ─────────────────────────────────────────────────
+
+function initUpdates() {
+  renderFeatureRequests();
+}
+
+// ─── S9: Auth / Login Gate ────────────────────────────────────────────────
+
+// SHA-256 via Web Crypto API — no library needed
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// Render login body based on whether a password has been set
+function renderLoginOverlay() {
+  const body = document.getElementById('loginBody');
+  if (!body) return;
+  const isFirstLaunch = !appData.authHash;
+  if (isFirstLaunch) {
+    body.innerHTML = `
+      <p style="font-size:13px; font-weight:600; margin-bottom:16px; text-align:center;">Create your password</p>
+      <p style="font-size:11px; color:var(--muted); margin-bottom:16px; line-height:1.6; text-align:center;">This is your first time opening Finance Hub. Set a password to protect your data.</p>
+      <label class="login-label">Password</label>
+      <input type="password" id="loginPassword" class="login-input" placeholder="Choose a password" autocomplete="new-password">
+      <label class="login-label">Confirm Password</label>
+      <input type="password" id="loginPasswordConfirm" class="login-input" placeholder="Confirm password" autocomplete="new-password"
+             onkeydown="if(event.key==='Enter')createPassword()">
+      <div id="loginError" class="login-err"></div>
+      <button class="login-btn" onclick="createPassword()">Create Password</button>`;
+  } else {
+    body.innerHTML = `
+      <p style="font-size:13px; font-weight:600; margin-bottom:16px; text-align:center;">Welcome back</p>
+      <label class="login-label">Password</label>
+      <input type="password" id="loginPassword" class="login-input" placeholder="Enter your password" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter')login()" autofocus>
+      <div id="loginError" class="login-err"></div>
+      <button class="login-btn" onclick="login()">Enter</button>`;
+  }
+}
+
+// Called after loadApp() — show or hide the overlay
+function checkAuth() {
+  if (sessionStorage.getItem('hubSession') === 'authenticated') {
+    document.getElementById('loginOverlay').style.display = 'none';
+    return;
+  }
+  renderLoginOverlay();
+}
+
+async function login() {
+  const pw = (document.getElementById('loginPassword') || {}).value || '';
+  if (!pw) return;
+  const hash = await sha256(pw);
+  if (hash === appData.authHash) {
+    sessionStorage.setItem('hubSession', 'authenticated');
+    document.getElementById('loginOverlay').style.display = 'none';
+  } else {
+    const err = document.getElementById('loginError');
+    if (err) { err.textContent = 'Incorrect password.'; err.style.display = 'block'; }
+    const inp = document.getElementById('loginPassword');
+    if (inp) inp.value = '';
+  }
+}
+
+async function createPassword() {
+  const pw  = (document.getElementById('loginPassword') || {}).value || '';
+  const pw2 = (document.getElementById('loginPasswordConfirm') || {}).value || '';
+  const err = document.getElementById('loginError');
+  if (!pw) { if (err) { err.textContent = 'Please enter a password.'; err.style.display = 'block'; } return; }
+  if (pw !== pw2) { if (err) { err.textContent = 'Passwords do not match.'; err.style.display = 'block'; } return; }
+  appData.authHash = await sha256(pw);
+  save();
+  sessionStorage.setItem('hubSession', 'authenticated');
+  document.getElementById('loginOverlay').style.display = 'none';
+}
+
+function logout() {
+  sessionStorage.removeItem('hubSession');
+  location.reload();
+}
+
+async function changePassword() {
+  const cur  = (document.getElementById('pwCurrent') || {}).value || '';
+  const nw   = (document.getElementById('pwNew') || {}).value || '';
+  const conf = (document.getElementById('pwConfirm') || {}).value || '';
+  const msg  = document.getElementById('pwMsg');
+  function showMsg(text, ok) {
+    if (!msg) return;
+    msg.textContent = text;
+    msg.style.color = ok ? 'var(--ok)' : 'var(--err)';
+    msg.style.display = 'block';
+  }
+  if (!cur || !nw || !conf) { showMsg('All three fields are required.', false); return; }
+  if (nw !== conf)           { showMsg('New passwords do not match.', false); return; }
+  const curHash = await sha256(cur);
+  if (curHash !== appData.authHash) { showMsg('Current password is incorrect.', false); return; }
+  appData.authHash = await sha256(nw);
+  save();
+  // Clear fields
+  ['pwCurrent','pwNew','pwConfirm'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  showMsg('Password updated.', true);
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────
+loadApp().then(() => { initPersonalFinance(); checkAuth(); renderMarketStrip(false); });
+</script>
+</body>
+</html>
