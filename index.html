@@ -1,4 +1,4 @@
-<!-- Finance Hub v2.3 — Session 2.3: Home Dashboard (default tab — stress score, net worth, budget position, portfolio pulse, visa countdown, upcoming plans) -->
+<!-- Finance Hub v2.4 — Session 2.4: Month navigation arrows (Budget + Spending + Income) -->
 <!-- Project Kangaroo | michael-finance-hub -->
 <!-- Built: May 2026 | Sessions: 9 planned -->
 <!DOCTYPE html>
@@ -770,9 +770,11 @@ th {
       <div class="card">
         <div class="budget-hdr">
           <div class="card-title" style="margin-bottom:0">💰 Monthly Budget</div>
-          <div class="month-sel">
+          <div class="month-sel" style="display:flex;align-items:center;gap:4px;">
             <label>Month:</label>
+            <button class="btn" style="padding:3px 8px;font-size:14px;line-height:1;" onclick="stepBudgetMonth(-1)" title="Previous month">‹</button>
             <select id="budgetMonth" onchange="renderBudget()"></select>
+            <button class="btn" style="padding:3px 8px;font-size:14px;line-height:1;" onclick="stepBudgetMonth(1)" title="Next month">›</button>
           </div>
         </div>
         <p style="font-size:11px;color:var(--muted);margin:-6px 0 10px;">Budget &amp; Actual are entered in A$ (AUD). Variance displays in your selected base currency.</p>
@@ -810,7 +812,9 @@ th {
             <option>Travel</option>
             <option>Other</option>
           </select>
+          <button class="btn" style="padding:3px 8px;font-size:14px;line-height:1;" onclick="stepSpendingMonth(-1)" title="Previous month">‹</button>
           <select id="spFilterMonth" onchange="renderSpending()"><option value="">All Months</option></select>
+          <button class="btn" style="padding:3px 8px;font-size:14px;line-height:1;" onclick="stepSpendingMonth(1)" title="Next month">›</button>
         </div>
         <div id="spTableWrap"></div>
       </div>
@@ -1004,9 +1008,15 @@ th {
 
       <!-- Income Log -->
       <div class="card" style="margin-bottom:14px; padding:16px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
           <div class="section-heading" style="margin:0;">Income Log</div>
           <button class="btn" style="background:var(--n1);color:#fff;" onclick="addIncome()">+ Add Income</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
+          <button class="btn" style="padding:3px 8px;font-size:14px;line-height:1;" onclick="stepIncomeMonth(-1)" title="Previous month">‹</button>
+          <span id="incomeMonthLabel" style="font-size:12px; color:var(--muted); min-width:80px; text-align:center;">All</span>
+          <button class="btn" style="padding:3px 8px;font-size:14px;line-height:1;" onclick="stepIncomeMonth(1)" title="Next month">›</button>
+          <button class="btn" style="padding:2px 8px;font-size:11px;" onclick="resetIncomeMonth()" title="Show all months">All</button>
         </div>
         <div style="overflow-x:auto;">
           <table class="inv-tbl" style="width:100%;" id="incomeTable">
@@ -1293,7 +1303,7 @@ th {
     </div>
 
     <div class="ver-footer">
-      <span id="versionDisplay">Finance Hub v2.3 — Home Dashboard</span>
+      <span id="versionDisplay">Finance Hub v2.4 — Month Navigation</span>
       <span id="lastSavedDisplay" style="color:var(--muted)">–</span>
     </div>
   </div>
@@ -1597,7 +1607,7 @@ th {
     </div>
 
     <div class="ver-footer">
-      <span>Finance Hub v2.3</span>
+      <span>Finance Hub v2.4</span>
       <span>v2.x in progress — Home Dashboard active</span>
     </div>
   </div>
@@ -3633,6 +3643,62 @@ const INCOME_TYPES = ['Salary','Freelance','Dividend','Other'];
 const INCOME_TYPE_BUDGET_MAP = { Salary: 'salary', Freelance: 'sideIncome', Dividend: 'otherIncome', Other: 'otherIncome' };
 const DEDUCTION_CATS = ['Work-from-home','Professional fees','Self-education','Donations','Investment expenses','Other'];
 
+// ─── S2.4: Month navigation helpers ──────────────────────────────────────
+
+let incomeMonthFilter = ''; // '' = show all, 'YYYY-MM' = filtered
+
+function prevMonth(key) {
+  const [y, m] = key.split('-').map(Number);
+  return m === 1 ? `${y-1}-12` : `${y}-${String(m-1).padStart(2,'0')}`;
+}
+function nextMonth(key) {
+  const [y, m] = key.split('-').map(Number);
+  const now = new Date();
+  const next = m === 12 ? `${y+1}-01` : `${y}-${String(m+1).padStart(2,'0')}`;
+  const nowKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  return next <= nowKey ? next : key; // don't go past current calendar month
+}
+
+function stepBudgetMonth(delta) {
+  const sel = document.getElementById('budgetMonth');
+  if (!sel || !sel.options.length) return;
+  const idx = sel.selectedIndex + delta;
+  if (idx < 0 || idx >= sel.options.length) return;
+  sel.selectedIndex = idx;
+  renderBudget();
+}
+
+function stepSpendingMonth(delta) {
+  const sel = document.getElementById('spFilterMonth');
+  if (!sel) return;
+  let cur = sel.value;
+  if (!cur) {
+    // "All Months" — default to current calendar month on first arrow press
+    const now = new Date();
+    cur = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  }
+  const target = delta < 0 ? prevMonth(cur) : nextMonth(cur);
+  if (target === cur) return; // nextMonth returned same key (at boundary)
+  // Only navigate if the target month exists in the dropdown (has data)
+  const opt = sel.querySelector(`option[value="${target}"]`);
+  if (opt) { sel.value = target; renderSpending(); }
+}
+
+function stepIncomeMonth(delta) {
+  const now = new Date();
+  const calNow = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  let cur = incomeMonthFilter || calNow;
+  const target = delta < 0 ? prevMonth(cur) : nextMonth(cur);
+  if (target === cur) return; // at boundary
+  incomeMonthFilter = target;
+  renderIncomeTable();
+}
+
+function resetIncomeMonth() {
+  incomeMonthFilter = '';
+  renderIncomeTable();
+}
+
 function showIncTab(id, el) {
   document.querySelectorAll('#tab-income > [id^="inc-"]').forEach(p => p.style.display = 'none');
   document.querySelectorAll('.inc-subtab').forEach(t => t.classList.remove('active'));
@@ -3715,13 +3781,18 @@ function renderIncomeTable() {
   const tbody = document.getElementById('incomeTbody');
   const totalEl = document.getElementById('incomeMonthlyTotal');
   if (!tbody) return;
-  const list = (store('income') || []).slice().sort((a,b) => b.date.localeCompare(a.date));
+  const all = (store('income') || []).slice().sort((a,b) => b.date.localeCompare(a.date));
   const base = appData.settings.baseCurrency || 'AUD';
-  // Monthly total (current month)
-  const mk = monthKeyNow ? monthKeyNow() : new Date().toISOString().slice(0,7);
+  // Filter by incomeMonthFilter if set
+  const list = incomeMonthFilter ? all.filter(e => (e.date||'').startsWith(incomeMonthFilter)) : all;
+  // Update month label
+  const labelEl = document.getElementById('incomeMonthLabel');
+  if (labelEl) labelEl.textContent = incomeMonthFilter || 'All';
+  // Monthly total for the filtered scope (or current month if showing all)
+  const mk = incomeMonthFilter || (monthKeyNow ? monthKeyNow() : new Date().toISOString().slice(0,7));
   let monthTotal = 0;
-  list.forEach(e => { if ((e.date||'').startsWith(mk)) monthTotal += toAUD(parseFloat(e.amount)||0, e.currency||'AUD'); });
-  if (totalEl) totalEl.textContent = `This month total: ${fmtMoney(toBase(monthTotal,'AUD'), base)}`;
+  all.forEach(e => { if ((e.date||'').startsWith(mk)) monthTotal += toAUD(parseFloat(e.amount)||0, e.currency||'AUD'); });
+  if (totalEl) totalEl.textContent = `${incomeMonthFilter ? incomeMonthFilter : 'This month'} total: ${fmtMoney(toBase(monthTotal,'AUD'), base)}`;
 
   if (!list.length) { tbody.innerHTML = `<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:16px;">No income entries yet — click + Add Income to start.</td></tr>`; return; }
 
