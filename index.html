@@ -1,4 +1,4 @@
-<!-- Finance Hub v2.4 — Session 2.4: Month navigation arrows (Budget + Spending + Income) -->
+<!-- Finance Hub v2.5 — Session 2.5: AmEx Statement Import (Paste & Parse modal) -->
 <!-- Project Kangaroo | michael-finance-hub -->
 <!-- Built: May 2026 | Sessions: 9 planned -->
 <!DOCTYPE html>
@@ -797,7 +797,10 @@ th {
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
           <div class="card-title" style="margin-bottom:0">💸 Transactions</div>
-          <button class="btn btn-sm btn-primary" onclick="addSpending()">+ Add Transaction</button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn" style="font-size:12px;" onclick="openStatementModal()">📋 Paste Statement</button>
+            <button class="btn btn-sm btn-primary" onclick="addSpending()">+ Add Transaction</button>
+          </div>
         </div>
         <div class="sp-filters">
           <select id="spFilterCard" onchange="renderSpending()"><option value="">All Accounts</option></select>
@@ -1302,8 +1305,64 @@ th {
       </div>
     </div>
 
+    <!-- Statement Import Modal (S2.5) -->
+    <div id="statementModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:9999; align-items:flex-start; justify-content:center; padding:20px; overflow-y:auto;">
+      <div style="background:var(--card); border:1px solid var(--bdr); border-radius:10px; padding:24px; width:100%; max-width:720px; margin:auto; box-shadow:0 8px 40px rgba(0,0,0,.3);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <div style="font-size:15px; font-weight:700; color:var(--txt);">📋 Import AmEx Statement</div>
+          <button class="btn" style="padding:3px 10px;" onclick="closeStatementModal()">✕</button>
+        </div>
+
+        <!-- Step 1: Paste -->
+        <div id="stmtStep1">
+          <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">Paste raw text from your AmEx statement (copy from PDF, app export, or email). Supported: DD/MM/YYYY · CSV · Mon DD format.</p>
+          <textarea id="stmtPasteArea" rows="10" style="width:100%; font-size:12px; font-family:monospace; padding:10px; border:1px solid var(--bdr); border-radius:6px; background:var(--bg); color:var(--txt); resize:vertical; box-sizing:border-box;"
+            placeholder="Example:
+01/06/2026  WOOLWORTHS 0342 SYDNEY            $87.50
+02/06/2026  NETFLIX.COM/AU                    $17.99
+03/06/2026  UBER TRIP SYDNEY                  $14.30
+
+Or CSV:
+Date,Description,Amount
+01/06/2026,WOOLWORTHS METRO,-87.50
+02/06/2026,NETFLIX,-17.99"></textarea>
+          <div id="stmtParseWarn" style="display:none; color:var(--err); font-size:12px; margin-top:6px;"></div>
+          <div style="display:flex; gap:8px; margin-top:12px;">
+            <button class="btn" style="background:var(--n1);color:#fff;" onclick="parseAndPreview()">Parse →</button>
+            <button class="btn" style="background:var(--card);border:1px solid var(--bdr);" onclick="closeStatementModal()">Cancel</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Preview (shown after parse) -->
+        <div id="stmtStep2" style="display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div style="font-size:13px; font-weight:600; color:var(--txt);" id="stmtPreviewTitle">0 transactions found</div>
+            <button class="btn" style="font-size:11px;padding:3px 10px;" onclick="document.getElementById('stmtStep2').style.display='none'; document.getElementById('stmtStep1').style.display='';">← Back</button>
+          </div>
+          <div style="overflow-x:auto; max-height:340px; overflow-y:auto; border:1px solid var(--bdr); border-radius:6px;">
+            <table class="inv-tbl" style="width:100%; font-size:11px;" id="stmtPreviewTable">
+              <thead><tr>
+                <th style="white-space:nowrap;">Date</th>
+                <th>Description</th>
+                <th style="text-align:right;">Amount (AUD)</th>
+                <th>Category</th>
+                <th>Account</th>
+                <th style="text-align:center;">Include</th>
+              </tr></thead>
+              <tbody id="stmtPreviewBody"></tbody>
+            </table>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:14px; align-items:center;">
+            <button class="btn" style="background:var(--n1);color:#fff;font-weight:600;" id="stmtConfirmBtn" onclick="commitParsedTransactions()">✓ Confirm 0 transactions</button>
+            <button class="btn" style="background:var(--card);border:1px solid var(--bdr);" onclick="closeStatementModal()">Cancel</button>
+            <span id="stmtCommitMsg" style="font-size:11px; color:var(--ok); display:none;"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="ver-footer">
-      <span id="versionDisplay">Finance Hub v2.4 — Month Navigation</span>
+      <span id="versionDisplay">Finance Hub v2.5 — Statement Import</span>
       <span id="lastSavedDisplay" style="color:var(--muted)">–</span>
     </div>
   </div>
@@ -1607,7 +1666,7 @@ th {
     </div>
 
     <div class="ver-footer">
-      <span>Finance Hub v2.4</span>
+      <span>Finance Hub v2.5</span>
       <span>v2.x in progress — Home Dashboard active</span>
     </div>
   </div>
@@ -2492,6 +2551,183 @@ function deleteSpending(id) {
   save();
   populateSpendingFilters();
   renderSpending();
+}
+
+// ─── S2.5: Statement Import ────────────────────────────────────────────────
+let parsedStatementRows = [];
+
+function openStatementModal() {
+  document.getElementById('stmtPasteArea').value = '';
+  document.getElementById('stmtParseWarn').style.display = 'none';
+  document.getElementById('stmtStep1').style.display = '';
+  document.getElementById('stmtStep2').style.display = 'none';
+  document.getElementById('stmtCommitMsg').style.display = 'none';
+  const m = document.getElementById('statementModal');
+  m.style.display = 'flex';
+}
+
+function closeStatementModal() {
+  document.getElementById('statementModal').style.display = 'none';
+  parsedStatementRows = [];
+}
+
+function guessCategory(desc) {
+  const d = desc.toLowerCase();
+  if (/woolworths|coles|aldi|iga|harris farm|foodland|costco/.test(d)) return 'Food & Dining';
+  if (/restaurant|cafe|coffee|mcdonalds|mcdonald|kfc|domino|hungry jack|subway|grill|bistro|deliveroo|doordash|menulog|ubereats|uber eats/.test(d)) return 'Food & Dining';
+  if (/uber(?!.*eats)|didi|lyft|taxi|train|bus|ferry|opal|myki|metro|transport|parking|toll|fuel|petrol|shell|bp|caltex/.test(d)) return 'Transport';
+  if (/netflix|spotify|apple\.com\/bill|itunes|google play|amazon prime|stan|binge|foxtel|disney/.test(d)) return 'Entertainment';
+  if (/amazon|ebay|kmart|target|myer|david jones|uniqlo|zara|cotton on|the iconic|asos/.test(d)) return 'Shopping';
+  if (/chemist|pharmacy|doctor|gp |medical|hospital|health|dental|physio|optom/.test(d)) return 'Health';
+  if (/electricity|water|gas |internet|telstra|optus|vodafone|aussie broadband|tpg|origin energy|agl/.test(d)) return 'Utilities';
+  if (/flight|airline|qantas|virgin|jetstar|rex |airbnb|booking\.com|hotel|resort|motel|expedia/.test(d)) return 'Travel';
+  return 'Other';
+}
+
+function parseAmexStatement(text) {
+  const rows = [];
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+  // Try CSV first: look for a header line with Date/Description/Amount
+  const csvHeader = lines.findIndex(l => /date.*description.*amount/i.test(l));
+  if (csvHeader !== -1) {
+    for (let i = csvHeader + 1; i < lines.length; i++) {
+      const parts = lines[i].split(',');
+      if (parts.length < 3) continue;
+      const rawDate = parts[0].trim();
+      const desc = parts[1].trim();
+      const rawAmt = parts[2].replace(/[^0-9.\-]/g, '').trim();
+      if (!rawDate || !desc || !rawAmt) continue;
+      const date = normaliseDate(rawDate);
+      if (!date) continue;
+      const amount = Math.abs(parseFloat(rawAmt));
+      if (!isFinite(amount) || amount <= 0) continue;
+      rows.push({ date, description: desc, amount: +amount.toFixed(2), category: guessCategory(desc), include: true });
+    }
+    return rows;
+  }
+
+  // Space-separated / plain-text format:
+  // Patterns: DD/MM/YYYY or DD-MM-YYYY or Mon DD or Mon DD YYYY at start of line
+  // then description, then dollar amount at end
+  const amtRe = /\$?([\d,]+\.\d{2})\s*(?:CR)?$/;
+  const dateDMY = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/;
+  const dateMON = /^([A-Za-z]{3})\s+(\d{1,2})(?:\s+(\d{4}))?/;
+
+  for (const line of lines) {
+    const amtMatch = line.match(amtRe);
+    if (!amtMatch) continue;
+    const rawAmt = amtMatch[1].replace(',', '');
+    const amount = parseFloat(rawAmt);
+    if (!isFinite(amount) || amount <= 0) continue;
+
+    // Strip the amount from end to get date + description
+    const rest = line.slice(0, line.lastIndexOf(amtMatch[0])).trim();
+    let date = null;
+    let description = rest;
+
+    const dmyMatch = rest.match(dateDMY);
+    if (dmyMatch) {
+      date = normaliseDate(dmyMatch[0]);
+      description = rest.slice(dmyMatch[0].length).trim();
+    } else {
+      const monMatch = rest.match(dateMON);
+      if (monMatch) {
+        date = normaliseDate(monMatch[0]);
+        description = rest.slice(monMatch[0].length).trim();
+      }
+    }
+
+    if (!date || !description) continue;
+    rows.push({ date, description, amount: +amount.toFixed(2), category: guessCategory(description), include: true });
+  }
+  return rows;
+}
+
+function normaliseDate(raw) {
+  // DD/MM/YYYY or DD-MM-YYYY
+  const dmy = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if (dmy) {
+    let [, d, m, y] = dmy;
+    if (y.length === 2) y = '20' + y;
+    return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+  // Mon DD or Mon DD YYYY
+  const months = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  const mon = raw.match(/^([A-Za-z]{3})\s+(\d{1,2})(?:\s+(\d{4}))?/);
+  if (mon) {
+    const mNum = months[mon[1].toLowerCase()];
+    if (!mNum) return null;
+    const y = mon[3] || new Date().getFullYear();
+    return `${y}-${String(mNum).padStart(2,'0')}-${String(parseInt(mon[2])).padStart(2,'0')}`;
+  }
+  return null;
+}
+
+function parseAndPreview() {
+  const text = document.getElementById('stmtPasteArea').value.trim();
+  const warn = document.getElementById('stmtParseWarn');
+  warn.style.display = 'none';
+  if (!text) { warn.textContent = 'Please paste statement text first.'; warn.style.display = ''; return; }
+  parsedStatementRows = parseAmexStatement(text);
+  if (!parsedStatementRows.length) {
+    warn.textContent = 'No transactions detected. Check that the pasted text includes dates and dollar amounts.';
+    warn.style.display = '';
+    return;
+  }
+  renderParsedPreview(parsedStatementRows);
+  document.getElementById('stmtStep1').style.display = 'none';
+  document.getElementById('stmtStep2').style.display = '';
+}
+
+function renderParsedPreview(rows) {
+  const cats = ['Food & Dining','Transport','Shopping','Entertainment','Health','Utilities','Travel','Other'];
+  const cards = (appData.cards || []);
+  const cardOpts = cards.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  const tbody = document.getElementById('stmtPreviewBody');
+  document.getElementById('stmtPreviewTitle').textContent = `${rows.length} transaction${rows.length !== 1 ? 's' : ''} found`;
+  updateConfirmBtn();
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td style="white-space:nowrap;">${r.date}</td>
+      <td style="max-width:200px; word-break:break-word;">${r.description}</td>
+      <td style="text-align:right; white-space:nowrap;">$${r.amount.toFixed(2)}</td>
+      <td>
+        <select onchange="parsedStatementRows[${i}].category=this.value" style="font-size:11px; background:var(--bg); color:var(--txt); border:1px solid var(--bdr); border-radius:4px; padding:2px 4px;">
+          ${cats.map(c => `<option value="${c}" ${c===r.category?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <select onchange="parsedStatementRows[${i}].cardId=this.value" style="font-size:11px; background:var(--bg); color:var(--txt); border:1px solid var(--bdr); border-radius:4px; padding:2px 4px;">
+          <option value="">—</option>${cardOpts}
+        </select>
+      </td>
+      <td style="text-align:center;">
+        <input type="checkbox" ${r.include?'checked':''} onchange="parsedStatementRows[${i}].include=this.checked; updateConfirmBtn();">
+      </td>
+    </tr>`).join('');
+}
+
+function updateConfirmBtn() {
+  const n = (parsedStatementRows || []).filter(r => r.include).length;
+  const btn = document.getElementById('stmtConfirmBtn');
+  if (btn) btn.textContent = `✓ Confirm ${n} transaction${n !== 1 ? 's' : ''}`;
+}
+
+function commitParsedTransactions() {
+  const toAdd = parsedStatementRows.filter(r => r.include);
+  if (!toAdd.length) return;
+  if (!appData.spending) appData.spending = [];
+  toAdd.forEach(r => {
+    appData.spending.push({ id: spUID(), date: r.date, description: r.description, amount: r.amount, currency: 'AUD', category: r.category, cardId: r.cardId || '' });
+  });
+  save();
+  populateSpendingFilters();
+  renderSpending();
+  const msg = document.getElementById('stmtCommitMsg');
+  msg.textContent = `✓ ${toAdd.length} transaction${toAdd.length !== 1 ? 's' : ''} added.`;
+  msg.style.display = '';
+  setTimeout(() => closeStatementModal(), 1200);
 }
 
 // ─── S3: wealth ────────────────────────────────────────────────────────────
