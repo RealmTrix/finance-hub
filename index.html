@@ -1,4 +1,4 @@
-<!-- Finance Hub v2.2 — Session 2.2: AI Chat tab (Claude proxy chatbot with appData context) -->
+<!-- Finance Hub v2.3 — Session 2.3: Home Dashboard (default tab — stress score, net worth, budget position, portfolio pulse, visa countdown, upcoming plans) -->
 <!-- Project Kangaroo | michael-finance-hub -->
 <!-- Built: May 2026 | Sessions: 9 planned -->
 <!DOCTYPE html>
@@ -460,6 +460,15 @@ th {
 .chat-ai { align-self:flex-start; background:var(--card); color:var(--txt); border:1px solid var(--bdr); border-bottom-left-radius:3px; }
 .chat-err { align-self:flex-start; color:var(--err); font-size:12px; font-style:italic; }
 .chat-empty { color:var(--muted); font-size:12px; text-align:center; padding:18px 0 8px; }
+/* S2.3: Home dashboard */
+.home-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.home-grid .card { margin:0; }
+.home-grid .home-full { grid-column:1 / -1; }
+.home-big { font-size:26px; font-weight:700; }
+.home-sub { font-size:11px; color:var(--muted); }
+.home-row { display:flex; justify-content:space-between; gap:10px; font-size:12px; padding:3px 0; }
+.home-stale { font-size:10px; font-weight:600; padding:1px 7px; border-radius:9px; background:var(--amber-bg); color:var(--amber); }
+@media (max-width: 760px) { .home-grid { grid-template-columns:1fr; } }
 .brief-row { display:flex; flex-wrap:wrap; gap:14px; font-size:12px; }
 
 /* ─── S3: Spending ───────────────────────────────────────────────────────── */
@@ -680,7 +689,8 @@ th {
 
 <!-- ─── Main Tab Bar ─────────────────────────────────────────────────────── -->
 <nav class="main-tabs" id="mainTabs">
-  <button class="tab active" onclick="showTab('personal-finance', this); initPersonalFinance()">Personal Finance</button>
+  <button class="tab active" onclick="showTab('home', this); initHome()">Home</button>
+  <button class="tab" onclick="showTab('personal-finance', this); initPersonalFinance()">Personal Finance</button>
   <button class="tab" onclick="showTab('investments', this); initInvestments()">Investments</button>
   <button class="tab" onclick="showTab('income', this); initIncome()">Income</button>
   <button class="tab" onclick="showTab('tax', this); initTax()">Tax</button>
@@ -707,8 +717,38 @@ th {
 <!-- ─── Tab Content ──────────────────────────────────────────────────────── -->
 <main class="content">
 
+  <!-- Home — Session 2.3 -->
+  <div id="tab-home" class="tab-panel">
+    <div class="home-grid">
+      <div class="card home-full">
+        <div class="card-title">⚡ Financial Stress Score</div>
+        <div id="homeStressBody" style="font-size:13px;"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">💰 Net Worth</div>
+        <div id="homeNetWorthBody" style="font-size:13px;"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 This Month — Budget Position</div>
+        <div id="homeBudgetBody" style="font-size:13px;"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📈 Portfolio Pulse</div>
+        <div id="homePortfolioBody" style="font-size:13px;"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🛂 Visa Countdown</div>
+        <div id="homeVisaBody" style="font-size:13px;"></div>
+      </div>
+      <div class="card home-full">
+        <div class="card-title">🎯 Upcoming Plans</div>
+        <div id="homePlansBody" style="font-size:13px;"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Personal Finance — Session 3 -->
-  <div id="tab-personal-finance" class="tab-panel">
+  <div id="tab-personal-finance" class="tab-panel" style="display:none">
 
     <!-- PF Sub-tab bar -->
     <nav class="pf-subtabs">
@@ -1253,7 +1293,7 @@ th {
     </div>
 
     <div class="ver-footer">
-      <span id="versionDisplay">Finance Hub v2.1 — Visa &amp; Goals</span>
+      <span id="versionDisplay">Finance Hub v2.3 — Home Dashboard</span>
       <span id="lastSavedDisplay" style="color:var(--muted)">–</span>
     </div>
   </div>
@@ -1270,21 +1310,21 @@ th {
       <p style="font-size:11px;color:var(--muted);margin:0 0 14px;">Six sessions planned for the next major version. Build plan: <code style="font-size:10px;">Finance Hub v2.1 — Project Build.md</code></p>
       <ul class="session-list">
         <li class="session-item">
-          <span class="session-badge" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);">S2.1</span>
+          <span class="session-badge done">S2.1</span>
           <div>
             <div class="session-name">Visa &amp; Goals Planner</div>
             <div class="session-desc">485 visa countdown, PR pathway milestones, wealth trajectory projection to visa expiry.</div>
           </div>
         </li>
         <li class="session-item">
-          <span class="session-badge" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);">S2.2</span>
+          <span class="session-badge done">S2.2</span>
           <div>
             <div class="session-name">Claude AI Chat [Opus]</div>
             <div class="session-desc">Inline chat widget with full appData context. Ask about your spending, stress score, visa runway, holdings. Claude proxy already deployed — no Cowork needed.</div>
           </div>
         </li>
         <li class="session-item">
-          <span class="session-badge" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);">S2.3</span>
+          <span class="session-badge done">S2.3</span>
           <div>
             <div class="session-name">Home Dashboard</div>
             <div class="session-desc">New default tab: one-screen snapshot of stress score, net worth, budget position, portfolio pulse, visa countdown, and upcoming plans.</div>
@@ -1557,8 +1597,8 @@ th {
     </div>
 
     <div class="ver-footer">
-      <span>Finance Hub v2.1</span>
-      <span>v2.1 in progress — Visa &amp; Goals active</span>
+      <span>Finance Hub v2.3</span>
+      <span>v2.x in progress — Home Dashboard active</span>
     </div>
   </div>
 
@@ -4623,8 +4663,165 @@ async function askChatAI(prompt) {
   return j.text || '';
 }
 
+// ─── S2.3: Home Dashboard ──────────────────────────────────────────────────
+function initHome() {
+  initPersonalFinance();   // seeds budget/cards/FX so Home cards have data
+  renderHome();
+}
+
+function renderHome() {
+  const fmt = v => 'A$ ' + (v < 0 ? '−' : '') + Math.abs(Math.round(v)).toLocaleString('en-AU');
+
+  // 1. Stress score — reuse the Income tab renderer, mirror its output (no logic duplication)
+  const hs = document.getElementById('homeStressBody');
+  if (hs) {
+    renderStressScore();   // renders into #stressScoreBody (Income tab, hidden)
+    const src = document.getElementById('stressScoreBody');
+    hs.innerHTML = (src && src.innerHTML) ? src.innerHTML : '<span style="color:var(--muted);">Unavailable</span>';
+  }
+
+  // 2. Net worth snapshot — read-only mirror of the Wealth tab calc (no nwHistory write)
+  const nwEl = document.getElementById('homeNetWorthBody');
+  if (nwEl) {
+    try {
+      const ccy = { idr: 'IDR', usd: 'USD', aud: 'AUD' };
+      const liquid = (appData.cards || []).filter(c => c.type !== 'Credit')
+        .reduce((s, c) => s + toAUD(c.balance || 0, c.currency || 'AUD'), 0);
+      let portfolio = 0;
+      ['idr','usd','aud'].forEach(k => {
+        (((appData.portfolios || {})[k] || {}).holdings || []).forEach(h => {
+          portfolio += toAUD((h.currentPrice || 0) * (h.qty || 0), ccy[k]);
+        });
+      });
+      const manualAssets = (appData.assets || []).reduce((s, a) => s + toAUD(a.value || 0, a.currency || 'AUD'), 0);
+      const assets = liquid + portfolio + manualAssets;
+      const liabs  = (appData.liabilities || []).reduce((s, l) => s + toAUD(l.value || 0, l.currency || 'AUD'), 0)
+                   + (appData.cards || []).filter(c => c.type === 'Credit')
+                       .reduce((s, c) => s + toAUD(c.balance || 0, c.currency || 'AUD'), 0);
+      const nw = assets - liabs;
+      const lastMk = (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); })();
+      const lastNW = (appData.nwHistory || {})[lastMk];
+      let deltaHtml = '<span class="home-sub">No snapshot last month</span>';
+      if (lastNW != null) {
+        const delta = nw - lastNW;
+        const pct = lastNW !== 0 ? (delta / Math.abs(lastNW) * 100) : 0;
+        const c = delta >= 0 ? 'var(--ok)' : 'var(--err)';
+        deltaHtml = '<span style="color:' + c + '; font-weight:600;">' + (delta >= 0 ? '▲ +' : '▼ ') + fmt(delta) + ' (' + pct.toFixed(1) + '%)</span> <span class="home-sub">vs last month</span>';
+      }
+      nwEl.innerHTML =
+        '<div class="home-big">' + fmt(nw) + '</div>' +
+        '<div style="margin:4px 0 8px;">' + deltaHtml + '</div>' +
+        '<div class="home-row"><span class="home-sub">Assets</span><strong>' + fmt(assets) + '</strong></div>' +
+        '<div class="home-row"><span class="home-sub">Liabilities</span><strong>' + fmt(liabs) + '</strong></div>';
+    } catch (e) { nwEl.innerHTML = '<span style="color:var(--muted);">Unavailable</span>'; }
+  }
+
+  renderHomeBudgetCard();
+  renderHomePortfolioCard();
+  renderHomeVisaCard();
+  renderHomePlansCard();
+}
+
+function renderHomeBudgetCard() {
+  const el = document.getElementById('homeBudgetBody');
+  if (!el) return;
+  const fmt = v => 'A$ ' + Math.round(v).toLocaleString('en-AU');
+  const mk = monthKeyNow();
+  const b = (appData.budget || {})[mk];
+  if (!b) { el.innerHTML = '<span style="color:var(--muted);font-size:12px;">No budget for this month yet — open Personal Finance → Budget.</span>'; return; }
+  const incActs = (typeof computeIncomeActuals === 'function') ? computeIncomeActuals(mk) : {};
+  let tIB = 0, tIA = 0, tEB = 0, tEA = 0;
+  INC_CATS.forEach(k => { const e = (b.income   || {})[k] || {}; tIB += e.budget || 0; tIA += incActs[k] || 0; });
+  EXP_CATS.forEach(k => { const e = (b.expenses || {})[k] || {}; tEB += e.budget || 0; tEA += e.actual || 0; });
+  const now = new Date();
+  const dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const elapsedPct = Math.round(now.getDate() / dim * 100);
+  const usedPct = tEB > 0 ? Math.round(tEA / tEB * 100) : 0;
+  const onTrack = usedPct <= elapsedPct + 5;
+  const tc = onTrack ? 'var(--ok)' : (usedPct <= elapsedPct + 15 ? 'var(--amber)' : 'var(--err)');
+  el.innerHTML =
+    '<div class="home-row"><span class="home-sub">Income (actual / budget)</span><strong>' + fmt(tIA) + ' / ' + fmt(tIB) + '</strong></div>' +
+    '<div class="home-row"><span class="home-sub">Expenses (actual / budget)</span><strong>' + fmt(tEA) + ' / ' + fmt(tEB) + '</strong></div>' +
+    '<div class="home-row"><span class="home-sub">Month elapsed</span><strong>' + elapsedPct + '%</strong></div>' +
+    '<div class="home-row"><span class="home-sub">Expense budget used</span><strong style="color:' + tc + ';">' + usedPct + '%</strong></div>' +
+    '<div style="margin-top:6px;font-size:12px;font-weight:600;color:' + tc + ';">' + (onTrack ? '✓ On track' : '⚠ Ahead of budget pace') + '</div>';
+}
+
+function renderHomePortfolioCard() {
+  const el = document.getElementById('homePortfolioBody');
+  if (!el) return;
+  const fmt = v => 'A$ ' + (v < 0 ? '−' : '') + Math.abs(Math.round(v)).toLocaleString('en-AU');
+  const ccy = { idr: 'IDR', usd: 'USD', aud: 'AUD' };
+  let cost = 0, val = 0, count = 0, best = null;
+  ['idr','usd','aud'].forEach(k => {
+    (((appData.portfolios || {})[k] || {}).holdings || []).forEach(h => {
+      const c = toAUD((h.avgBuyPrice || 0) * (h.qty || 0), ccy[k]);
+      const v = toAUD((h.currentPrice || 0) * (h.qty || 0), ccy[k]);
+      cost += c; val += v; count++;
+      if (h.ticker && c > 0) {
+        const pct = (v - c) / c * 100;
+        if (!best || pct > best.pct) best = { ticker: h.ticker, pct };
+      }
+    });
+  });
+  if (!count) { el.innerHTML = '<span style="color:var(--muted);font-size:12px;">No holdings yet — add them in Investments.</span>'; return; }
+  const pnl = val - cost;
+  const pnlPct = cost > 0 ? pnl / cost * 100 : 0;
+  const pc = pnl >= 0 ? 'var(--ok)' : 'var(--err)';
+  const lf = (appData.marketSnapshot || {}).lastFetched;
+  const stale = !lf || (Date.now() - new Date(lf).getTime() > 12 * 3600 * 1000);
+  el.innerHTML =
+    '<div class="home-big">' + fmt(val) + (stale ? ' <span class="home-stale">prices stale</span>' : '') + '</div>' +
+    '<div class="home-sub" style="margin-bottom:8px;">across all portfolios' + (lf ? ' · prices as of ' + new Date(lf).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '') + '</div>' +
+    '<div class="home-row"><span class="home-sub">Total P&amp;L</span><strong style="color:' + pc + ';">' + (pnl >= 0 ? '+' : '') + fmt(pnl) + ' (' + pnlPct.toFixed(1) + '%)</strong></div>' +
+    (best ? '<div class="home-row"><span class="home-sub">Best performer</span><strong style="color:' + (best.pct >= 0 ? 'var(--ok)' : 'var(--err)') + ';">' + escHtml(best.ticker) + ' ' + (best.pct >= 0 ? '+' : '') + best.pct.toFixed(1) + '%</strong></div>' : '');
+}
+
+function renderHomeVisaCard() {
+  const el = document.getElementById('homeVisaBody');
+  if (!el) return;
+  const s = appData.settings || {};
+  if (!s.visaExpiry) { el.innerHTML = '<span style="color:var(--muted);font-size:12px;">Set visa expiry in Settings → Visa &amp; Goals.</span>'; return; }
+  const today = new Date(); today.setHours(0,0,0,0);
+  const expiry = new Date(s.visaExpiry); expiry.setHours(0,0,0,0);
+  const daysLeft = Math.round((expiry - today) / 86400000);
+  const color = daysLeft > 365 ? 'var(--ok)' : daysLeft >= 180 ? 'var(--amber)' : 'var(--err)';
+  const label = daysLeft > 365 ? 'Visa secure' : daysLeft >= 180 ? 'Plan ahead' : 'Act soon';
+  let prHtml = '';
+  if (s.prTargetDate) {
+    const prDate = new Date(s.prTargetDate); prDate.setHours(0,0,0,0);
+    const dPR = Math.round((prDate - today) / 86400000);
+    const prc = dPR < 0 ? 'var(--err)' : dPR < 180 ? 'var(--amber)' : 'var(--ok)';
+    prHtml = '<div class="home-row" style="margin-top:6px;"><span class="home-sub">PR application target</span><strong style="color:' + prc + ';">' + (dPR < 0 ? 'Overdue by ' + Math.abs(dPR) + 'd' : dPR + ' days') + '</strong></div>';
+  }
+  el.innerHTML =
+    '<div class="home-big" style="color:' + color + ';">' + daysLeft + ' <span style="font-size:13px;font-weight:600;">days</span></div>' +
+    '<div style="font-size:12px;font-weight:600;color:' + color + ';">' + label + '</div>' +
+    '<div class="home-sub">' + escHtml(s.visaType ? s.visaType + ' visa' : 'Visa') + ' expires ' + s.visaExpiry + '</div>' + prHtml;
+}
+
+function renderHomePlansCard() {
+  const el = document.getElementById('homePlansBody');
+  if (!el) return;
+  const sym = baseSym();
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = (appData.plans || [])
+    .filter(p => p.status !== 'Completed' && p.targetDate)
+    .sort((a, b) => a.targetDate.localeCompare(b.targetDate))
+    .slice(0, 2);
+  if (!upcoming.length) { el.innerHTML = '<span style="color:var(--muted);font-size:12px;">No active plans — add one in Personal Finance → Plans.</span>'; return; }
+  el.innerHTML = upcoming.map(p => {
+    const months = monthsBetween(today, p.targetDate);
+    const req = (months > 0 && (p.target || 0) > 0) ? (p.target / months) : 0;
+    return '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:7px 0;border-bottom:1px solid var(--bdr);">' +
+      '<div><strong>' + escHtml(p.name || '(unnamed)') + '</strong><br><span class="home-sub">' + p.targetDate + ' · ' + (months > 0 ? months + ' months left' : '<span style="color:var(--err);">overdue</span>') + '</span></div>' +
+      '<div style="text-align:right;"><strong>' + sym + fmtMoney(p.target || 0).replace(/^[^\d−-]*/, '') + '</strong><br><span class="home-sub">' + (req > 0 ? 'save ' + sym + fmtMoney(req).replace(/^[^\d−-]*/, '') + '/mo' : '—') + '</span></div>' +
+    '</div>';
+  }).join('');
+}
+
 // ─── Boot ─────────────────────────────────────────────────────────────────
-loadApp().then(() => { initPersonalFinance(); checkAuth(); renderMarketStrip(false); });
+loadApp().then(() => { initHome(); checkAuth(); renderMarketStrip(false); });
 </script>
 </body>
 </html>
