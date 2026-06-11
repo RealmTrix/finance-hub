@@ -1106,212 +1106,258 @@ th {
   <!-- Updates -->
   <div id="tab-updates" class="tab-panel" style="display:none">
 
-    <div class="card">
-      <div class="card-title">📋 Build Plan — 9 Sessions</div>
+    <!-- ── v2.1 Roadmap ─────────────────────────────────────────────────── -->
+    <div class="card" style="border-left:3px solid var(--gold);">
+      <div class="card-title" style="display:flex;align-items:center;gap:8px;">
+        <span>🚀 v2.1 Roadmap</span>
+        <span style="font-size:10px;font-weight:600;letter-spacing:.06em;padding:2px 8px;border-radius:10px;background:var(--amber-bg);color:var(--amber);">UPCOMING</span>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin:0 0 14px;">Six sessions planned for the next major version. Build plan: <code style="font-size:10px;">Finance Hub v2.1 — Project Build.md</code></p>
       <ul class="session-list">
         <li class="session-item">
-          <span class="session-badge done">S1</span>
+          <span class="session-badge" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);">S2.1</span>
           <div>
-            <div class="session-name">Foundation Shell ✅</div>
-            <div class="session-desc">App shell, Supabase sync, design system, Settings tab, all tabs stubbed.</div>
+            <div class="session-name">Visa &amp; Goals Planner</div>
+            <div class="session-desc">485 visa countdown, PR pathway milestones, wealth trajectory projection to visa expiry.</div>
           </div>
         </li>
         <li class="session-item">
-          <span class="session-badge done">S2</span>
+          <span class="session-badge" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);">S2.2</span>
           <div>
-            <div class="session-name">Personal Finance: Budget + Cards + FX</div>
-            <div class="session-desc">Monthly budget (income/expense rows), card/account tracker (3 debit + 1 credit), live FX rates via Frankfurter API.</div>
+            <div class="session-name">Claude AI Chat [Opus]</div>
+            <div class="session-desc">Inline chat widget with full appData context. Ask about your spending, stress score, visa runway, holdings. Claude proxy already deployed — no Cowork needed.</div>
           </div>
         </li>
         <li class="session-item">
-          <span class="session-badge done">S3</span>
+          <span class="session-badge" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);">S2.3</span>
           <div>
-            <div class="session-name">Spending Tracker + Wealth Snapshot + Plans</div>
-            <div class="session-desc">Spending log per card/category, wealth overview (assets − liabilities in AUD), big spending planner with savings calculator.</div>
+            <div class="session-name">Home Dashboard</div>
+            <div class="session-desc">New default tab: one-screen snapshot of stress score, net worth, budget position, portfolio pulse, visa countdown, and upcoming plans.</div>
           </div>
         </li>
         <li class="session-item">
-          <span class="session-badge done">S4</span>
+          <span class="session-badge" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);">S2.4</span>
           <div>
-            <div class="session-name">Investment Core: Holdings + Watchlist</div>
-            <div class="session-desc">3 portfolios (IDR/USD/AUD), holdings table with P&amp;L, portfolio summary, watchlist. Manual prices for now.</div>
+            <div class="session-name">Month Navigation Arrows</div>
+            <div class="session-desc">← → arrows on Budget, Spending, and Income tabs to browse history month by month without a dropdown.</div>
           </div>
         </li>
         <li class="session-item">
-          <span class="session-badge done">S5</span>
+          <span class="session-badge" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);">S2.5</span>
           <div>
-            <div class="session-name">Live Market Data [Opus]</div>
-            <div class="session-desc">Yahoo Finance for stocks (ASX .AX / IDX .JK / NYSE), CoinGecko for crypto, market overview strip (indices).</div>
+            <div class="session-name">AmEx Statement Auto-Parser</div>
+            <div class="session-desc">Paste statement text → auto-detect transactions → staged preview table → confirm to add to Spending log. Always shows review step before committing.</div>
           </div>
         </li>
         <li class="session-item">
-          <span class="session-badge done">S6</span>
+          <span class="session-badge" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);">S2.6</span>
           <div>
-            <div class="session-name">Investment Intelligence [Opus]</div>
-            <div class="session-desc">Monthly AI report, strategy Q&amp;A, and 5am scheduled market snapshot written to Supabase.</div>
-          </div>
-        </li>
-        <li class="session-item">
-          <span class="session-badge done">S6B</span>
-          <div>
-            <div class="session-name">AI Signal Portfolio [Opus]</div>
-            <div class="session-desc">Short-term trade signals (1 day–2 weeks) for US stocks/crypto. Computes RSI/SMA/volume, fetches news, Claude generates signal cards. Trade log with win rate tracking.</div>
-          </div>
-        </li>
-        <li class="session-item">
-          <span class="session-badge done">S7</span>
-          <div>
-            <div class="session-name">Income + Tax + Financial Stress Score</div>
-            <div class="session-desc">Income log (multi-source, multi-currency), ATO tax estimator (FY Jul–Jun, 485 visa), PAYG reconciliation, deduction tracker, stress score.</div>
-          </div>
-        </li>
-        <li class="session-item">
-          <span class="session-badge done">S8</span>
-          <div>
-            <div class="session-name">Polish + QA + Netlify Deploy</div>
-            <div class="session-desc">Cross-tab data linkages, feature request form, export/import, full QA pass, Netlify deployment.</div>
-          </div>
-        </li>
-        <li class="session-item">
-          <span class="session-badge done">S9</span>
-          <div>
-            <div class="session-name">Security: Login Gate</div>
-            <div class="session-desc">Full-screen password overlay, SHA-256 hashing via Web Crypto API, sessionStorage session token, logout button, change password in Settings.</div>
+            <div class="session-name">Multi-User Login [Opus]</div>
+            <div class="session-desc">Multiple named profiles at login. Each profile has its own Supabase USER_ID row — complete data isolation. Michael stays on michael-finance-hub.</div>
           </div>
         </li>
       </ul>
     </div>
 
+    <!-- ── Feature Requests ──────────────────────────────────────────────── -->
+    <div id="feat-req-card" class="card" style="margin-top:12px;"></div>
+
+    <!-- ── v1.0 Archive ──────────────────────────────────────────────────── -->
+    <div class="card" style="margin-top:12px;">
+      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleArchive()">
+        <span style="display:flex;align-items:center;gap:8px;">
+          <span>📦 v1.0 Build Archive</span>
+          <span style="font-size:10px;font-weight:600;letter-spacing:.06em;padding:2px 8px;border-radius:10px;background:var(--ok-bg);color:var(--ok);">9 SESSIONS COMPLETE</span>
+        </span>
+        <span id="archiveChevron" style="font-size:14px;color:var(--muted);transition:transform .2s;">▸</span>
+      </div>
+      <div id="archiveBody" style="display:none;margin-top:12px;">
+        <ul class="session-list">
+          <li class="session-item">
+            <span class="session-badge done">S1</span>
+            <div>
+              <div class="session-name">Foundation Shell</div>
+              <div class="session-desc">App shell, Supabase sync, design system, Settings tab, all tabs stubbed.</div>
+            </div>
+          </li>
+          <li class="session-item">
+            <span class="session-badge done">S2</span>
+            <div>
+              <div class="session-name">Personal Finance: Budget + Cards + FX</div>
+              <div class="session-desc">Monthly budget (income/expense rows), card/account tracker, live FX rates via Frankfurter API.</div>
+            </div>
+          </li>
+          <li class="session-item">
+            <span class="session-badge done">S3</span>
+            <div>
+              <div class="session-name">Spending Tracker + Wealth + Plans</div>
+              <div class="session-desc">Spending log per card/category, wealth overview (assets − liabilities), big spending planner.</div>
+            </div>
+          </li>
+          <li class="session-item">
+            <span class="session-badge done">S4</span>
+            <div>
+              <div class="session-name">Investment Core: Holdings + Watchlist</div>
+              <div class="session-desc">3 portfolios (IDR/USD/AUD), holdings table with P&amp;L, portfolio summary, watchlist.</div>
+            </div>
+          </li>
+          <li class="session-item">
+            <span class="session-badge done">S5</span>
+            <div>
+              <div class="session-name">Live Market Data <span style="color:var(--muted);font-size:10px;">[Opus]</span></div>
+              <div class="session-desc">Yahoo Finance (ASX/IDX/NYSE), CoinGecko (crypto), market overview strip (indices + day change).</div>
+            </div>
+          </li>
+          <li class="session-item">
+            <span class="session-badge done">S6</span>
+            <div>
+              <div class="session-name">Investment Intelligence <span style="color:var(--muted);font-size:10px;">[Opus]</span></div>
+              <div class="session-desc">Monthly AI report, strategy Q&amp;A, morning briefing card, 5am snapshot toggle.</div>
+            </div>
+          </li>
+          <li class="session-item">
+            <span class="session-badge done">S6B</span>
+            <div>
+              <div class="session-name">AI Signal Portfolio <span style="color:var(--muted);font-size:10px;">[Opus]</span></div>
+              <div class="session-desc">Short-term trade signals via RSI/SMA/volume + news headlines. Claude generates signal cards. Trade log with win rate tracking.</div>
+            </div>
+          </li>
+          <li class="session-item">
+            <span class="session-badge done">S7</span>
+            <div>
+              <div class="session-name">Income + Tax + Stress Score</div>
+              <div class="session-desc">Income log (multi-source, multi-currency), ATO FY2026 tax estimator (485 visa), deductions, stress score.</div>
+            </div>
+          </li>
+          <li class="session-item">
+            <span class="session-badge done">S8</span>
+            <div>
+              <div class="session-name">Polish + QA + GitHub Pages</div>
+              <div class="session-desc">Cross-tab data linkages, feature requests, export/import, full QA pass, GitHub Pages deployment.</div>
+            </div>
+          </li>
+          <li class="session-item">
+            <span class="session-badge done">S9</span>
+            <div>
+              <div class="session-name">Security: Login Gate</div>
+              <div class="session-desc">Full-screen password overlay, SHA-256 via Web Crypto API, sessionStorage session token, logout button, change password.</div>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ── Version History ───────────────────────────────────────────────── -->
     <div class="card" style="margin-top:12px;">
       <div class="card-title">🗒️ Version History</div>
       <div style="font-size:12px;">
-        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
-          <strong>v1.1</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
-          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
-            <li>Session 9 — Login gate added; app is now password-protected</li>
+        <div style="padding:10px 0; border-bottom:1px solid var(--bdr);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <strong>v1.1</strong>
+            <span style="font-size:10px;padding:1px 6px;border-radius:8px;background:var(--ok-bg);color:var(--ok);font-weight:600;">CURRENT</span>
+            <span style="color:var(--muted);font-size:11px;">May 2026</span>
+          </div>
+          <ul style="margin:0;padding-left:16px;color:var(--muted);font-size:11px;line-height:1.8;">
+            <li>Session 9 — Login gate; app is now password-protected</li>
             <li>Full-screen overlay rendered before any tab content; blocked until authenticated</li>
-            <li>First-launch flow: create password; subsequent opens: enter password</li>
             <li>SHA-256 hashing via browser Web Crypto API — no library, no backend</li>
-            <li>Session token stored in sessionStorage (expires on tab close, re-auth required each browser session)</li>
-            <li>🔒 Lock button in nav header; Change Password section in Settings tab</li>
+            <li>Session token in sessionStorage; expires on tab close; re-auth required each browser session</li>
+            <li>🔒 Lock button in nav header; Change Password in Settings tab</li>
           </ul>
         </div>
-        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
-          <strong>v1.0</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
-          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
-            <li>Session 8 — Polish + QA pass; initial complete build — ready for Netlify</li>
-            <li>Cross-tab linkages verified: Post to Budget, card liabilities in Wealth, FX rates in investments, stress score, tax income auto-populate</li>
-            <li>Feature Request form: submit/delete requests stored in appData.featureRequests; rendered on Updates tab</li>
-            <li>Export JSON: downloads full appData backup as dated .json file</li>
-            <li>Import JSON: parses backup, runs migrate(), reloads; rejects malformed files</li>
-            <li>Reset All Data: confirmation modal → clears Supabase + localStorage → reloads</li>
-            <li>Settings: Danger Zone section with Reset All Data button</li>
-            <li>migrate() schemaVersion bumped to 9; featureRequests[] seeded</li>
-            <li>Dark mode QA: all new components use CSS variables — no hardcoded colors</li>
-            <li>sbGet()/sbUpsert() verified identical to Efficiency Rule — no drift</li>
-            <li>S8 badge → done; Updates tab footer updated to v1.0</li>
+        <div style="padding:10px 0; border-bottom:1px solid var(--bdr);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <strong>v1.0</strong>
+            <span style="color:var(--muted);font-size:11px;">May 2026</span>
+          </div>
+          <ul style="margin:0;padding-left:16px;color:var(--muted);font-size:11px;line-height:1.8;">
+            <li>Session 8 — Polish + QA; initial complete build</li>
+            <li>Cross-tab linkages verified; feature requests; export/import JSON; Reset All Data</li>
+            <li>migrate() schemaVersion bumped to 9; dark mode QA; sbGet/sbUpsert verified</li>
           </ul>
         </div>
-        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
-          <strong>v0.7</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
-          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
-            <li>Session 7 — Income tab and Tax tab fully implemented (placeholders replaced)</li>
-            <li>Income Log: add/edit/delete entries (Date, Source, Amount, Currency, Type); sorted date descending; monthly AUD total; "Post to Budget" button posts to matching budget row</li>
-            <li>Financial Stress Score: Score = daily salary accrual / daily burn rate; GREEN ≥1.5 / AMBER 0.8–1.5 / RED &lt;0.8; shows days until pay, daily burn, projected net at pay day; reads nextPayDate + monthlySalary from Settings + 30d spending from Spending tab</li>
-            <li>YTD Income Summary: grouped by source and by type for current FY; AUD total + % share</li>
-            <li>Tax Estimator: ATO FY2026 resident brackets + 2% Medicare levy; PAYG withheld field; estimated refund/owing card; 485 visa note (foreign income disregarded)</li>
-            <li>Tax Deduction Tracker: add/edit/delete deductions (Description, Category, Amount); total auto-reduces taxable income in estimator</li>
-            <li>New data keys: income[], deductions[], taxState{}; seeded in migrate()</li>
-            <li>New functions: initIncome, renderStressScore, renderIncomeTable, addIncome, updIncome, deleteIncome, postIncomeToBudget, renderIncomeSummary, currentFY, inFY, initTax, renderTaxEstimator, renderDeductionTable, addDeduction, updDeduction, deleteDeduction</li>
-            <li>Tab buttons updated to call initIncome() and initTax() on click</li>
+        <div style="padding:10px 0; border-bottom:1px solid var(--bdr);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <strong>v0.7</strong>
+            <span style="color:var(--muted);font-size:11px;">May 2026</span>
+          </div>
+          <ul style="margin:0;padding-left:16px;color:var(--muted);font-size:11px;line-height:1.8;">
+            <li>Session 7 — Income tab + Tax tab fully implemented</li>
+            <li>Financial Stress Score: daily salary accrual / daily burn (30d); GREEN/AMBER/RED</li>
+            <li>ATO FY2026 brackets + 2% Medicare levy; PAYG reconciliation; deduction tracker</li>
           </ul>
         </div>
-        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
-          <strong>v0.6B</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
-          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
-            <li>Session 6B — new "Signals" sub-tab inside Investments (existing sub-tabs untouched)</li>
-            <li>Signal Watchlist: separate scan list (Ticker/ID, Name, Type Stock/Crypto, Exchange); stored in appData.signalWatchlist</li>
-            <li>Signal Brief: "Generate Signals" fetches 30-day OHLCV (Yahoo), computes RSI(14) / 20-day SMA / price-vs-SMA% / volume ratio, fetches 3 headlines (NewsAPI), sends to Claude proxy → signal cards (direction badge, entry/stop/target, confidence chip, reasoning); saved to appData.signalHistory[date]</li>
-            <li>Trade Log: log trades from a signal (or manually) — entry/exit, dates, status (Open/Closed/Stopped Out), auto P&amp;L %; win rate / avg P&amp;L / accuracy stats; stored in appData.signalTrades</li>
-            <li>NewsAPI key input already in Settings; empty-key warning shown in Signal Brief</li>
-            <li>New functions: generateSignals, computeRSI, computeSMA, fetchOHLCV, fetchHeadlines, renderSignalBrief, renderSignalCard, renderSignalWatchlist + CRUD, renderTradeLog + CRUD + stats</li>
-            <li>migrate() seeds signalWatchlist[], signalHistory{}, signalTrades[]; S5/S6 fetch + report + strategy functions untouched</li>
+        <div style="padding:10px 0; border-bottom:1px solid var(--bdr);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <strong>v0.6B</strong>
+            <span style="color:var(--muted);font-size:11px;">May 2026</span>
+          </div>
+          <ul style="margin:0;padding-left:16px;color:var(--muted);font-size:11px;line-height:1.8;">
+            <li>Session 6B — AI Signal Portfolio (Signals sub-tab inside Investments)</li>
+            <li>RSI(14) / 20-day SMA / volume ratio computed in JS; headlines via NewsAPI; Claude proxy generates signal cards</li>
+            <li>Trade Log with win rate / avg P&amp;L / accuracy stats</li>
           </ul>
         </div>
-        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
-          <strong>v0.6</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
-          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
-            <li>Session 6 — Investment Intelligence added; Investments tab now has sub-tabs: Portfolio | Monthly Report | Strategy</li>
-            <li>Monthly Report: Generate Report button collects portfolio totals, per-holding P&amp;L, best/worst, total return %, FX impact → window.cowork.askClaude() → styled card; saved to appData.reports[monthKey]</li>
-            <li>Strategy: free-text Q&amp;A + quick prompts (rebalance / concentration risk / AUD ideas); holdings + watchlist sent as context; "not financial advice" disclaimer</li>
-            <li>Morning Briefing card (top of Investments): renders today's snapshot if present; "Refresh now" button if &gt;12h stale</li>
-            <li>Settings: "Enable Daily Market Snapshot at 5am" toggle; writes snapshot to appData.marketSnapshot.daily[date] (persisted to Supabase)</li>
-            <li>New functions: showInvSubTab, generateMonthlyReport, renderMonthlyReport, askStrategy, quickStrategy, gatherPortfolioData, loadMorningBriefing, refreshMorningBriefing, toggleDailySnapshot, askCoworkAI</li>
-            <li>migrate() updated: lazy seeds reports{}, portfolioHistory{}, marketSnapshot.daily{}</li>
-            <li>Session 5 fetchStockPrice / refreshAllPrices / renderMarketStrip left unchanged</li>
+        <div style="padding:10px 0; border-bottom:1px solid var(--bdr);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <strong>v0.6</strong>
+            <span style="color:var(--muted);font-size:11px;">May 2026</span>
+          </div>
+          <ul style="margin:0;padding-left:16px;color:var(--muted);font-size:11px;line-height:1.8;">
+            <li>Session 6 — Investment Intelligence (Monthly Report, Strategy, Morning Briefing)</li>
+            <li>AI via Claude proxy Edge Function; 5am market snapshot toggle</li>
           </ul>
         </div>
-        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
-          <strong>v0.5</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
-          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
-            <li>Session 5 — Live market data added to Investments tab</li>
-            <li>Market Overview strip: ASX 200, Jakarta Composite, S&amp;P 500, Dow Jones, Bitcoin — level + day change, green/red coded, refresh + timestamp</li>
-            <li>Stock prices via Yahoo Finance v8 (ASX .AX / IDX .JK / NYSE as-is)</li>
-            <li>Crypto prices via CoinGecko (symbol→id lookup table, usd/aud/idr)</li>
-            <li>Refresh Prices button: loops all holdings + watchlist, updates currentPrice, saves</li>
-            <li>On fetch error: keeps last known price, marks stale</li>
-            <li>migrate() updated: lazy seeds marketSnapshot{}</li>
+        <div style="padding:10px 0; border-bottom:1px solid var(--bdr);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <strong>v0.5</strong>
+            <span style="color:var(--muted);font-size:11px;">May 2026</span>
+          </div>
+          <ul style="margin:0;padding-left:16px;color:var(--muted);font-size:11px;line-height:1.8;">
+            <li>Session 5 — Live market data (Yahoo Finance v8 + CoinGecko)</li>
+            <li>Market strip: ASX 200, Jakarta, S&amp;P 500, Dow, BTC; Refresh Prices loops all holdings</li>
           </ul>
         </div>
-        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
-          <strong>v0.4</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
-          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
-            <li>Session 4 — Investments tab built</li>
-            <li>3 portfolios: Indonesia (IDR), Global (USD), Australia (AUD) with tab selector</li>
-            <li>Holdings table: Ticker, Name, Type, Qty, Avg Buy, Current Price, Mkt Value, P&amp;L, P&amp;L %</li>
-            <li>Portfolio summary card: Total Cost, Market Value, P&amp;L, P&amp;L %, Holdings count</li>
-            <li>Watchlist: Ticker, Name, Tag (Buy/Watch/Avoid), Current Price, Target Price, Notes</li>
-            <li>All fields inline-editable; data stored per portfolio in appData.portfolios</li>
-            <li>migrate() updated: lazy seeds portfolios{} and watchlist[]</li>
+        <div style="padding:10px 0; border-bottom:1px solid var(--bdr);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <strong>v0.4</strong>
+            <span style="color:var(--muted);font-size:11px;">May 2026</span>
+          </div>
+          <ul style="margin:0;padding-left:16px;color:var(--muted);font-size:11px;line-height:1.8;">
+            <li>Session 4 — Investment Core: 3 portfolios, holdings table, portfolio summary, watchlist</li>
           </ul>
         </div>
-        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
-          <strong>v0.3</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
-          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
-            <li>Session 3 — Personal Finance tab restructured with sub-tabs: Budget | Spending | Wealth | Plans</li>
-            <li>Spending sub-tab: transaction log with inline editing, filters by card/category/month, monthly totals by category</li>
-            <li>Wealth sub-tab: Assets and Liabilities tables, Net Worth grid (AUD-converted), monthly net worth auto-snapshot</li>
-            <li>Plans sub-tab: big-ticket spending planner with auto-calculated months left and required monthly saving</li>
+        <div style="padding:10px 0; border-bottom:1px solid var(--bdr);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <strong>v0.3</strong>
+            <span style="color:var(--muted);font-size:11px;">May 2026</span>
+          </div>
+          <ul style="margin:0;padding-left:16px;color:var(--muted);font-size:11px;line-height:1.8;">
+            <li>Session 3 — Personal Finance sub-tabs: Budget | Spending | Wealth | Plans</li>
           </ul>
         </div>
-        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
-          <strong>v0.2</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
-          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
-            <li>Session 2 — Personal Finance tab built</li>
-            <li>Live FX rates widget: Frankfurter API (AUD→IDR, AUD→USD), cached + offline fallback</li>
-            <li>Monthly budget table: 3 income + 9 expense categories, budget/actual/variance/% bar</li>
-            <li>Month selector (±3 months), values stored in AUD, variance displays in base currency</li>
-            <li>Card/Account tracker: add, edit, remove accounts; AUD/IDR/USD support</li>
-            <li>Net total across accounts (assets − credit liabilities) in base currency</li>
-            <li>setCurrency now re-renders budget and cards live when base currency changes</li>
+        <div style="padding:10px 0; border-bottom:1px solid var(--bdr);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <strong>v0.2</strong>
+            <span style="color:var(--muted);font-size:11px;">May 2026</span>
+          </div>
+          <ul style="margin:0;padding-left:16px;color:var(--muted);font-size:11px;line-height:1.8;">
+            <li>Session 2 — Budget + Cards + FX (Frankfurter API, monthly budget table, card tracker)</li>
           </ul>
         </div>
-        <div style="padding:8px 0; border-bottom:1px solid var(--bdr);">
-          <strong>v0.1</strong> <span style="color:var(--muted); margin-left:8px;">May 2026</span>
-          <ul style="margin-top:4px; padding-left:16px; color:var(--muted); font-size:11px; line-height:1.7;">
-            <li>Session 1 Foundation — app shell built</li>
-            <li>Project Kangaroo design system applied (CSS variables, dark mode, accent bar)</li>
-            <li>Supabase cloud sync wired (USER_ID: michael-finance-hub)</li>
-            <li>All 6 tabs stubbed with placeholder cards</li>
-            <li>Settings tab: currency toggle, FY month, pay date, salary, account names, NewsAPI key field</li>
-            <li>Updates tab: full 9-session build plan</li>
-            <li>initData(), save(), pushToCloud(), migrate() operational</li>
+        <div style="padding:10px 0;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <strong>v0.1</strong>
+            <span style="color:var(--muted);font-size:11px;">May 2026</span>
+          </div>
+          <ul style="margin:0;padding-left:16px;color:var(--muted);font-size:11px;line-height:1.8;">
+            <li>Session 1 Foundation — app shell, Supabase sync, design system, 6 tabs stubbed</li>
           </ul>
         </div>
       </div>
     </div>
 
-    <!-- Bug Report -->
+    <!-- ── Bug Report ────────────────────────────────────────────────────── -->
     <div class="card" style="margin-top:12px;">
       <div class="card-title">🐛 Report a Bug</div>
       <p style="font-size:11px; color:var(--muted); margin-bottom:12px;">Fill in what's broken and what should happen. Generates a ready-to-send prompt for Claude.</p>
@@ -1327,7 +1373,7 @@ th {
       <div id="bugPromptOut" style="margin-top:12px;"></div>
     </div>
 
-    <!-- Add Feature -->
+    <!-- ── Feature Request ───────────────────────────────────────────────── -->
     <div class="card" style="margin-top:12px;">
       <div class="card-title">✨ Request a Feature</div>
       <p style="font-size:11px; color:var(--muted); margin-bottom:12px;">Describe what you want added. Generates a ready-to-send prompt for Claude.</p>
@@ -1343,10 +1389,10 @@ th {
       <div id="featPromptOut" style="margin-top:12px;"></div>
     </div>
 
-    <!-- Export / Import -->
+    <!-- ── Data Backup ───────────────────────────────────────────────────── -->
     <div class="card" style="margin-top:12px;">
       <div class="card-title">📦 Data Backup</div>
-      <p style="font-size:11px; color:var(--muted); margin-bottom:10px;">Export a full JSON backup before any Netlify deployment. Import restores all data from a backup file.</p>
+      <p style="font-size:11px; color:var(--muted); margin-bottom:10px;">Export a full JSON backup before any deployment. Import restores all data from a backup file.</p>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn" style="background:var(--n1);color:#fff;" onclick="exportData()">⬇ Export JSON</button>
         <label class="btn" style="background:var(--card);border:1px solid var(--bdr);cursor:pointer;margin:0;">
@@ -1357,7 +1403,7 @@ th {
 
     <div class="ver-footer">
       <span>Finance Hub v1.1</span>
-      <span>Session 9 of 9 complete — login gate active</span>
+      <span>v1.0 complete — v2.1 roadmap active</span>
     </div>
   </div>
 
@@ -3840,6 +3886,53 @@ async function resetAllData() {
 // ─── S8: Updates tab init ─────────────────────────────────────────────────
 
 function initUpdates() {
+  const card = document.getElementById('feat-req-card');
+  if (card && !document.getElementById('frList')) {
+    card.innerHTML = `
+      <div class="card-title">⭐ Submitted Feature Requests</div>
+      <div id="frList"></div>
+      <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--bdr);">
+        <div style="font-size:11px;font-weight:600;color:var(--txt);margin-bottom:8px;">Submit a new request</div>
+        <div class="settings-field" style="margin-bottom:8px;">
+          <label>Title</label>
+          <input type="text" id="frTitle" placeholder="e.g. Net worth chart over time" maxlength="80" style="width:100%;box-sizing:border-box;">
+        </div>
+        <div class="settings-field" style="margin-bottom:8px;">
+          <label>Priority</label>
+          <select id="frPriority" style="width:100%;box-sizing:border-box;">
+            <option>Must have</option>
+            <option>Nice to have</option>
+          </select>
+        </div>
+        <div class="settings-field" style="margin-bottom:10px;">
+          <label>Description</label>
+          <textarea id="frDesc" rows="2" placeholder="Describe what you want..." maxlength="400" style="width:100%;box-sizing:border-box;resize:vertical;font-size:12px;"></textarea>
+        </div>
+        <button class="btn" style="background:var(--n1);color:#fff;" onclick="submitFeatureRequest()">Submit</button>
+      </div>`;
+  }
+  renderFeatureRequests();
+}
+
+function toggleArchive() {
+  const body = document.getElementById('archiveBody');
+  const chev = document.getElementById('archiveChevron');
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (chev) chev.style.transform = open ? '' : 'rotate(90deg)';
+}
+
+function submitFeatureRequest() {
+  const title = (document.getElementById('frTitle')||{}).value || '';
+  if (!title.trim()) return;
+  const priority = (document.getElementById('frPriority')||{}).value || 'Nice to have';
+  const desc = (document.getElementById('frDesc')||{}).value || '';
+  const list = store('featureRequests') || [];
+  list.push({ id: Date.now().toString(), title: title.trim(), priority, description: desc.trim(), submittedAt: new Date().toISOString() });
+  store('featureRequests', list);
+  save();
+  ['frTitle','frDesc'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   renderFeatureRequests();
 }
 
