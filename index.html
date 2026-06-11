@@ -66,7 +66,8 @@ body {
 .hdr-left { display: flex; align-items: center; gap: 10px; }
 .hdr-logo { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
 .hdr-sub { font-size: 11px; color: rgba(255,255,255,0.55); }
-.hdr-right { display: flex; align-items: center; gap: 8px; }
+.hdr-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+#hubClock { flex-basis: 100%; text-align: right; font-size: 11px; color: rgba(255,255,255,.75); font-variant-numeric: tabular-nums; line-height: 1.2; }
 
 .accent-bar {
   height: 3px;
@@ -721,6 +722,7 @@ th {
     <button class="theme-btn" onclick="toggleTheme()" title="Toggle dark mode">🌙</button>
     <button class="theme-btn" id="uiModeBtn" onclick="toggleUiMode()" title="Toggle modern/basic UI">✨</button>
     <button class="logout-btn" onclick="logout()" title="Lock and log out">🔒 Lock</button>
+    <span id="hubClock"></span>
   </div>
 </header>
 <div class="accent-bar"></div>
@@ -852,18 +854,14 @@ th {
           <select id="spFilterCard" onchange="renderSpending()"><option value="">All Accounts</option></select>
           <select id="spFilterCat" onchange="renderSpending()">
             <option value="">All Categories</option>
-            <option>Food &amp; Dining</option>
-            <option>Transport</option>
-            <option>Shopping</option>
-            <option>Entertainment</option>
-            <option>Health</option>
-            <option>Utilities</option>
-            <option>Travel</option>
-            <option>Other</option>
           </select>
           <button class="btn" style="padding:3px 8px;font-size:14px;line-height:1;" onclick="stepSpendingMonth(-1)" title="Previous month">‹</button>
           <select id="spFilterMonth" onchange="renderSpending()"><option value="">All Months</option></select>
           <button class="btn" style="padding:3px 8px;font-size:14px;line-height:1;" onclick="stepSpendingMonth(1)" title="Next month">›</button>
+          <span style="display:inline-flex;gap:6px;align-items:center;margin-left:auto;">
+            <select id="spBulkCard"><option value="">Choose account…</option></select>
+            <button class="btn" style="font-size:11px;" onclick="bulkAssignAccount()" title="Assign this account to every currently filtered transaction that has no account yet">Assign to unassigned</button>
+          </span>
         </div>
         <div id="spTableWrap"></div>
       </div>
@@ -1291,6 +1289,15 @@ th {
       <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">These mirror your Cards &amp; Accounts in Personal Finance. Edit names there to update everywhere.</p>
       <div id="settingsAccountsWrap"></div>
 
+      <div class="section-heading" style="margin-top:16px;">🏷 Spending Categories</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Used by the Spending log and statement parser. Deleting a category keeps it on all existing transactions — it just stops being offered for new ones. New categories apply from now on.</p>
+      <div id="categoriesWrap" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="text" id="newCatName" placeholder="New category name" maxlength="30" style="max-width:200px;"
+               onkeydown="if(event.key==='Enter')addCategory()">
+        <button class="btn" onclick="addCategory()">+ Add Category</button>
+      </div>
+
       <div class="section-heading" style="margin-top:16px;">API Keys</div>
       <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Required for Session 6B signal features. Free tier at newsapi.org (100 req/day).</p>
       <div class="settings-field">
@@ -1425,6 +1432,11 @@ Date,Description,Amount
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <div style="font-size:13px; font-weight:600; color:var(--txt);" id="stmtPreviewTitle">0 transactions found</div>
             <button class="btn" style="font-size:11px;padding:3px 10px;" onclick="document.getElementById('stmtStep2').style.display='none'; document.getElementById('stmtStep1').style.display='';">← Back</button>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:12px;">
+            <label style="color:var(--muted); white-space:nowrap;">Statement account:</label>
+            <select id="stmtAccountAll" onchange="applyStatementAccount(this.value)" style="font-size:12px; background:var(--bg); color:var(--txt); border:1px solid var(--bdr); border-radius:4px; padding:3px 6px;"></select>
+            <span style="font-size:10px; color:var(--muted);">applies to every row — override per row below</span>
           </div>
           <div style="overflow-x:auto; max-height:340px; overflow-y:auto; border:1px solid var(--bdr); border-radius:6px;">
             <table class="inv-tbl" style="width:100%; font-size:11px;" id="stmtPreviewTable">
@@ -2007,7 +2019,41 @@ function renderSettings() {
   if ($id('prTargetDate')) $id('prTargetDate').value = s.prTargetDate || '';
   renderSettingsAccounts();
   renderProfilesSection();
+  renderCategoriesSection();
   updateLastSaved();
+}
+
+// ─── Spending category management (add/delete; history preserved) ─────────
+function renderCategoriesSection() {
+  const wrap = document.getElementById('categoriesWrap');
+  if (!wrap) return;
+  wrap.innerHTML = getCategories().map(c => `
+    <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;background:var(--bg);border:1px solid var(--bdr);border-radius:12px;padding:3px 6px 3px 10px;">
+      ${escHtml(c)}
+      ${c === 'Other' ? '' : `<button class="btn-del" style="font-size:11px;" title="Remove from list (past transactions keep it)" onclick="deleteCategory('${escHtml(c)}')">×</button>`}
+    </span>`).join('');
+}
+
+function addCategory() {
+  const el = document.getElementById('newCatName');
+  const name = ((el || {}).value || '').trim();
+  if (!name) return;
+  const cats = getCategories();
+  if (cats.some(c => c.toLowerCase() === name.toLowerCase())) { alert('That category already exists.'); return; }
+  cats.push(name);
+  save();
+  if (el) el.value = '';
+  renderCategoriesSection();
+  populateSpendingFilters();
+}
+
+function deleteCategory(name) {
+  if (name === 'Other') return;   // fallback category must stay
+  if (!confirm(`Remove "${name}" from the category list?\n\nExisting transactions keep this category — it just won't be offered for new transactions.`)) return;
+  appData.categories = getCategories().filter(c => c !== name);
+  save();
+  renderCategoriesSection();
+  populateSpendingFilters();
 }
 
 function renderSettingsAccounts() {
@@ -2106,8 +2152,8 @@ function escHtml(s) {
 function toAUD(amount, currency) {
   if (!currency || currency === 'AUD') return amount;
   const r = appData.rates || {};
-  if (currency === 'IDR') return amount / (r.AUD_IDR || 10500);
-  if (currency === 'USD') return amount / (r.AUD_USD || 0.635);
+  if (currency === 'IDR') return amount / (r.AUD_IDR || 12000);   // offline fallback: 1 AUD = 12,000 IDR
+  if (currency === 'USD') return amount / (r.AUD_USD || 0.65);    // offline fallback: 1 AUD = 0.65 USD
   return amount;
 }
 function toBase(amount, fromCurrency) {
@@ -2115,8 +2161,8 @@ function toBase(amount, fromCurrency) {
   const aud  = toAUD(amount, fromCurrency || 'AUD');
   const r    = appData.rates || {};
   if (base === 'AUD') return aud;
-  if (base === 'IDR') return aud * (r.AUD_IDR || 10500);
-  if (base === 'USD') return aud * (r.AUD_USD || 0.635);
+  if (base === 'IDR') return aud * (r.AUD_IDR || 12000);   // offline fallback: 1 AUD = 12,000 IDR
+  if (base === 'USD') return aud * (r.AUD_USD || 0.65);    // offline fallback: 1 AUD = 0.65 USD
   return aud;
 }
 function fmtMoney(amount, currency) {
@@ -2518,7 +2564,26 @@ function delCard(i) {
 }
 
 // ─── S3: constants ────────────────────────────────────────────────────────
-const SP_CATS     = ['Food & Dining','Transport','Shopping','Entertainment','Health','Utilities','Travel','Other'];
+// Categories now mirror the Budget screen expense rows. SP_CATS is the default
+// seed; the live list is appData.categories (user can add/delete in Settings).
+const SP_CATS     = ['Rent','Groceries','Transport','Dining','Subscriptions','Shopping','Healthcare','Savings','Other'];
+
+// Live category list — lazy-seeded (migrate() untouched per bug-fix rules).
+// Deleting a category only removes it from this list: transactions from previous
+// months keep their original category string and still display it.
+function getCategories() {
+  if (!Array.isArray(appData.categories) || !appData.categories.length) appData.categories = SP_CATS.slice();
+  return appData.categories;
+}
+// Learned description→category map for the statement parser (lazy-seeded).
+function getCategoryMap() {
+  if (!appData.categoryMap || typeof appData.categoryMap !== 'object') appData.categoryMap = {};
+  return appData.categoryMap;
+}
+// Normalise a merchant line to its first 3 words for stable matching
+function normDesc(d) {
+  return (d || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim().split(' ').slice(0, 3).join(' ');
+}
 const ASSET_TYPES = ['Stocks','Crypto','Property','Superannuation','Cash','Other'];
 const PLAN_PRI    = ['High','Med','Low'];
 const PLAN_STAT   = ['Not Started','Saving','Ready','Completed'];
@@ -2548,6 +2613,32 @@ function populateSpendingFilters() {
     if (String(c.id) === String(curC)) o.selected = true;
     cf.appendChild(o);
   });
+  // Category filter: live list + legacy categories still present in the data
+  const catF = document.getElementById('spFilterCat');
+  if (catF) {
+    const curCat = catF.value;
+    const inData = (appData.spending || []).map(s => s.category).filter(Boolean);
+    const allCats = [...new Set([...getCategories(), ...inData])];
+    catF.innerHTML = '<option value="">All Categories</option>';
+    allCats.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c; o.textContent = c;
+      if (c === curCat) o.selected = true;
+      catF.appendChild(o);
+    });
+  }
+  // Bulk-assign account dropdown (for transactions imported without an account)
+  const bk = document.getElementById('spBulkCard');
+  if (bk) {
+    const curB = bk.value;
+    bk.innerHTML = '<option value="">Choose account…</option>';
+    (appData.cards || []).forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id; o.textContent = c.name;
+      if (String(c.id) === String(curB)) o.selected = true;
+      bk.appendChild(o);
+    });
+  }
   const mf = document.getElementById('spFilterMonth');
   if (!mf) return;
   const curM = mf.value;
@@ -2582,13 +2673,15 @@ function renderSpending() {
 
   const cardOptsFull = (appData.cards || []).map(c =>
     `<option value="${c.id}">${escHtml(c.name)}</option>`).join('');
-  const catOptsFull = SP_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
+  const catsNow = getCategories();
 
   const trs = rows.map(r => {
     const cardSel = (`<option value="">—</option>` + cardOptsFull)
       .replace(`value="${r.cardId}"`, `value="${r.cardId}" selected`);
-    const catSel = (`<option value="">—</option>` + catOptsFull)
-      .replace(`value="${r.category}"`, `value="${r.category}" selected`);
+    // Live categories + this row's own (possibly deleted) category so history keeps displaying
+    const rowCats = (r.category && !catsNow.includes(r.category)) ? [r.category, ...catsNow] : catsNow;
+    const catSel = (`<option value="">—</option>` + rowCats.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join(''))
+      .replace(`value="${escHtml(r.category)}"`, `value="${escHtml(r.category)}" selected`);
     const curSel = ['AUD','IDR','USD'].map(c =>
       `<option value="${c}" ${r.currency === c ? 'selected' : ''}>${c}</option>`).join('');
     return `<tr>
@@ -2682,6 +2775,27 @@ function deleteSpending(id) {
   renderSpending();
 }
 
+// Bulk-fix: give every currently filtered transaction WITHOUT an account the chosen one
+function bulkAssignAccount() {
+  const cardId = (document.getElementById('spBulkCard') || {}).value || '';
+  if (!cardId) { alert('Choose an account first.'); return; }
+  const filterCard  = (document.getElementById('spFilterCard')  || {}).value || '';
+  const filterCat   = (document.getElementById('spFilterCat')   || {}).value || '';
+  const filterMonth = (document.getElementById('spFilterMonth') || {}).value || '';
+  let n = 0;
+  (appData.spending || []).forEach(r => {
+    if (r.cardId) return;                                                   // only unassigned
+    if (filterCard  && String(r.cardId) !== String(filterCard)) return;
+    if (filterCat   && r.category !== filterCat) return;
+    if (filterMonth && (r.date || '').slice(0, 7) !== filterMonth) return;
+    r.cardId = cardId; n++;
+  });
+  if (!n) { alert('No unassigned transactions in the current view.'); return; }
+  save();
+  renderSpending();
+  alert(n + ' transaction' + (n !== 1 ? 's' : '') + ' assigned.');
+}
+
 // ─── S2.5: Statement Import ────────────────────────────────────────────────
 let parsedStatementRows = [];
 
@@ -2701,16 +2815,27 @@ function closeStatementModal() {
 }
 
 function guessCategory(desc) {
+  const cats = getCategories();
+  // 1. Learned map first — what you've previously confirmed for this merchant
+  const map = getCategoryMap();
+  const key = normDesc(desc);
+  if (key && map[key] && cats.includes(map[key])) return map[key];
+  for (const k of Object.keys(map)) {
+    if (k && key.startsWith(k) && cats.includes(map[k])) return map[k];
+  }
+  // 2. Keyword rules — mapped to the Budget screen categories
   const d = desc.toLowerCase();
-  if (/woolworths|ww metro|coles|aldi|iga|harris farm|foodland|costco/.test(d)) return 'Food & Dining';
-  if (/restaurant|cafe|coffee|mcdonalds|mcdonald|kfc|domino|hungry jack|subway|grill|bistro|deliveroo|doordash|menulog|ubereats|uber eats|eatclub/.test(d)) return 'Food & Dining';
-  if (/uber(?!.*eats)|didi|lyft|lime\W*ride|lime\*|taxi|train|bus|ferry|opal|myki|transport|parking|toll|fuel|petrol|shell|bp|caltex/.test(d)) return 'Transport';
-  if (/netflix|spotify|apple\.com\/bill|itunes|google play|amazon prime|stan|binge|foxtel|disney/.test(d)) return 'Entertainment';
-  if (/amazon|ebay|kmart|target|myer|david jones|uniqlo|zara|cotton on|the iconic|asos/.test(d)) return 'Shopping';
-  if (/chemist|pharmacy|doctor|gp |medical|hospital|health|dental|physio|optom/.test(d)) return 'Health';
-  if (/electricity|water|gas |internet|telstra|optus|vodafone|aussie broadband|tpg|origin energy|agl/.test(d)) return 'Utilities';
-  if (/flight|airline|qantas|virgin|jetstar|rex |airbnb|booking\.com|hotel|resort|motel|expedia/.test(d)) return 'Travel';
-  return 'Other';
+  let g = 'Other';
+  if (/rent|real estate|realestate|landlord/.test(d)) g = 'Rent';
+  else if (/woolworths|ww metro|coles|aldi|iga|harris farm|foodland|costco/.test(d)) g = 'Groceries';
+  else if (/restaurant|cafe|coffee|mcdonalds|mcdonald|kfc|domino|hungry jack|subway|grill|bistro|deliveroo|doordash|menulog|ubereats|uber eats|eatclub|bar |pub /.test(d)) g = 'Dining';
+  else if (/uber(?!.*eats)|didi|lyft|lime\W*ride|lime\*|taxi|train|bus|ferry|opal|myki|transport|parking|toll|fuel|petrol|shell|bp|caltex/.test(d)) g = 'Transport';
+  else if (/netflix|spotify|apple\.com\/bill|itunes|google play|amazon prime|stan|binge|foxtel|disney|youtube|chatgpt|openai|claude|anthropic|subscription/.test(d)) g = 'Subscriptions';
+  else if (/amazon|ebay|kmart|target|myer|david jones|uniqlo|zara|cotton on|the iconic|asos/.test(d)) g = 'Shopping';
+  else if (/chemist|pharmacy|doctor|gp |medical|hospital|health|dental|physio|optom/.test(d)) g = 'Healthcare';
+  else if (/saving|transfer to sav|vault/.test(d)) g = 'Savings';
+  // 3. Never suggest a category that isn't in the live list
+  return cats.includes(g) ? g : 'Other';
 }
 
 function parseAmexStatement(text) {
@@ -2847,17 +2972,42 @@ function parseAndPreview() {
   parsedStatementRows.forEach(r => {
     if (isDuplicateTxn(r)) { r.dup = true; r.include = false; }
   });
+  // Auto-select the statement account: prefer a card named AmEx, else first Credit card
+  const amex = detectAmexCard();
+  if (amex) parsedStatementRows.forEach(r => { if (!r.cardId) r.cardId = amex.id; });
   renderParsedPreview(parsedStatementRows);
   document.getElementById('stmtStep1').style.display = 'none';
   document.getElementById('stmtStep2').style.display = '';
 }
 
+// Find the most likely AmEx account: name match first, then any Credit card
+function detectAmexCard() {
+  const cards = appData.cards || [];
+  return cards.find(c => /amex|american\s*express/i.test(c.name || ''))
+      || cards.find(c => c.type === 'Credit')
+      || null;
+}
+
+// Set one account on every parsed row (per-row dropdowns can still override after)
+function applyStatementAccount(cardId) {
+  (parsedStatementRows || []).forEach(r => { r.cardId = cardId; });
+  renderParsedPreview(parsedStatementRows);
+}
+
 function renderParsedPreview(rows) {
-  const cats = ['Food & Dining','Transport','Shopping','Entertainment','Health','Utilities','Travel','Other'];
+  const cats = getCategories();
   const cards = (appData.cards || []);
-  const cardOpts = cards.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
   const tbody = document.getElementById('stmtPreviewBody');
   document.getElementById('stmtPreviewTitle').textContent = `${rows.length} transaction${rows.length !== 1 ? 's' : ''} found`;
+  // Statement-level account selector — defaults to the account most rows carry
+  const allSel = document.getElementById('stmtAccountAll');
+  if (allSel) {
+    const counts = {};
+    rows.forEach(r => { if (r.cardId) counts[r.cardId] = (counts[r.cardId] || 0) + 1; });
+    const majority = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || '';
+    allSel.innerHTML = '<option value="">— No account —</option>' +
+      cards.map(c => `<option value="${c.id}" ${String(c.id) === String(majority) ? 'selected' : ''}>${escHtml(c.name)}</option>`).join('');
+  }
   updateConfirmBtn();
   tbody.innerHTML = rows.map((r, i) => `
     <tr>
@@ -2871,7 +3021,7 @@ function renderParsedPreview(rows) {
       </td>
       <td>
         <select onchange="parsedStatementRows[${i}].cardId=this.value" style="font-size:11px; background:var(--bg); color:var(--txt); border:1px solid var(--bdr); border-radius:4px; padding:2px 4px;">
-          <option value="">—</option>${cardOpts}
+          <option value="">—</option>${cards.map(c => `<option value="${c.id}" ${String(c.id) === String(r.cardId) ? 'selected' : ''}>${escHtml(c.name)}</option>`).join('')}
         </select>
       </td>
       <td style="text-align:center;">
@@ -2890,8 +3040,13 @@ function commitParsedTransactions() {
   const toAdd = parsedStatementRows.filter(r => r.include);
   if (!toAdd.length) return;
   if (!appData.spending) appData.spending = [];
+  const learnMap = getCategoryMap();
   toAdd.forEach(r => {
     appData.spending.push({ id: spUID(), date: r.date, description: r.description, amount: r.amount, currency: 'AUD', category: r.category, cardId: r.cardId || '' });
+    // Learn: remember which category you confirmed for this merchant line,
+    // so future parses of the same merchant auto-categorise correctly
+    const k = normDesc(r.description);
+    if (k && r.category) learnMap[k] = r.category;
   });
   save();
   populateSpendingFilters();
@@ -5484,9 +5639,11 @@ function initHome() {
 }
 
 // ─── v2.6: Top News Picks (Home) ──────────────────────────────────────────
-// Sources: NewsAPI when a key is set in Settings; otherwise Google News RSS
-// (Tech/AI · Finance · Global: US/Indonesia/Australia/Singapore) via a CORS
-// proxy. Cached in localStorage for 60 minutes; ⟳ Refresh forces a re-fetch.
+// Today-only headlines come from Google News RSS (when:1d filter) via a CORS
+// proxy, then Claude (existing smooth-action proxy, same as AI Chat) curates:
+// picks the top 8, removes near-duplicates, and tags Tech/Finance/AI/Global.
+// NewsAPI dependency removed (free tier blocks non-localhost origins).
+// Cached per-day in localStorage for 60 minutes; ⟳ Refresh forces a re-fetch.
 const NEWS_CACHE_KEY = 'financeHub_newsCache';
 const NEWS_FEEDS = [
   { tag: 'Tech/AI',  url: 'https://news.google.com/rss/search?q=technology+OR+%22artificial+intelligence%22+when:1d&hl=en-US&gl=US&ceid=US:en' },
@@ -5498,10 +5655,11 @@ let newsBusy = false;
 async function loadHomeNews(force) {
   const el = document.getElementById('homeNewsBody');
   if (!el || newsBusy) return;
-  // Serve from cache when fresh (<60 min) and not forced
+  const todayStr = new Date().toISOString().slice(0, 10);
+  // Serve from cache when it's from today, fresh (<60 min), and not forced
   try {
     const cache = JSON.parse(localStorage.getItem(NEWS_CACHE_KEY) || 'null');
-    if (!force && cache && cache.items && (Date.now() - cache.fetchedAt) < 3600000) {
+    if (!force && cache && cache.items && cache.day === todayStr && (Date.now() - cache.fetchedAt) < 3600000) {
       renderHomeNews(cache.items, cache.fetchedAt);
       return;
     }
@@ -5510,40 +5668,40 @@ async function loadHomeNews(force) {
   el.innerHTML = '<span style="color:var(--muted);">⟳ Fetching today\'s top stories…</span>';
   let items = [];
   try {
-    const key = (appData.settings || {}).newsApiKey;
-    if (key) {
-      // NewsAPI path (note: free tier only permits localhost origins)
-      try {
-        const q = encodeURIComponent('technology OR finance OR "artificial intelligence" OR Indonesia OR Singapore OR Australia');
-        const r = await fetch(`https://newsapi.org/v2/everything?q=${q}&language=en&sortBy=publishedAt&pageSize=9&apiKey=${key}`);
-        if (r.ok) {
-          const j = await r.json();
-          items = (j.articles || []).map(a => ({ title: a.title, link: a.url, source: (a.source || {}).name || '', tag: 'News' }));
-        }
-      } catch { /* fall through to RSS */ }
-    }
-    if (!items.length) {
-      // Google News RSS via CORS proxy — 3 stories per topic
-      const results = await Promise.allSettled(NEWS_FEEDS.map(async f => {
-        const r = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(f.url));
-        if (!r.ok) throw new Error('feed ' + r.status);
-        const xml = new DOMParser().parseFromString(await r.text(), 'text/xml');
-        return Array.from(xml.querySelectorAll('item')).slice(0, 3).map(it => ({
-          title: (it.querySelector('title') || {}).textContent || '',
-          link:  (it.querySelector('link')  || {}).textContent || '',
-          source: ((it.querySelector('source') || {}).textContent || '').trim(),
-          tag: f.tag
-        }));
+    // 1. Today's raw headlines (when:1d) — up to 8 per topic feed
+    const results = await Promise.allSettled(NEWS_FEEDS.map(async f => {
+      const r = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(f.url));
+      if (!r.ok) throw new Error('feed ' + r.status);
+      const xml = new DOMParser().parseFromString(await r.text(), 'text/xml');
+      return Array.from(xml.querySelectorAll('item')).slice(0, 8).map(it => ({
+        title: (it.querySelector('title') || {}).textContent || '',
+        link:  (it.querySelector('link')  || {}).textContent || '',
+        source: ((it.querySelector('source') || {}).textContent || '').trim(),
+        tag: f.tag
       }));
-      results.forEach(res => { if (res.status === 'fulfilled') items = items.concat(res.value); });
+    }));
+    results.forEach(res => { if (res.status === 'fulfilled') items = items.concat(res.value); });
+
+    // 2. Claude curates today's picks via the existing smooth-action proxy
+    if (items.length > 8) {
+      try {
+        const list = items.map((it, i) => `${i}. [${it.tag}] ${it.title}${it.source ? ' (' + it.source + ')' : ''}`).join('\n');
+        const prompt = 'You curate the daily news card on a personal finance dashboard. From TODAY\'s headlines below, choose the 8 most important, covering Tech, Finance, AI and Global news (US, Indonesia, Australia, Singapore) where possible. Skip near-duplicates and clickbait. Reply with STRICT JSON only, no other text: [{"i":<headline number>,"tag":"Tech"|"Finance"|"AI"|"Global"}]\n\n' + list;
+        const txt = await askChatAI(prompt);
+        const m = txt.match(/\[[\s\S]*\]/);
+        if (m) {
+          const picks = JSON.parse(m[0]).filter(p => items[p.i]);
+          if (picks.length >= 3) items = picks.slice(0, 8).map(p => ({ ...items[p.i], tag: p.tag || items[p.i].tag }));
+        }
+      } catch (e) { console.warn('news: Claude curation skipped, showing raw feed —', e); }
     }
   } catch (e) { console.error('loadHomeNews:', e); }
   newsBusy = false;
   if (!items.length) {
-    el.innerHTML = '<span style="color:var(--muted);">Couldn\'t fetch news right now (network or proxy unavailable). Try ⟳ Refresh, or add a NewsAPI key in Settings.</span>';
+    el.innerHTML = '<span style="color:var(--muted);">Couldn\'t fetch news right now (network or proxy unavailable). Try ⟳ Refresh.</span>';
     return;
   }
-  const payload = { fetchedAt: Date.now(), items };
+  const payload = { fetchedAt: Date.now(), day: todayStr, items };
   try { localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(payload)); } catch { /* quota */ }
   renderHomeNews(items, payload.fetchedAt);
 }
@@ -5551,7 +5709,7 @@ async function loadHomeNews(force) {
 function renderHomeNews(items, fetchedAt) {
   const el = document.getElementById('homeNewsBody');
   if (!el) return;
-  const tagColor = { 'Tech/AI': 'var(--n1)', 'Finance': 'var(--gold)', 'Global': 'var(--ok)', 'News': 'var(--n1)' };
+  const tagColor = { 'Tech/AI': 'var(--n1)', 'Tech': 'var(--n1)', 'AI': 'var(--n1)', 'Finance': 'var(--gold)', 'Global': 'var(--ok)', 'News': 'var(--n1)' };
   el.innerHTML = items.slice(0, 9).map(it => `
     <div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--bdr);">
       <span style="flex-shrink:0; font-size:9px; font-weight:700; letter-spacing:.04em; color:#fff; background:${tagColor[it.tag] || 'var(--n1)'}; padding:2px 7px; border-radius:8px;">${escHtml(it.tag)}</span>
@@ -5713,6 +5871,18 @@ function renderHomePlansCard() {
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────
+// Header clock — date + time with seconds, ticks every second
+function tickClock() {
+  const el = document.getElementById('hubClock');
+  if (!el) return;
+  el.textContent = new Date().toLocaleString('en-AU', {
+    weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  });
+}
+tickClock();
+setInterval(tickClock, 1000);
+
 // S2.6: restore the profile identity for this browser session before loading data
 activeUserId = sessionStorage.getItem('hubUser') || activeUserId;
 loadApp().then(() => { migrateProfilesRegistry(); initHome(); checkAuth(); renderMarketStrip(false); });
