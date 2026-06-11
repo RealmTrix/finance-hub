@@ -1,4 +1,4 @@
-<!-- Finance Hub v1.1 — Session 9: Login Gate + Password Management -->
+<!-- Finance Hub v2.1 — Session 2.1: Visa & Goals sub-tab (Visa Countdown + Milestone Timeline + Wealth Trajectory) -->
 <!-- Project Kangaroo | michael-finance-hub -->
 <!-- Built: May 2026 | Sessions: 9 planned -->
 <!DOCTYPE html>
@@ -425,6 +425,29 @@ th {
 .inv-subtab { font-size:12px; font-weight:500; padding:7px 16px; border:none; border-bottom:2px solid transparent; margin-bottom:-2px; background:none; color:var(--muted); cursor:pointer; font-family:var(--font); transition:color .15s, border-color .15s; }
 .inv-subtab:hover  { color:var(--txt); }
 .inv-subtab.active { color:var(--gold); border-bottom-color:var(--gold); font-weight:600; }
+/* S2.1: Income sub-tabs */
+.inc-subtabs { display:flex; gap:0; border-bottom:2px solid var(--bdr); margin-bottom:16px; }
+.inc-subtab { font-size:12px; font-weight:500; padding:7px 16px; border:none; border-bottom:2px solid transparent; margin-bottom:-2px; background:none; color:var(--muted); cursor:pointer; font-family:var(--font); transition:color .15s, border-color .15s; }
+.inc-subtab:hover  { color:var(--txt); }
+.inc-subtab.active { color:var(--gold); border-bottom-color:var(--gold); font-weight:600; }
+/* S2.1: Milestone timeline */
+.vis-timeline { display:flex; flex-direction:column; gap:0; position:relative; }
+.vis-timeline::before { content:''; position:absolute; left:11px; top:8px; bottom:8px; width:2px; background:var(--bdr); }
+.vis-milestone { display:flex; gap:14px; align-items:flex-start; padding:8px 0; position:relative; }
+.vis-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; margin-top:3px; border:2px solid; }
+.vis-dot-visa    { border-color:var(--n1);  background:var(--n1); }
+.vis-dot-finance { border-color:var(--gold); background:var(--gold); }
+.vis-dot-career  { border-color:var(--ok);  background:var(--ok); }
+.vis-dot-personal{ border-color:var(--amber); background:var(--amber); }
+.vis-dot-done    { border-color:var(--muted); background:var(--muted); }
+.vis-info { flex:1; }
+.vis-name { font-size:13px; font-weight:600; color:var(--txt); }
+.vis-date { font-size:11px; color:var(--muted); }
+.vis-cat  { font-size:10px; padding:2px 7px; border-radius:10px; font-weight:600; margin-left:6px; }
+.vis-cat-visa    { background:rgba(var(--n1-rgb,14,77,145),.12); color:var(--n1); }
+.vis-cat-finance { background:rgba(var(--gold-rgb,212,175,55),.15); color:var(--gold); }
+.vis-cat-career  { background:rgba(0,180,100,.12); color:var(--ok); }
+.vis-cat-personal{ background:rgba(var(--amber-rgb,230,160,40),.15); color:var(--amber); }
 .ai-card { background:var(--bg); border:1px solid var(--bdr); border-radius:6px; padding:14px; margin-top:12px; }
 .ai-output { font-size:13px; line-height:1.6; white-space:pre-wrap; color:var(--txt); }
 .ai-disclaimer { font-size:10px; color:var(--muted); font-style:italic; margin-top:10px; }
@@ -917,34 +940,120 @@ th {
   <!-- Income -->
   <div id="tab-income" class="tab-panel" style="display:none">
 
-    <!-- Financial Stress Score -->
-    <div id="stressScoreCard" class="card" style="margin-bottom:14px; padding:16px;">
-      <div style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:10px;">Financial Stress Score</div>
-      <div id="stressScoreBody" style="color:var(--muted); font-size:12px;">Loading…</div>
-    </div>
+    <nav class="inc-subtabs">
+      <button class="inc-subtab active" onclick="showIncTab('inc-income',this)">💰 Income</button>
+      <button class="inc-subtab" onclick="showIncTab('inc-visa',this)">🛂 Visa &amp; Goals</button>
+    </nav>
 
-    <!-- Income Log -->
-    <div class="card" style="margin-bottom:14px; padding:16px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <div class="section-heading" style="margin:0;">Income Log</div>
-        <button class="btn" style="background:var(--n1);color:#fff;" onclick="addIncome()">+ Add Income</button>
-      </div>
-      <div style="overflow-x:auto;">
-        <table class="inv-tbl" style="width:100%;" id="incomeTable">
-          <thead><tr>
-            <th>Date</th><th>Source</th><th>Amount</th><th>Currency</th><th>Type</th><th>AUD Value</th><th>Post to Budget</th><th></th>
-          </tr></thead>
-          <tbody id="incomeTbody"></tbody>
-        </table>
-      </div>
-      <div id="incomeMonthlyTotal" style="margin-top:10px; font-size:12px; color:var(--muted);"></div>
-    </div>
+    <!-- ── Income panel ───────────────────────────────────────────────── -->
+    <div id="inc-income">
 
-    <!-- Multi-Source YTD Summary -->
-    <div class="card" style="padding:16px;">
-      <div class="section-heading" style="margin-bottom:10px;">YTD Income by Source</div>
-      <div id="incomeSummary" style="color:var(--muted); font-size:12px;">No income entries yet.</div>
-    </div>
+      <!-- Financial Stress Score -->
+      <div id="stressScoreCard" class="card" style="margin-bottom:14px; padding:16px;">
+        <div style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:10px;">Financial Stress Score</div>
+        <div id="stressScoreBody" style="color:var(--muted); font-size:12px;">Loading…</div>
+      </div>
+
+      <!-- Income Log -->
+      <div class="card" style="margin-bottom:14px; padding:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div class="section-heading" style="margin:0;">Income Log</div>
+          <button class="btn" style="background:var(--n1);color:#fff;" onclick="addIncome()">+ Add Income</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="inv-tbl" style="width:100%;" id="incomeTable">
+            <thead><tr>
+              <th>Date</th><th>Source</th><th>Amount</th><th>Currency</th><th>Type</th><th>AUD Value</th><th>Post to Budget</th><th></th>
+            </tr></thead>
+            <tbody id="incomeTbody"></tbody>
+          </table>
+        </div>
+        <div id="incomeMonthlyTotal" style="margin-top:10px; font-size:12px; color:var(--muted);"></div>
+      </div>
+
+      <!-- Multi-Source YTD Summary -->
+      <div class="card" style="padding:16px;">
+        <div class="section-heading" style="margin-bottom:10px;">YTD Income by Source</div>
+        <div id="incomeSummary" style="color:var(--muted); font-size:12px;">No income entries yet.</div>
+      </div>
+
+    </div><!-- /inc-income -->
+
+    <!-- ── Visa & Goals panel ─────────────────────────────────────────── -->
+    <div id="inc-visa" style="display:none">
+
+      <!-- Visa Countdown -->
+      <div class="card" style="margin-bottom:14px; padding:16px;" id="visaCountdownCard">
+        <div style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:10px;">🛂 Visa Countdown</div>
+        <div id="visaCountdownBody">Loading…</div>
+      </div>
+
+      <!-- Milestone Timeline -->
+      <div class="card" style="margin-bottom:14px; padding:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div class="section-heading" style="margin:0;">📍 Milestone Timeline</div>
+          <button class="btn" style="background:var(--n1);color:#fff;" onclick="addMilestone()">+ Add Milestone</button>
+        </div>
+        <div id="milestoneList"><span style="color:var(--muted);font-size:12px;">No milestones yet. Add one above.</span></div>
+        <!-- Add/Edit form (hidden by default) -->
+        <div id="milestoneForm" style="display:none; margin-top:14px; border-top:1px solid var(--bdr); padding-top:14px;">
+          <input type="hidden" id="mfId">
+          <div class="settings-grid" style="margin-bottom:10px;">
+            <div class="settings-field">
+              <label>Name</label>
+              <input type="text" id="mfName" placeholder="e.g. Apply for PR" maxlength="80">
+            </div>
+            <div class="settings-field">
+              <label>Target Date</label>
+              <input type="date" id="mfDate">
+            </div>
+            <div class="settings-field">
+              <label>Target Amount (AUD, optional)</label>
+              <input type="number" id="mfAmount" min="0" step="1000" placeholder="e.g. 50000">
+            </div>
+            <div class="settings-field">
+              <label>Category</label>
+              <select id="mfCat">
+                <option value="Visa">Visa</option>
+                <option value="Finance">Finance</option>
+                <option value="Career">Career</option>
+                <option value="Personal">Personal</option>
+              </select>
+            </div>
+            <div class="settings-field">
+              <label>Status</label>
+              <select id="mfStatus">
+                <option value="Not Started">Not Started</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Done">Done</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn" style="background:var(--n1);color:#fff;" onclick="saveMilestone()">Save</button>
+            <button class="btn" style="background:var(--card);border:1px solid var(--bdr);" onclick="document.getElementById('milestoneForm').style.display='none'">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wealth Trajectory -->
+      <div class="card" style="padding:16px;">
+        <div class="section-heading" style="margin-bottom:4px;">📈 Wealth Trajectory</div>
+        <p style="font-size:11px; color:var(--muted); margin-bottom:12px;">Projected net worth at visa expiry based on current net worth + estimated monthly savings. Uses Wealth tab data.</p>
+        <div class="settings-grid" style="margin-bottom:12px;">
+          <div class="settings-field">
+            <label>Wealth Target (AUD, optional)</label>
+            <input type="number" id="wealthTarget" min="0" step="5000" placeholder="e.g. 150000" oninput="renderWealthTrajectory()">
+          </div>
+          <div class="settings-field">
+            <label>Target Date for Wealth Goal</label>
+            <input type="date" id="wealthTargetDate" oninput="renderWealthTrajectory()">
+          </div>
+        </div>
+        <div id="wealthTrajectoryBody"><span style="color:var(--muted);font-size:12px;">Set your visa expiry in Settings → Visa &amp; Goals to enable projections.</span></div>
+      </div>
+
+    </div><!-- /inc-visa -->
 
   </div>
 
@@ -1061,6 +1170,24 @@ th {
       </label>
       <p id="snapshotNote" style="font-size:11px; color:var(--muted); margin-top:6px;">Fetches market indices + your holdings each morning and shows a briefing at the top of the Investments tab.</p>
 
+      <div class="section-heading" style="margin-top:16px;">🛂 Visa &amp; Goals</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Used by the Visa &amp; Goals panel in the Income tab.</p>
+      <div class="settings-grid">
+        <div class="settings-field">
+          <label>Visa Type (e.g. 485)</label>
+          <input type="text" id="visaType" placeholder="e.g. 485" maxlength="20"
+                 onchange="saveSetting('visaType', this.value)">
+        </div>
+        <div class="settings-field">
+          <label>Visa Expiry Date</label>
+          <input type="date" id="visaExpiry" onchange="saveSetting('visaExpiry', this.value)">
+        </div>
+        <div class="settings-field">
+          <label>PR Application Target Date</label>
+          <input type="date" id="prTargetDate" onchange="saveSetting('prTargetDate', this.value)">
+        </div>
+      </div>
+
       <div class="section-heading" style="margin-top:16px;">🔒 Change Password</div>
       <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Requires your current password to update.</p>
       <div class="settings-grid">
@@ -1098,7 +1225,7 @@ th {
     </div>
 
     <div class="ver-footer">
-      <span id="versionDisplay">Finance Hub v1.1 — Login Gate + Password Management</span>
+      <span id="versionDisplay">Finance Hub v2.1 — Visa &amp; Goals</span>
       <span id="lastSavedDisplay" style="color:var(--muted)">–</span>
     </div>
   </div>
@@ -1402,8 +1529,8 @@ th {
     </div>
 
     <div class="ver-footer">
-      <span>Finance Hub v1.1</span>
-      <span>v1.0 complete — v2.1 roadmap active</span>
+      <span>Finance Hub v2.1</span>
+      <span>v2.1 in progress — Visa &amp; Goals active</span>
     </div>
   </div>
 
@@ -1455,7 +1582,10 @@ function initData() {
       acct3Name: 'Bank 3',
       acct4Name: 'Credit Card',
       newsApiKey: '',
-      dailySnapshotEnabled: false
+      dailySnapshotEnabled: false,
+      visaType: '',
+      visaExpiry: '',
+      prTargetDate: ''
     }
     // Future sessions will add keys here via migrate():
     // s2: budget, cards, rates
@@ -1510,7 +1640,12 @@ function migrate(d) {
   if (!d.taxState || typeof d.taxState !== 'object') d.taxState = { paygYTD: 0 };
   // S8: feature requests
   if (!Array.isArray(d.featureRequests)) d.featureRequests = [];
-  d.schemaVersion = 9;
+  // S2.1: visa & goals
+  if (!Array.isArray(d.milestones)) d.milestones = [];
+  if (!d.settings.visaType)    d.settings.visaType    = '';
+  if (!d.settings.visaExpiry)  d.settings.visaExpiry  = '';
+  if (!d.settings.prTargetDate) d.settings.prTargetDate = '';
+  d.schemaVersion = 10;
   return d;
 }
 
@@ -1615,6 +1750,9 @@ function renderSettings() {
   if ($id('monthlySalary')) $id('monthlySalary').value = s.monthlySalary || '';
   if ($id('newsApiKey'))  $id('newsApiKey').value  = s.newsApiKey || '';
   if ($id('dailySnapshotToggle')) $id('dailySnapshotToggle').checked = !!s.dailySnapshotEnabled;
+  if ($id('visaType'))     $id('visaType').value     = s.visaType     || '';
+  if ($id('visaExpiry'))   $id('visaExpiry').value   = s.visaExpiry   || '';
+  if ($id('prTargetDate')) $id('prTargetDate').value = s.prTargetDate || '';
   renderSettingsAccounts();
   updateLastSaved();
 }
@@ -3425,9 +3563,18 @@ const INCOME_TYPES = ['Salary','Freelance','Dividend','Other'];
 const INCOME_TYPE_BUDGET_MAP = { Salary: 'salary', Freelance: 'sideIncome', Dividend: 'otherIncome', Other: 'otherIncome' };
 const DEDUCTION_CATS = ['Work-from-home','Professional fees','Self-education','Donations','Investment expenses','Other'];
 
+function showIncTab(id, el) {
+  document.querySelectorAll('#tab-income > [id^="inc-"]').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.inc-subtab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).style.display = '';
+  el.classList.add('active');
+  if (id === 'inc-visa') initVisa();
+}
+
 function initIncome() {
   if (!Array.isArray(store('income'))) store('income', []);
   if (!Array.isArray(store('deductions'))) store('deductions', []);
+  if (!Array.isArray(appData.milestones)) appData.milestones = [];
   renderStressScore();
   renderIncomeTable();
   renderIncomeSummary();
@@ -3621,6 +3768,241 @@ function inFY(dateStr, fy) {
   const m = d.getMonth() + 1; const y = d.getFullYear();
   if (m >= fyStart) return y === fy.start;
   return y === fy.end;
+}
+
+// ─── S2.1: Visa & Goals ───────────────────────────────────────────────────
+
+function VISA_UID() { return 'v' + Date.now() + Math.random().toString(36).slice(2, 6); }
+
+function initVisa() {
+  if (!Array.isArray(appData.milestones)) appData.milestones = [];
+  renderVisaCountdown();
+  renderMilestones();
+  renderWealthTrajectory();
+}
+
+function renderVisaCountdown() {
+  const el = document.getElementById('visaCountdownBody');
+  if (!el) return;
+  const s = appData.settings || {};
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  if (!s.visaExpiry) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:12px;">Set your Visa Expiry Date in Settings → Visa &amp; Goals to enable this card.</p>';
+    return;
+  }
+
+  const expiry = new Date(s.visaExpiry); expiry.setHours(0,0,0,0);
+  const daysLeft = Math.round((expiry - today) / 86400000);
+  const color = daysLeft > 365 ? 'var(--ok)' : daysLeft >= 180 ? 'var(--amber)' : 'var(--err)';
+  const label = daysLeft > 365 ? 'Visa secure' : daysLeft >= 180 ? 'Plan ahead' : 'Act soon';
+  const pct = Math.max(0, Math.min(100, Math.round(daysLeft / 730 * 100)));
+
+  let prHtml = '';
+  if (s.prTargetDate) {
+    const prDate = new Date(s.prTargetDate); prDate.setHours(0,0,0,0);
+    const daysUntilPR = Math.round((prDate - today) / 86400000);
+    const prColor = daysUntilPR < 0 ? 'var(--err)' : daysUntilPR < 180 ? 'var(--amber)' : 'var(--ok)';
+    prHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bdr);font-size:12px;">
+      <span style="color:var(--muted);">PR Application Target</span><br>
+      <strong style="color:${prColor};">${daysUntilPR < 0 ? 'Overdue by ' + Math.abs(daysUntilPR) : daysUntilPR + ' days away'}</strong>
+      <span style="color:var(--muted);"> · ${s.prTargetDate}</span>
+    </div>`;
+  }
+
+  el.innerHTML = `
+    <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap; margin-bottom:10px;">
+      <div style="text-align:center;">
+        <div style="font-size:36px; font-weight:700; color:${color};">${daysLeft}</div>
+        <div style="font-size:11px; color:${color}; font-weight:600;">${label}</div>
+        <div style="font-size:10px; color:var(--muted);">days remaining</div>
+      </div>
+      <div style="flex:1; min-width:160px;">
+        <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">
+          ${s.visaType ? '<strong>Visa ' + escHtml(s.visaType) + '</strong> · ' : ''}Expires ${s.visaExpiry}
+        </div>
+        <div style="background:var(--bdr); border-radius:6px; height:8px; overflow:hidden;">
+          <div style="height:100%; width:${pct}%; background:${color}; border-radius:6px; transition:width .4s;"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:4px;">
+          <span>Today</span><span>Expiry</span>
+        </div>
+      </div>
+    </div>
+    ${prHtml}`;
+}
+
+function renderMilestones() {
+  const el = document.getElementById('milestoneList');
+  if (!el) return;
+  const list = (appData.milestones || []).slice().sort((a, b) => {
+    if (a.status === 'Done' && b.status !== 'Done') return 1;
+    if (b.status === 'Done' && a.status !== 'Done') return -1;
+    return (a.targetDate || '').localeCompare(b.targetDate || '');
+  });
+  if (!list.length) {
+    el.innerHTML = '<span style="color:var(--muted);font-size:12px;">No milestones yet. Add one above.</span>';
+    return;
+  }
+  const today = new Date(); today.setHours(0,0,0,0);
+  const catClass = { Visa:'visa', Finance:'finance', Career:'career', Personal:'personal' };
+  el.innerHTML = `<div class="vis-timeline">${list.map(m => {
+    const done = m.status === 'Done';
+    const dot = done ? 'vis-dot-done' : `vis-dot-${(catClass[m.category] || 'visa')}`;
+    const mDate = m.targetDate ? new Date(m.targetDate) : null;
+    mDate && mDate.setHours(0,0,0,0);
+    const daysUntil = mDate ? Math.round((mDate - today) / 86400000) : null;
+    const dateLabel = mDate ? m.targetDate + (daysUntil !== null ? ` · ${daysUntil < 0 ? Math.abs(daysUntil) + 'd overdue' : daysUntil + 'd away'}` : '') : '';
+    const amtLabel = m.targetAmount ? ` · AUD ${Number(m.targetAmount).toLocaleString()}` : '';
+    return `<div class="vis-milestone">
+      <div class="vis-dot ${dot}" style="flex-shrink:0; margin-top:4px;"></div>
+      <div class="vis-info">
+        <div style="display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
+          <span class="vis-name" style="${done ? 'color:var(--muted);text-decoration:line-through;' : ''}">${done ? '✓ ' : ''}${escHtml(m.name)}</span>
+          <span class="vis-cat vis-cat-${catClass[m.category] || 'visa'}">${escHtml(m.category || 'Visa')}</span>
+          <span style="font-size:10px;color:var(--muted);">${escHtml(m.status)}</span>
+        </div>
+        <div class="vis-date">${escHtml(dateLabel)}${amtLabel}</div>
+      </div>
+      <div style="display:flex; gap:6px; flex-shrink:0;">
+        <button class="btn" style="font-size:11px;padding:3px 8px;" onclick="editMilestone('${m.id}')">Edit</button>
+        <button class="btn" style="font-size:11px;padding:3px 8px;background:var(--err);color:#fff;" onclick="deleteMilestone('${m.id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function addMilestone() {
+  document.getElementById('mfId').value = '';
+  ['mfName','mfAmount'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const mfDate = document.getElementById('mfDate'); if (mfDate) mfDate.value = '';
+  const mfCat = document.getElementById('mfCat'); if (mfCat) mfCat.value = 'Visa';
+  const mfStatus = document.getElementById('mfStatus'); if (mfStatus) mfStatus.value = 'Not Started';
+  document.getElementById('milestoneForm').style.display = '';
+  document.getElementById('mfName').focus();
+}
+
+function editMilestone(id) {
+  const m = (appData.milestones || []).find(x => x.id === id);
+  if (!m) return;
+  document.getElementById('mfId').value = id;
+  document.getElementById('mfName').value = m.name || '';
+  document.getElementById('mfDate').value = m.targetDate || '';
+  document.getElementById('mfAmount').value = m.targetAmount || '';
+  document.getElementById('mfCat').value = m.category || 'Visa';
+  document.getElementById('mfStatus').value = m.status || 'Not Started';
+  document.getElementById('milestoneForm').style.display = '';
+  document.getElementById('mfName').focus();
+}
+
+function saveMilestone() {
+  const name = (document.getElementById('mfName') || {}).value || '';
+  if (!name.trim()) return;
+  const id   = document.getElementById('mfId').value;
+  const obj  = {
+    id:           id || VISA_UID(),
+    name:         name.trim(),
+    targetDate:   document.getElementById('mfDate').value || '',
+    targetAmount: parseFloat(document.getElementById('mfAmount').value) || 0,
+    category:     document.getElementById('mfCat').value || 'Visa',
+    status:       document.getElementById('mfStatus').value || 'Not Started'
+  };
+  if (!Array.isArray(appData.milestones)) appData.milestones = [];
+  if (id) {
+    const idx = appData.milestones.findIndex(x => x.id === id);
+    if (idx !== -1) appData.milestones[idx] = obj;
+    else appData.milestones.push(obj);
+  } else {
+    appData.milestones.push(obj);
+  }
+  save();
+  document.getElementById('milestoneForm').style.display = 'none';
+  renderMilestones();
+}
+
+function deleteMilestone(id) {
+  if (!Array.isArray(appData.milestones)) return;
+  appData.milestones = appData.milestones.filter(x => x.id !== id);
+  save();
+  renderMilestones();
+}
+
+function renderWealthTrajectory() {
+  const el = document.getElementById('wealthTrajectoryBody');
+  if (!el) return;
+  const s = appData.settings || {};
+
+  if (!s.visaExpiry) {
+    el.innerHTML = '<span style="color:var(--muted);font-size:12px;">Set your Visa Expiry Date in Settings → Visa &amp; Goals to enable projections.</span>';
+    return;
+  }
+
+  // Current net worth from Wealth tab
+  const toA = (val, cur) => toAUD(parseFloat(val) || 0, cur || 'AUD');
+  const assets = (appData.assets || []).reduce((s, a) => s + toA(a.value, a.currency), 0);
+  const liabs  = (appData.liabilities || []).reduce((s, l) => s + toA(l.value, l.currency), 0);
+  // Also include credit card balances as liabilities (mirror of Wealth tab)
+  const creditLiab = (appData.cards || []).filter(c => c.type === 'Credit').reduce((s, c) => s + toA(c.balance, c.currency), 0);
+  const currentNW = assets - liabs - creditLiab;
+
+  // Estimated monthly savings = salary − avg monthly spend (last 3 months)
+  const salary = parseFloat(s.monthlySalary) || 0;
+  const spend = appData.spending || [];
+  const now = new Date();
+  let spend3m = 0, monthsWithData = 0;
+  for (let i = 1; i <= 3; i++) {
+    const ref = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = ref.getFullYear() + '-' + String(ref.getMonth() + 1).padStart(2, '0');
+    const monthSpend = spend.filter(x => (x.date || '').startsWith(key)).reduce((s, x) => s + toAUD(parseFloat(x.amount) || 0, x.currency || 'AUD'), 0);
+    if (monthSpend > 0) { spend3m += monthSpend; monthsWithData++; }
+  }
+  const avgMonthlySpend = monthsWithData > 0 ? spend3m / monthsWithData : 0;
+  const monthlySavings = salary - avgMonthlySpend;
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const expiry = new Date(s.visaExpiry); expiry.setHours(0,0,0,0);
+  const monthsToExpiry = Math.max(0, Math.round((expiry - today) / (30.44 * 86400000)));
+  const projectedNW = currentNW + monthlySavings * monthsToExpiry;
+
+  // Optional wealth goal
+  const goalEl = document.getElementById('wealthTarget');
+  const goalDateEl = document.getElementById('wealthTargetDate');
+  const goal = goalEl ? (parseFloat(goalEl.value) || 0) : 0;
+  const goalDateStr = goalDateEl ? goalDateEl.value : '';
+  let goalHtml = '';
+  if (goal > 0 && goalDateStr) {
+    const goalDate = new Date(goalDateStr); goalDate.setHours(0,0,0,0);
+    const monthsToGoal = Math.max(1, Math.round((goalDate - today) / (30.44 * 86400000)));
+    const required = (goal - currentNW) / monthsToGoal;
+    const feasible = required <= monthlySavings;
+    goalHtml = `
+      <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--bdr); font-size:12px;">
+        <div style="font-weight:600; margin-bottom:4px;">Wealth Goal: AUD ${Number(goal).toLocaleString()} by ${goalDateStr}</div>
+        <div>Required monthly saving: <strong style="color:${feasible?'var(--ok)':'var(--err)'};">${fmtMoney(toBase(required,'AUD'), s.baseCurrency)}</strong></div>
+        <div style="color:var(--muted);">${feasible ? '✓ Achievable at your current savings rate.' : '⚠ Higher than your current estimated savings — review expenses or salary.'}</div>
+      </div>`;
+  }
+
+  const nwColor = currentNW >= 0 ? 'var(--ok)' : 'var(--err)';
+  const projColor = projectedNW >= currentNW ? 'var(--ok)' : 'var(--err)';
+  el.innerHTML = `
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:4px;">
+      <div style="background:var(--bg); border:1px solid var(--bdr); border-radius:6px; padding:12px; text-align:center;">
+        <div style="font-size:10px; color:var(--muted); margin-bottom:4px;">Current Net Worth</div>
+        <div style="font-size:18px; font-weight:700; color:${nwColor};">${fmtMoney(toBase(currentNW,'AUD'), s.baseCurrency)}</div>
+      </div>
+      <div style="background:var(--bg); border:1px solid var(--bdr); border-radius:6px; padding:12px; text-align:center;">
+        <div style="font-size:10px; color:var(--muted); margin-bottom:4px;">Est. at Visa Expiry</div>
+        <div style="font-size:18px; font-weight:700; color:${projColor};">${fmtMoney(toBase(projectedNW,'AUD'), s.baseCurrency)}</div>
+        <div style="font-size:10px; color:var(--muted);">${monthsToExpiry} months · +${fmtMoney(toBase(monthlySavings,'AUD'), s.baseCurrency)}/mo</div>
+      </div>
+      <div style="background:var(--bg); border:1px solid var(--bdr); border-radius:6px; padding:12px; text-align:center;">
+        <div style="font-size:10px; color:var(--muted); margin-bottom:4px;">Est. Monthly Savings</div>
+        <div style="font-size:18px; font-weight:700; color:${monthlySavings>=0?'var(--ok)':'var(--err)'};">${fmtMoney(toBase(monthlySavings,'AUD'), s.baseCurrency)}</div>
+        <div style="font-size:10px; color:var(--muted);">salary − avg 3m spend</div>
+      </div>
+    </div>
+    ${goalHtml}`;
 }
 
 // ─── S7: Tax Tab ──────────────────────────────────────────────────────────
