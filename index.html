@@ -1,4 +1,4 @@
-<!-- Finance Hub v2.1 — Session 2.1: Visa & Goals sub-tab (Visa Countdown + Milestone Timeline + Wealth Trajectory) -->
+<!-- Finance Hub v2.2 — Session 2.2: AI Chat tab (Claude proxy chatbot with appData context) -->
 <!-- Project Kangaroo | michael-finance-hub -->
 <!-- Built: May 2026 | Sessions: 9 planned -->
 <!DOCTYPE html>
@@ -453,6 +453,13 @@ th {
 .ai-disclaimer { font-size:10px; color:var(--muted); font-style:italic; margin-top:10px; }
 .quick-prompt { font-size:11px; padding:4px 11px; border:1px solid var(--bdr); border-radius:14px; background:var(--card); color:var(--txt); cursor:pointer; font-family:var(--font); }
 .quick-prompt:hover { border-color:var(--gold); color:var(--gold); }
+/* S2.2: AI Chat */
+.chat-box { display:flex; flex-direction:column; gap:8px; max-height:420px; min-height:140px; overflow-y:auto; padding:10px; background:var(--bg); border:1px solid var(--bdr); border-radius:6px; }
+.chat-bubble { max-width:82%; padding:8px 12px; border-radius:12px; font-size:13px; line-height:1.5; white-space:pre-wrap; word-break:break-word; }
+.chat-user { align-self:flex-end; background:var(--n1); color:#fff; border-bottom-right-radius:3px; }
+.chat-ai { align-self:flex-start; background:var(--card); color:var(--txt); border:1px solid var(--bdr); border-bottom-left-radius:3px; }
+.chat-err { align-self:flex-start; color:var(--err); font-size:12px; font-style:italic; }
+.chat-empty { color:var(--muted); font-size:12px; text-align:center; padding:18px 0 8px; }
 .brief-row { display:flex; flex-wrap:wrap; gap:14px; font-size:12px; }
 
 /* ─── S3: Spending ───────────────────────────────────────────────────────── */
@@ -677,6 +684,7 @@ th {
   <button class="tab" onclick="showTab('investments', this); initInvestments()">Investments</button>
   <button class="tab" onclick="showTab('income', this); initIncome()">Income</button>
   <button class="tab" onclick="showTab('tax', this); initTax()">Tax</button>
+  <button class="tab" onclick="showTab('ai-chat', this); initAIChat()">AI Chat</button>
   <button class="tab" onclick="showTab('settings', this); renderSettingsAccounts()">Settings</button>
   <button class="tab" onclick="showTab('updates', this); initUpdates()">Updates</button>
 </nav>
@@ -1101,6 +1109,26 @@ th {
       <div id="deductionTotal" style="margin-top:10px; font-size:12px; color:var(--muted);"></div>
     </div>
 
+  </div>
+
+  <!-- AI Chat (S2.2) -->
+  <div id="tab-ai-chat" class="tab-panel" style="display:none">
+    <div class="card" style="padding:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+        <div class="section-heading" style="margin:0;">💬 AI Chat</div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" style="background:var(--card); color:var(--txt); border:1px solid var(--bdr);" onclick="refreshChatContext()">⟳ Refresh context</button>
+          <button class="btn" style="background:var(--card); color:var(--txt); border:1px solid var(--bdr);" onclick="clearChat()">Clear chat</button>
+        </div>
+      </div>
+      <div id="chatHistoryBox" class="chat-box"></div>
+      <div id="chatQuickPrompts" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;"></div>
+      <div style="display:flex; gap:8px; margin-top:10px; align-items:flex-end;">
+        <textarea id="chatInput" rows="2" placeholder="Ask about your finances… (Enter to send, Shift+Enter for new line)" style="flex:1; resize:vertical; font-family:var(--font); font-size:13px; padding:8px; border:1px solid var(--bdr); border-radius:6px; background:var(--card); color:var(--txt);" onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); sendChatMessage(); }"></textarea>
+        <button class="btn" id="chatSendBtn" style="background:var(--n1); color:#fff;" onclick="sendChatMessage()">Send</button>
+      </div>
+      <div class="ai-disclaimer">AI responses are for personal reference only, not financial advice.</div>
+    </div>
   </div>
 
   <!-- Settings -->
@@ -1645,6 +1673,8 @@ function migrate(d) {
   if (!d.settings.visaType)    d.settings.visaType    = '';
   if (!d.settings.visaExpiry)  d.settings.visaExpiry  = '';
   if (!d.settings.prTargetDate) d.settings.prTargetDate = '';
+  // S2.2: AI chat history — non-critical key, lazy seed only (no schema bump)
+  if (!Array.isArray(d.chatHistory)) d.chatHistory = [];
   d.schemaVersion = 10;
   return d;
 }
@@ -4414,6 +4444,183 @@ async function changePassword() {
   // Clear fields
   ['pwCurrent','pwNew','pwConfirm'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   showMsg('Password updated.', true);
+}
+
+// ─── S2.2: AI Chat ─────────────────────────────────────────────────────────
+const CHAT_QUICK_PROMPTS = [
+  'How am I doing this month?',
+  'When should I top up my savings?',
+  "What's my biggest spending category?",
+  'How long until I can afford a $3k holiday?'
+];
+let chatContextCache = null;   // built once per session; rebuilt only on explicit refresh
+let chatBusy = false;
+
+function initAIChat() {
+  if (!Array.isArray(appData.chatHistory)) appData.chatHistory = [];
+  if (!chatContextCache) chatContextCache = buildChatContext();
+  renderChatHistory();
+}
+
+function refreshChatContext() {
+  chatContextCache = buildChatContext();
+  renderChatHistory();
+}
+
+function clearChat() {
+  appData.chatHistory = [];
+  save();
+  renderChatHistory();
+}
+
+// Concise plain-English + JSON summary of appData for the chat system context (~<800 tokens).
+function buildChatContext() {
+  const s = appData.settings || {};
+  const mk = monthKeyNow();
+  const ctx = { month: mk, baseCurrency: s.baseCurrency || 'AUD' };
+
+  // Current month budget totals (income actuals come from the income log)
+  try {
+    const b = (appData.budget || {})[mk];
+    if (b) {
+      const incActs = (typeof computeIncomeActuals === 'function') ? computeIncomeActuals(mk) : {};
+      let tIB = 0, tIA = 0, tEB = 0, tEA = 0;
+      Object.keys(b.income || {}).forEach(k => { tIB += (b.income[k].budget || 0); tIA += (incActs[k] || 0); });
+      Object.keys(b.expenses || {}).forEach(k => { tEB += (b.expenses[k].budget || 0); tEA += (b.expenses[k].actual || 0); });
+      ctx.budgetThisMonth = { incomeBudget: +tIB.toFixed(0), incomeActual: +tIA.toFixed(0), expenseBudget: +tEB.toFixed(0), expenseActual: +tEA.toFixed(0) };
+    }
+  } catch (e) {}
+
+  // Net worth (AUD): assets − liabilities − credit card balances
+  try {
+    let nw = 0;
+    (appData.assets || []).forEach(a => { nw += toAUD(parseFloat(a.value) || 0, a.currency || 'AUD'); });
+    (appData.liabilities || []).forEach(l => { nw -= toAUD(parseFloat(l.value) || 0, l.currency || 'AUD'); });
+    (appData.cards || []).forEach(c => { if (c.type === 'Credit') nw -= toAUD(parseFloat(c.balance) || 0, c.currency || 'AUD'); });
+    ctx.netWorthAUD = +nw.toFixed(0);
+  } catch (e) {}
+
+  // Recent 5 income entries
+  try {
+    ctx.recentIncome = (appData.income || []).slice()
+      .sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 5)
+      .map(i => ({ date: i.date, source: i.source, amount: i.amount, currency: i.currency, type: i.type }));
+  } catch (e) {}
+
+  // Financial stress score (daily salary accrual ÷ daily burn, 30d)
+  try {
+    const salary = parseFloat(s.monthlySalary) || 0;
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+    let spend30 = 0;
+    (appData.spending || []).forEach(sp => {
+      if (new Date(sp.date) >= cutoff) spend30 += toAUD(parseFloat(sp.amount) || 0, sp.currency || 'AUD');
+    });
+    const dailyBurn = spend30 / 30;
+    if (dailyBurn > 0 && salary > 0) ctx.stressScore = +((salary / 30) / dailyBurn).toFixed(2);
+    ctx.spendLast30dAUD = +spend30.toFixed(0);
+  } catch (e) {}
+
+  // Visa expiry countdown
+  try {
+    if (s.visaExpiry) {
+      const days = Math.round((new Date(s.visaExpiry) - new Date()) / 86400000);
+      ctx.visa = { type: s.visaType || '', expiry: s.visaExpiry, daysRemaining: days };
+    }
+  } catch (e) {}
+
+  // Top 3 holdings by AUD market value (across all portfolios)
+  try {
+    const all = [];
+    const ccyMap = { idr: 'IDR', usd: 'USD', aud: 'AUD' };
+    Object.keys(appData.portfolios || {}).forEach(k => {
+      const hs = (appData.portfolios[k] && appData.portfolios[k].holdings) || [];
+      hs.forEach(h => {
+        const mv = (parseFloat(h.currentPrice) || 0) * (parseFloat(h.qty) || 0);
+        if (h.ticker && mv > 0) all.push({ ticker: h.ticker, name: h.name, audValue: +toAUD(mv, ccyMap[k] || 'AUD').toFixed(0) });
+      });
+    });
+    ctx.topHoldings = all.sort((a, b) => b.audValue - a.audValue).slice(0, 3);
+  } catch (e) {}
+
+  // Open signal trades
+  try {
+    ctx.openSignalTrades = (appData.signalTrades || []).filter(t => t.status === 'Open')
+      .map(t => ({ ticker: t.ticker, direction: t.direction, entryPrice: t.entryPrice, dateEntered: t.dateEntered }));
+  } catch (e) {}
+
+  return 'You are the in-app financial assistant for Michael\'s personal Finance Hub. ' +
+    'Answer using the data snapshot below. All currency in AUD unless noted. ' +
+    'Be concise, direct, and practical. If data is missing, say so rather than guessing.\n\n' +
+    'DATA SNAPSHOT:\n' + JSON.stringify(ctx);
+}
+
+function renderChatHistory() {
+  const box = document.getElementById('chatHistoryBox');
+  const qp  = document.getElementById('chatQuickPrompts');
+  if (!box) return;
+  const hist = appData.chatHistory || [];
+  if (!hist.length) {
+    box.innerHTML = '<div class="chat-empty">Ask anything about your budget, spending, net worth, investments, visa timeline or goals.</div>';
+    if (qp) qp.innerHTML = CHAT_QUICK_PROMPTS.map(p =>
+      '<button class="quick-prompt" onclick="document.getElementById(\'chatInput\').value=this.textContent; sendChatMessage()">' + escHtml(p) + '</button>').join('');
+  } else {
+    box.innerHTML = hist.map(m =>
+      '<div class="chat-bubble ' + (m.role === 'user' ? 'chat-user' : 'chat-ai') + '">' + escHtml(m.content) + '</div>').join('');
+    if (qp) qp.innerHTML = '';
+  }
+  if (chatBusy) box.innerHTML += '<div class="chat-bubble chat-ai" style="color:var(--muted);">Thinking…</div>';
+  box.scrollTop = box.scrollHeight;
+}
+
+async function sendChatMessage() {
+  if (chatBusy) return;
+  const input = document.getElementById('chatInput');
+  const text = (input && input.value || '').trim();
+  if (!text) return;
+  input.value = '';
+  if (!Array.isArray(appData.chatHistory)) appData.chatHistory = [];
+  appData.chatHistory.push({ role: 'user', content: text });
+  while (appData.chatHistory.length > 20) appData.chatHistory.shift();
+  save();
+  chatBusy = true;
+  renderChatHistory();
+  try {
+    if (!chatContextCache) chatContextCache = buildChatContext();
+    const transcript = appData.chatHistory.map(m => (m.role === 'user' ? 'User: ' : 'Assistant: ') + m.content).join('\n');
+    const prompt = chatContextCache + '\n\nCONVERSATION SO FAR:\n' + transcript + '\n\nReply to the last user message as the assistant. Keep it under 200 words.';
+    const reply = await askChatAI(prompt);
+    appData.chatHistory.push({ role: 'assistant', content: reply || '(empty response)' });
+    while (appData.chatHistory.length > 20) appData.chatHistory.shift();
+    save();
+  } catch (e) {
+    chatBusy = false;
+    renderChatHistory();
+    const box = document.getElementById('chatHistoryBox');
+    if (box) { box.innerHTML += '<div class="chat-err">Claude is unavailable right now.</div>'; box.scrollTop = box.scrollHeight; }
+    return;
+  }
+  chatBusy = false;
+  renderChatHistory();
+}
+
+// Chat-specific proxy call — Haiku model, capped output, same Edge Function as askCoworkAI().
+async function askChatAI(prompt) {
+  const r = await fetch(CLAUDE_PROXY_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'apikey': SUPABASE_KEY
+    },
+    body: JSON.stringify({ prompt, data: [], model: 'claude-haiku-4-5-20251001', max_tokens: 500 })
+  });
+  if (!r.ok) {
+    let detail = '';
+    try { detail = (await r.json()).error || ''; } catch (e) { detail = await r.text().catch(() => ''); }
+    throw new Error('AI chat request failed (' + r.status + ')' + (detail ? ': ' + detail : ''));
+  }
+  const j = await r.json();
+  return j.text || '';
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────
