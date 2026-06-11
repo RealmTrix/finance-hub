@@ -1,4 +1,4 @@
-<!-- Finance Hub v2.5 — Session 2.5: AmEx Statement Import (Paste & Parse modal) -->
+<!-- Finance Hub v2.6 — Session 2.6: Multi-Profile Login + Pockets + News + Modern UI -->
 <!-- Project Kangaroo | michael-finance-hub -->
 <!-- Built: May 2026 | Sessions: 9 planned -->
 <!DOCTYPE html>
@@ -667,6 +667,43 @@ th {
 .login-err      { font-size:11px; color:var(--err); margin-bottom:12px; display:none; }
 .logout-btn     { font-size:11px; font-weight:500; background:transparent; border:1px solid rgba(255,255,255,.3); color:rgba(255,255,255,.8); border-radius:4px; padding:4px 10px; cursor:pointer; }
 .logout-btn:hover { background:rgba(255,255,255,.1); }
+
+/* ── S2.6: Login profile selector ── */
+.profile-avatar-btn { display:flex; flex-direction:column; align-items:center; gap:6px; background:transparent; border:none; cursor:pointer; padding:6px 10px; border-radius:8px; }
+.profile-avatar-btn:hover { background:var(--bg); }
+.profile-avatar { width:52px; height:52px; border-radius:50%; background:var(--n1); color:#fff; font-size:22px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+.profile-avatar-name { font-size:12px; font-weight:600; color:var(--txt); }
+
+/* ── S2.6: Modern UI mode — scoped to [data-ui="modern"], Basic mode untouched ── */
+[data-ui="modern"] .card { border-radius:14px; box-shadow:0 1px 3px rgba(15,23,42,.06), 0 4px 16px rgba(15,23,42,.05); transition:box-shadow .25s ease, transform .25s ease; }
+[data-ui="modern"] .card:hover { box-shadow:0 2px 6px rgba(15,23,42,.08), 0 10px 28px rgba(15,23,42,.09); transform:translateY(-1px); }
+[data-ui="modern"] .btn, [data-ui="modern"] .login-btn { border-radius:8px; transition:transform .15s ease, box-shadow .15s ease, background .15s ease, opacity .15s ease; }
+[data-ui="modern"] .btn:hover, [data-ui="modern"] .login-btn:hover { transform:translateY(-1px); box-shadow:0 3px 10px rgba(15,23,42,.15); }
+[data-ui="modern"] .btn:active { transform:translateY(0) scale(.97); }
+[data-ui="modern"] .tab, [data-ui="modern"] .pf-subtab, [data-ui="modern"] .inv-subtab { transition:background .2s ease, color .2s ease, transform .15s ease; border-radius:8px 8px 0 0; }
+[data-ui="modern"] .tab:hover { transform:translateY(-1px); }
+[data-ui="modern"] .tab-panel { animation:hubFadeIn .3s ease both; }
+[data-ui="modern"] .pf-panel { animation:hubFadeIn .25s ease both; }
+[data-ui="modern"] input, [data-ui="modern"] select, [data-ui="modern"] textarea { transition:border-color .2s ease, box-shadow .2s ease; border-radius:8px; }
+[data-ui="modern"] input:focus, [data-ui="modern"] select:focus, [data-ui="modern"] textarea:focus { box-shadow:0 0 0 3px rgba(201,168,106,.25); outline:none; }
+[data-ui="modern"] .sync-chip { transition:opacity .3s ease; }
+[data-ui="modern"] .home-grid .card { animation:hubRiseIn .35s ease both; }
+[data-ui="modern"] .home-grid .card:nth-child(2) { animation-delay:.04s; }
+[data-ui="modern"] .home-grid .card:nth-child(3) { animation-delay:.08s; }
+[data-ui="modern"] .home-grid .card:nth-child(4) { animation-delay:.12s; }
+[data-ui="modern"] .home-grid .card:nth-child(5) { animation-delay:.16s; }
+[data-ui="modern"] .home-grid .card:nth-child(6) { animation-delay:.20s; }
+[data-ui="modern"] .home-grid .card:nth-child(7) { animation-delay:.24s; }
+[data-ui="modern"] .accent-bar { background:linear-gradient(90deg, var(--gold), #e3cfa3, var(--gold)); background-size:200% 100%; animation:hubShimmer 6s linear infinite; }
+[data-ui="modern"] .profile-avatar { transition:transform .2s ease; }
+[data-ui="modern"] .profile-avatar-btn:hover .profile-avatar { transform:scale(1.08); }
+@keyframes hubFadeIn { from { opacity:0; } to { opacity:1; } }
+@keyframes hubRiseIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@keyframes hubShimmer { 0% { background-position:0% 0; } 100% { background-position:200% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  [data-ui="modern"] .tab-panel, [data-ui="modern"] .pf-panel, [data-ui="modern"] .home-grid .card { animation:none; }
+  [data-ui="modern"] .accent-bar { animation:none; }
+}
 </style>
 </head>
 <body>
@@ -682,6 +719,7 @@ th {
   <div class="hdr-right">
     <span id="syncChip" class="sync-chip syncing">⟳ Connecting…</span>
     <button class="theme-btn" onclick="toggleTheme()" title="Toggle dark mode">🌙</button>
+    <button class="theme-btn" id="uiModeBtn" onclick="toggleUiMode()" title="Toggle modern/basic UI">✨</button>
     <button class="logout-btn" onclick="logout()" title="Lock and log out">🔒 Lock</button>
   </div>
 </header>
@@ -689,14 +727,14 @@ th {
 
 <!-- ─── Main Tab Bar ─────────────────────────────────────────────────────── -->
 <nav class="main-tabs" id="mainTabs">
-  <button class="tab active" onclick="showTab('home', this); initHome()">Home</button>
-  <button class="tab" onclick="showTab('personal-finance', this); initPersonalFinance()">Personal Finance</button>
-  <button class="tab" onclick="showTab('investments', this); initInvestments()">Investments</button>
-  <button class="tab" onclick="showTab('income', this); initIncome()">Income</button>
-  <button class="tab" onclick="showTab('tax', this); initTax()">Tax</button>
-  <button class="tab" onclick="showTab('ai-chat', this); initAIChat()">AI Chat</button>
-  <button class="tab" onclick="showTab('settings', this); renderSettingsAccounts()">Settings</button>
-  <button class="tab" onclick="showTab('updates', this); initUpdates()">Updates</button>
+  <button class="tab active" data-tab="home" onclick="showTab('home', this); initHome()">Home</button>
+  <button class="tab" data-tab="personal-finance" onclick="showTab('personal-finance', this); initPersonalFinance()">Personal Finance</button>
+  <button class="tab" data-tab="investments" onclick="showTab('investments', this); initInvestments()">Investments</button>
+  <button class="tab" data-tab="income" onclick="showTab('income', this); initIncome()">Income</button>
+  <button class="tab" data-tab="tax" onclick="showTab('tax', this); initTax()">Tax</button>
+  <button class="tab" data-tab="ai-chat" onclick="showTab('ai-chat', this); initAIChat()">AI Chat</button>
+  <button class="tab" data-tab="settings" onclick="showTab('settings', this); renderSettings()">Settings</button>
+  <button class="tab" data-tab="updates" onclick="showTab('updates', this); initUpdates()">Updates</button>
 </nav>
 
 <!-- ─── Login Gate (S9) ──────────────────────────────────────────────────── -->
@@ -723,6 +761,14 @@ th {
       <div class="card home-full">
         <div class="card-title">⚡ Financial Stress Score</div>
         <div id="homeStressBody" style="font-size:13px;"></div>
+      </div>
+      <!-- v2.6: Top News Picks -->
+      <div class="card home-full">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <div class="card-title" style="margin-bottom:0;">📰 Top News Today <span style="font-size:10px; color:var(--muted); font-weight:400;">Tech · Finance · AI · Global</span></div>
+          <button class="btn" style="font-size:11px; padding:3px 10px;" onclick="loadHomeNews(true)">⟳ Refresh</button>
+        </div>
+        <div id="homeNewsBody" style="font-size:12px;"><span style="color:var(--muted);">Loading news…</span></div>
       </div>
       <div class="card">
         <div class="card-title">💰 Net Worth</div>
@@ -847,6 +893,15 @@ th {
         </div>
         <p style="font-size:11px;color:var(--muted);margin:-6px 0 10px;">Credit card balances are automatically included from your Cards tracker.</p>
         <div id="liabsWrap"></div>
+      </div>
+      <!-- v2.6: Savings Pockets -->
+      <div class="card" style="margin-top:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div class="card-title" style="margin-bottom:0">🪣 Savings Pockets</div>
+          <button class="btn btn-sm btn-primary" onclick="addPocket()">+ Add Pocket</button>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin:-6px 0 10px;">Mirror the purpose-specific savings accounts inside your debit card. Each pocket takes its value from an Asset, a debit account, or a manual amount — and links to a Big Spending Plan, a Milestone, or your Wealth Goal to track funding progress.</p>
+        <div id="pocketsWrap"></div>
       </div>
     </div><!-- /pf-wealth -->
 
@@ -1104,11 +1159,11 @@ th {
         <div class="settings-grid" style="margin-bottom:12px;">
           <div class="settings-field">
             <label>Wealth Target (AUD, optional)</label>
-            <input type="number" id="wealthTarget" min="0" step="5000" placeholder="e.g. 150000" oninput="renderWealthTrajectory()">
+            <input type="number" id="wealthTarget" min="0" step="5000" placeholder="e.g. 150000" onchange="saveWealthGoal()" oninput="renderWealthTrajectory()">
           </div>
           <div class="settings-field">
             <label>Target Date for Wealth Goal</label>
-            <input type="date" id="wealthTargetDate" oninput="renderWealthTrajectory()">
+            <input type="date" id="wealthTargetDate" onchange="saveWealthGoal()" oninput="renderWealthTrajectory()">
           </div>
         </div>
         <div id="wealthTrajectoryBody"><span style="color:var(--muted);font-size:12px;">Set your visa expiry in Settings → Visa &amp; Goals to enable projections.</span></div>
@@ -1269,6 +1324,32 @@ th {
         </div>
       </div>
 
+      <div class="section-heading" style="margin-top:16px;">👥 Profiles</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Each profile has its own password and its own cloud data row — complete data isolation. Tick which pages a profile can see. Profiles are stored on this device only; removing one never deletes its cloud data.</p>
+      <div id="profilesListWrap"></div>
+      <div id="addProfileForm" style="display:none; margin-top:12px; border-top:1px solid var(--bdr); padding-top:12px;">
+        <div class="settings-grid" style="margin-bottom:10px;">
+          <div class="settings-field">
+            <label>Profile Name</label>
+            <input type="text" id="npName" placeholder="e.g. Sarah" maxlength="30">
+          </div>
+          <div class="settings-field">
+            <label>Password</label>
+            <input type="password" id="npPassword" placeholder="Their password" autocomplete="new-password">
+          </div>
+          <div class="settings-field">
+            <label>Confirm Password</label>
+            <input type="password" id="npConfirm" placeholder="Confirm password" autocomplete="new-password">
+          </div>
+        </div>
+        <div id="npMsg" style="font-size:11px; margin-bottom:8px; display:none;"></div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" style="background:var(--n1);color:#fff;" onclick="addProfile()">Create Profile</button>
+          <button class="btn" style="background:var(--card);border:1px solid var(--bdr);" onclick="document.getElementById('addProfileForm').style.display='none'">Cancel</button>
+        </div>
+      </div>
+      <button class="btn" style="margin-top:10px;" onclick="document.getElementById('addProfileForm').style.display=''; document.getElementById('npName').focus()">+ Add Profile</button>
+
       <div class="section-heading" style="margin-top:16px;">🔒 Change Password</div>
       <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Requires your current password to update.</p>
       <div class="settings-grid">
@@ -1305,7 +1386,13 @@ th {
       </div>
     </div>
 
-    <!-- Statement Import Modal (S2.5) -->
+    <div class="ver-footer">
+      <span id="versionDisplay">Finance Hub v2.6 — Profiles + Pockets + News</span>
+      <span id="lastSavedDisplay" style="color:var(--muted)">–</span>
+    </div>
+  </div>
+
+    <!-- Statement Import Modal (S2.5; moved outside tab panels in v2.6 so it opens from any tab) -->
     <div id="statementModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:9999; align-items:flex-start; justify-content:center; padding:20px; overflow-y:auto;">
       <div style="background:var(--card); border:1px solid var(--bdr); border-radius:10px; padding:24px; width:100%; max-width:720px; margin:auto; box-shadow:0 8px 40px rgba(0,0,0,.3);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
@@ -1315,7 +1402,7 @@ th {
 
         <!-- Step 1: Paste -->
         <div id="stmtStep1">
-          <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">Paste raw text from your AmEx statement (copy from PDF, app export, or email). Supported: DD/MM/YYYY · CSV · Mon DD format.</p>
+          <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">Paste raw text from your AmEx statement (copy from PDF, app export, or email). Supported: AmEx table (Date | Date Processed | Description | Amount) · DD/MM/YYYY · CSV · Mon DD. Each transaction is auto-categorised for your review. Paste full statements freely — transactions already in your Spending log are flagged and skipped, so overlapping billing cycles (AmEx 28th vs your 15–14) are handled automatically.</p>
           <textarea id="stmtPasteArea" rows="10" style="width:100%; font-size:12px; font-family:monospace; padding:10px; border:1px solid var(--bdr); border-radius:6px; background:var(--bg); color:var(--txt); resize:vertical; box-sizing:border-box;"
             placeholder="Example:
 01/06/2026  WOOLWORTHS 0342 SYDNEY            $87.50
@@ -1361,12 +1448,6 @@ Date,Description,Amount
       </div>
     </div>
 
-    <div class="ver-footer">
-      <span id="versionDisplay">Finance Hub v2.5 — Statement Import</span>
-      <span id="lastSavedDisplay" style="color:var(--muted)">–</span>
-    </div>
-  </div>
-
   <!-- Updates -->
   <div id="tab-updates" class="tab-panel" style="display:none">
 
@@ -1374,9 +1455,9 @@ Date,Description,Amount
     <div class="card" style="border-left:3px solid var(--gold);">
       <div class="card-title" style="display:flex;align-items:center;gap:8px;">
         <span>🚀 v2.1 Roadmap</span>
-        <span style="font-size:10px;font-weight:600;letter-spacing:.06em;padding:2px 8px;border-radius:10px;background:var(--amber-bg);color:var(--amber);">UPCOMING</span>
+        <span style="font-size:10px;font-weight:600;letter-spacing:.06em;padding:2px 8px;border-radius:10px;background:var(--ok-bg);color:var(--ok);">COMPLETE — v2.6</span>
       </div>
-      <p style="font-size:11px;color:var(--muted);margin:0 0 14px;">Six sessions planned for the next major version. Build plan: <code style="font-size:10px;">Finance Hub v2.1 — Project Build.md</code></p>
+      <p style="font-size:11px;color:var(--muted);margin:0 0 14px;">All six v2.x sessions complete. v2.6 adds multi-profile login with per-page permissions, savings pockets, persistent wealth goal, smarter savings estimate, AmEx table parsing with duplicate detection, top news on Home, and a Modern/Basic UI toggle (✨ button in the header).</p>
       <ul class="session-list">
         <li class="session-item">
           <span class="session-badge done">S2.1</span>
@@ -1400,27 +1481,30 @@ Date,Description,Amount
           </div>
         </li>
         <li class="session-item">
-          <span class="session-badge" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);">S2.4</span>
+          <span class="session-badge done">S2.4</span>
           <div>
             <div class="session-name">Month Navigation Arrows</div>
             <div class="session-desc">← → arrows on Budget, Spending, and Income tabs to browse history month by month without a dropdown.</div>
           </div>
         </li>
         <li class="session-item">
-          <span class="session-badge" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);">S2.5</span>
+          <span class="session-badge done">S2.5</span>
           <div>
             <div class="session-name">AmEx Statement Auto-Parser</div>
-            <div class="session-desc">Paste statement text → auto-detect transactions → staged preview table → confirm to add to Spending log. Always shows review step before committing.</div>
+            <div class="session-desc">Paste statement text → auto-detect transactions → staged preview table → confirm to add to Spending log. Always shows review step before committing. v2.6: opens from any tab, parses the AmEx pipe-table export, auto-categorises every row, and flags duplicates from overlapping billing cycles.</div>
           </div>
         </li>
         <li class="session-item">
-          <span class="session-badge" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);">S2.6</span>
+          <span class="session-badge done">S2.6</span>
           <div>
             <div class="session-name">Multi-User Login [Opus]</div>
-            <div class="session-desc">Multiple named profiles at login. Each profile has its own Supabase USER_ID row — complete data isolation. Michael stays on michael-finance-hub.</div>
+            <div class="session-desc">Multiple named profiles at login. Each profile has its own Supabase USER_ID row — complete data isolation. Michael stays on michael-finance-hub. Profiles are managed in Settings → Profiles, including per-page visibility toggles. Plus: savings pockets, persistent wealth goal, behaviour-learning savings estimate, Home news picks, Modern/Basic UI toggle.</div>
           </div>
         </li>
       </ul>
+      <div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--bdr); font-size:11px; color:var(--muted);">
+        <strong style="color:var(--txt);">What's next (v3 candidates):</strong> TradingView webhook alerts merged into Signals · per-pocket auto-transfers from budget · scheduled news digest in AI Chat · CSV export per tab.
+      </div>
     </div>
 
     <!-- ── Feature Requests ──────────────────────────────────────────────── -->
@@ -1666,8 +1750,8 @@ Date,Description,Amount
     </div>
 
     <div class="ver-footer">
-      <span>Finance Hub v2.5</span>
-      <span>v2.x in progress — Home Dashboard active</span>
+      <span>Finance Hub v2.6</span>
+      <span>v2.1 roadmap complete — Multi-Profile + Pockets + News + Modern UI</span>
     </div>
   </div>
 
@@ -1678,7 +1762,27 @@ Date,Description,Amount
 // ─── Supabase config (verbatim from Efficiency Rule) ──────────────────────
 const SUPABASE_URL = 'https://tbnkoilqtyuykyqmwzpy.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRibmtvaWxxdHl1eWt5cW13enB5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTAyNzAsImV4cCI6MjA5NTM2NjI3MH0.wQWkCdCT_sSGcm2aSVCjvX6sXaD0HjGURfdYMREtKHQ';
-const USER_ID = 'michael-finance-hub';
+// S2.6: USER_ID is now a runtime variable — set at login from the selected profile.
+let activeUserId = 'michael-finance-hub';
+
+// S2.6: Profile registry — local device configuration, stored OUTSIDE appData.
+// [{ name, userId, authHash, pages: null | ['home','personal-finance',...] }]
+const PROFILES_KEY = 'financeHub_profiles';
+function getProfiles() {
+  try { const p = JSON.parse(localStorage.getItem(PROFILES_KEY)); return Array.isArray(p) ? p : []; }
+  catch { return []; }
+}
+function saveProfiles(list) { localStorage.setItem(PROFILES_KEY, JSON.stringify(list)); }
+function activeProfile() { return getProfiles().find(p => p.userId === activeUserId) || null; }
+// Per-profile localStorage cache key — prevents one profile's cache being read as another's
+function dataKey() { return 'financeHub_data_' + activeUserId; }
+// One-time migration: move legacy appData.authHash into the registry as the 'Michael' profile
+function migrateProfilesRegistry() {
+  if (getProfiles().length === 0 && appData.authHash) {
+    saveProfiles([{ name: 'Michael', userId: 'michael-finance-hub', authHash: appData.authHash, pages: null }]);
+  }
+}
+
 const SB_HEADERS = {
   'apikey': SUPABASE_KEY,
   'Authorization': 'Bearer ' + SUPABASE_KEY,
@@ -1686,7 +1790,7 @@ const SB_HEADERS = {
 };
 
 async function sbGet() {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/reading_state?user_id=eq.${USER_ID}&select=data,updated_at`, { headers: SB_HEADERS });
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/reading_state?user_id=eq.${activeUserId}&select=data,updated_at`, { headers: SB_HEADERS });
   if (!r.ok) throw new Error('GET ' + r.status);
   const rows = await r.json();
   return rows.length ? rows[0] : null;
@@ -1696,7 +1800,7 @@ async function sbUpsert(d) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/reading_state`, {
     method: 'POST',
     headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates' },
-    body: JSON.stringify({ user_id: USER_ID, data: d, updated_at: new Date().toISOString() })
+    body: JSON.stringify({ user_id: activeUserId, data: d, updated_at: new Date().toISOString() })
   });
   if (!r.ok) throw new Error('UPSERT ' + r.status);
 }
@@ -1784,14 +1888,17 @@ function migrate(d) {
   if (!d.settings.prTargetDate) d.settings.prTargetDate = '';
   // S2.2: AI chat history — non-critical key, lazy seed only (no schema bump)
   if (!Array.isArray(d.chatHistory)) d.chatHistory = [];
-  d.schemaVersion = 10;
+  // S2.6: persisted wealth goal (was input-only and lost on refresh) + savings pockets
+  if (!d.wealthGoal || typeof d.wealthGoal !== 'object') d.wealthGoal = { target: 0, targetDate: '' };
+  if (!Array.isArray(d.pockets)) d.pockets = [];
+  d.schemaVersion = 11;
   return d;
 }
 
 // ─── save — write to localStorage + push to cloud ────────────────────────
 function save() {
   appData.lastBackup = new Date().toISOString();
-  localStorage.setItem('financeHub_data', JSON.stringify(appData));
+  localStorage.setItem(dataKey(), JSON.stringify(appData));
   updateLastSaved();
   pushToCloud();
 }
@@ -1841,11 +1948,17 @@ function saveSetting(key, value) {
 
 // ─── loadApp — init on page load ─────────────────────────────────────────
 async function loadApp() {
-  // Apply theme immediately to avoid flash
+  // Apply theme + UI mode immediately to avoid flash
   document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light');
+  applyUiMode(localStorage.getItem('uiMode') || 'modern');
 
-  // Load from localStorage first (instant)
-  const local = localStorage.getItem('financeHub_data');
+  // Load from localStorage first (instant). S2.6: per-profile key, with one-time
+  // fallback to the legacy shared key for the original Michael profile.
+  let local = localStorage.getItem(dataKey());
+  if (!local && activeUserId === 'michael-finance-hub') {
+    local = localStorage.getItem('financeHub_data');
+    if (local) localStorage.setItem(dataKey(), local);   // migrate cache forward
+  }
   if (local) {
     try { appData = JSON.parse(local); } catch { appData = initData(); }
   } else {
@@ -1863,7 +1976,7 @@ async function loadApp() {
       const localTime = new Date(appData.lastBackup || 0);
       if (cloudTime > localTime) {
         appData = migrate(cloud.data);
-        localStorage.setItem('financeHub_data', JSON.stringify(appData));
+        localStorage.setItem(dataKey(), JSON.stringify(appData));
         renderSettings(); // re-render with cloud data
       }
     }
@@ -1893,6 +2006,7 @@ function renderSettings() {
   if ($id('visaExpiry'))   $id('visaExpiry').value   = s.visaExpiry   || '';
   if ($id('prTargetDate')) $id('prTargetDate').value = s.prTargetDate || '';
   renderSettingsAccounts();
+  renderProfilesSection();
   updateLastSaved();
 }
 
@@ -1944,6 +2058,21 @@ function toggleTheme() {
   const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('theme', next);
+}
+
+// ─── S2.6: Modern/Basic UI mode toggle ────────────────────────────────────
+function applyUiMode(mode) {
+  document.documentElement.setAttribute('data-ui', mode);
+  const btn = document.getElementById('uiModeBtn');
+  if (btn) {
+    btn.textContent = mode === 'modern' ? '✨' : '▢';
+    btn.title = mode === 'modern' ? 'Modern UI on — switch to Basic' : 'Basic UI on — switch to Modern';
+  }
+}
+function toggleUiMode() {
+  const next = (localStorage.getItem('uiMode') || 'modern') === 'modern' ? 'basic' : 'modern';
+  localStorage.setItem('uiMode', next);
+  applyUiMode(next);
 }
 
 // ─── Sync chip ────────────────────────────────────────────────────────────
@@ -2401,7 +2530,7 @@ function showPFTab(id, el) {
   document.getElementById(id).style.display = '';
   el.classList.add('active');
   if (id === 'pf-spending') { populateSpendingFilters(); renderSpending(); }
-  if (id === 'pf-wealth')   renderWealth();
+  if (id === 'pf-wealth')   { renderWealth(); renderPockets(); }
   if (id === 'pf-plans')    renderPlans();
 }
 
@@ -2573,9 +2702,9 @@ function closeStatementModal() {
 
 function guessCategory(desc) {
   const d = desc.toLowerCase();
-  if (/woolworths|coles|aldi|iga|harris farm|foodland|costco/.test(d)) return 'Food & Dining';
-  if (/restaurant|cafe|coffee|mcdonalds|mcdonald|kfc|domino|hungry jack|subway|grill|bistro|deliveroo|doordash|menulog|ubereats|uber eats/.test(d)) return 'Food & Dining';
-  if (/uber(?!.*eats)|didi|lyft|taxi|train|bus|ferry|opal|myki|metro|transport|parking|toll|fuel|petrol|shell|bp|caltex/.test(d)) return 'Transport';
+  if (/woolworths|ww metro|coles|aldi|iga|harris farm|foodland|costco/.test(d)) return 'Food & Dining';
+  if (/restaurant|cafe|coffee|mcdonalds|mcdonald|kfc|domino|hungry jack|subway|grill|bistro|deliveroo|doordash|menulog|ubereats|uber eats|eatclub/.test(d)) return 'Food & Dining';
+  if (/uber(?!.*eats)|didi|lyft|lime\W*ride|lime\*|taxi|train|bus|ferry|opal|myki|transport|parking|toll|fuel|petrol|shell|bp|caltex/.test(d)) return 'Transport';
   if (/netflix|spotify|apple\.com\/bill|itunes|google play|amazon prime|stan|binge|foxtel|disney/.test(d)) return 'Entertainment';
   if (/amazon|ebay|kmart|target|myer|david jones|uniqlo|zara|cotton on|the iconic|asos/.test(d)) return 'Shopping';
   if (/chemist|pharmacy|doctor|gp |medical|hospital|health|dental|physio|optom/.test(d)) return 'Health';
@@ -2587,6 +2716,35 @@ function guessCategory(desc) {
 function parseAmexStatement(text) {
   const rows = [];
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+  // v2.6: AmEx pipe-table format first, e.g.
+  // |**27/05/2026**|28/05/2026|EATCLUB FINANCIAL PL    NEWSTEAD|28.99|
+  // Columns: Date | Date Processed | Description | Amount. We use the transaction
+  // date (col 1). Billing-cycle mismatch (AmEx 28th vs app 15–14) doesn't matter:
+  // each transaction lands on its own date, and duplicates from overlapping
+  // statement pastes are flagged in the preview and skipped on commit.
+  const pipeLines = lines.filter(l => l.startsWith('|') && l.split('|').length >= 4);
+  if (pipeLines.length >= 2) {
+    for (const line of pipeLines) {
+      const cells = line.split('|').map(c => c.replace(/\*/g, '').trim()).filter(c => c !== '');
+      if (cells.length < 3) continue;                                   // separator / empty rows
+      if (/^date/i.test(cells[0]) || /^-+$/.test(cells[0])) continue;   // header / divider rows
+      const date = normaliseDate(cells[0]);
+      if (!date) continue;
+      // Description = everything between the date columns and the amount column
+      const last = cells[cells.length - 1];
+      const isCredit = /CR\s*$/i.test(last) || /^-/.test(last);
+      const amount = Math.abs(parseFloat(last.replace(/[^0-9.\-]/g, '')));
+      if (!isFinite(amount) || amount <= 0) continue;
+      if (isCredit) continue;                                            // skip credits/reversals
+      // cells[1] may be the processed date — drop it if it parses as a date
+      const descCells = cells.slice(1, cells.length - 1).filter(c => !normaliseDate(c));
+      const description = descCells.join(' ').replace(/\s{2,}/g, ' ').trim();
+      if (!description) continue;
+      rows.push({ date, description, amount: +amount.toFixed(2), category: guessCategory(description), include: true });
+    }
+    if (rows.length) return rows;
+  }
 
   // Try CSV first: look for a header line with Date/Description/Amount
   const csvHeader = lines.findIndex(l => /date.*description.*amount/i.test(l));
@@ -2664,6 +2822,16 @@ function normaliseDate(raw) {
   return null;
 }
 
+// v2.6: a transaction already in the Spending log (same date + description + amount)
+// is a duplicate — happens when overlapping statement cycles are pasted.
+function isDuplicateTxn(r) {
+  return (appData.spending || []).some(s =>
+    s.date === r.date &&
+    Math.abs((parseFloat(s.amount) || 0) - r.amount) < 0.005 &&
+    (s.description || '').replace(/\s+/g, ' ').trim().toLowerCase() === r.description.replace(/\s+/g, ' ').trim().toLowerCase()
+  );
+}
+
 function parseAndPreview() {
   const text = document.getElementById('stmtPasteArea').value.trim();
   const warn = document.getElementById('stmtParseWarn');
@@ -2675,6 +2843,10 @@ function parseAndPreview() {
     warn.style.display = '';
     return;
   }
+  // Flag duplicates (already imported) — excluded by default, can be re-ticked
+  parsedStatementRows.forEach(r => {
+    if (isDuplicateTxn(r)) { r.dup = true; r.include = false; }
+  });
   renderParsedPreview(parsedStatementRows);
   document.getElementById('stmtStep1').style.display = 'none';
   document.getElementById('stmtStep2').style.display = '';
@@ -2690,7 +2862,7 @@ function renderParsedPreview(rows) {
   tbody.innerHTML = rows.map((r, i) => `
     <tr>
       <td style="white-space:nowrap;">${r.date}</td>
-      <td style="max-width:200px; word-break:break-word;">${r.description}</td>
+      <td style="max-width:200px; word-break:break-word;">${r.description}${r.dup ? ' <span style="font-size:9px;font-weight:700;color:var(--amber);background:var(--amber-bg);padding:1px 5px;border-radius:6px;white-space:nowrap;">ALREADY IMPORTED</span>' : ''}</td>
       <td style="text-align:right; white-space:nowrap;">$${r.amount.toFixed(2)}</td>
       <td>
         <select onchange="parsedStatementRows[${i}].category=this.value" style="font-size:11px; background:var(--bg); color:var(--txt); border:1px solid var(--bdr); border-radius:4px; padding:2px 4px;">
@@ -2956,8 +3128,15 @@ function renderPlans() {
     const monthsDisp = months > 0 ? months
       : months === 0 ? '0'
       : `<span class="bad">Overdue</span>`;
-    const req     = (months > 0 && (p.target || 0) > 0) ? (p.target / months) : 0;
-    const reqDisp = req > 0 ? `${sym}${fmtMoney(req)}/mo` : '—';
+    // v2.6: pockets earmarked for this plan reduce the remaining amount
+    const saved = pocketsForPlanAUD(p.id);
+    const remaining = Math.max(0, (p.target || 0) - saved);
+    const savedDisp = saved > 0
+      ? `<span style="color:var(--ok);font-weight:600;">A$${fmtMoney(saved)}</span>`
+      : '<span style="color:var(--muted);">—</span>';
+    const req     = (months > 0 && remaining > 0) ? (remaining / months) : 0;
+    const reqDisp = req > 0 ? `${sym}${fmtMoney(req)}/mo`
+      : (saved >= (p.target || 0) && (p.target || 0) > 0) ? '<span class="ok">✓ Funded</span>' : '—';
     const priSel  = PLAN_PRI.map(v =>
       `<option value="${v}" ${p.priority === v ? 'selected' : ''}>${v}</option>`).join('');
     const statSel = PLAN_STAT.map(v =>
@@ -2973,6 +3152,7 @@ function renderPlans() {
             onchange="updPlan('${p.id}','targetDate',this.value)"></td>
       <td><select onchange="updPlan('${p.id}','priority',this.value)">${priSel}</select></td>
       <td style="text-align:center">${monthsDisp}</td>
+      <td style="text-align:right">${savedDisp}</td>
       <td style="text-align:right">${reqDisp}</td>
       <td><select onchange="updPlan('${p.id}','status',this.value)">${statSel}</select></td>
       <td><input type="text" value="${escHtml(p.notes||'')}" maxlength="100" placeholder="Notes…" style="width:120px;font-size:11px;"
@@ -2984,7 +3164,7 @@ function renderPlans() {
   wrap.innerHTML = `<div style="overflow-x:auto;"><table class="pl-tbl">
     <thead><tr>
       <th>Name</th><th>Target (A$)</th><th>Target Date</th><th>Priority</th>
-      <th>Months Left</th><th>Req. Monthly</th><th>Status</th><th>Notes</th><th></th>
+      <th>Months Left</th><th>Saved 🪣</th><th>Req. Monthly</th><th>Status</th><th>Notes</th><th></th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
@@ -3007,6 +3187,121 @@ function updPlan(id, field, val) {
 function deletePlan(id) {
   appData.plans = (appData.plans || []).filter(x => x.id !== id);
   save(); renderPlans();
+}
+
+// ─── v2.6: Savings Pockets ─────────────────────────────────────────────────
+// A pocket mirrors a purpose-specific savings account. Its value comes from an
+// Asset, a debit card/account, or a manual amount; it can link to a Plan,
+// Milestone, or the Wealth Goal to show funding progress.
+function pkUID() { return 'pk' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+function pocketValueAUD(p) {
+  if (!p) return 0;
+  if (p.sourceType === 'asset') {
+    const a = (appData.assets || []).find(x => x.id === p.sourceId);
+    return a ? toAUD(parseFloat(a.value) || 0, a.currency || 'AUD') : 0;
+  }
+  if (p.sourceType === 'card') {
+    const c = (appData.cards || []).find(x => x.id === p.sourceId);
+    return c ? toAUD(parseFloat(c.balance) || 0, c.currency || 'AUD') : 0;
+  }
+  return toAUD(parseFloat(p.amount) || 0, p.currency || 'AUD');
+}
+
+function pocketTargetAUD(p) {
+  if (!p) return 0;
+  if (p.linkType === 'plan') {
+    const pl = (appData.plans || []).find(x => x.id === p.linkId);
+    return pl ? (parseFloat(pl.target) || 0) : 0;
+  }
+  if (p.linkType === 'milestone') {
+    const m = (appData.milestones || []).find(x => x.id === p.linkId);
+    return m ? (parseFloat(m.targetAmount) || 0) : 0;
+  }
+  if (p.linkType === 'wealthGoal') return parseFloat((appData.wealthGoal || {}).target) || 0;
+  return 0;
+}
+
+// Total pocket value earmarked for a given plan — used by renderPlans()
+function pocketsForPlanAUD(planId) {
+  return (appData.pockets || []).filter(p => p.linkType === 'plan' && p.linkId === planId)
+    .reduce((sum, p) => sum + pocketValueAUD(p), 0);
+}
+
+function renderPockets() {
+  const wrap = document.getElementById('pocketsWrap');
+  if (!wrap) return;
+  if (!Array.isArray(appData.pockets)) appData.pockets = [];
+  if (!appData.pockets.length) {
+    wrap.innerHTML = '<p style="text-align:center;color:var(--muted);padding:16px 0;font-size:12px;">No pockets yet. Click + Add Pocket to mirror your savings accounts.</p>';
+    return;
+  }
+  const sym = baseSym();
+  const sourceOpts = (p) => {
+    const assets = (appData.assets || []).map(a => `<option value="asset:${a.id}" ${p.sourceType==='asset'&&p.sourceId===a.id?'selected':''}>Asset: ${escHtml(a.name||'')}</option>`).join('');
+    const cards  = (appData.cards || []).filter(c => c.type !== 'Credit').map(c => `<option value="card:${c.id}" ${p.sourceType==='card'&&p.sourceId===c.id?'selected':''}>Account: ${escHtml(c.name||'')}</option>`).join('');
+    return `<option value="manual" ${(!p.sourceType||p.sourceType==='manual')?'selected':''}>Manual amount</option>${assets}${cards}`;
+  };
+  const linkOpts = (p) => {
+    const plans = (appData.plans || []).filter(x => x.status !== 'Completed').map(x => `<option value="plan:${x.id}" ${p.linkType==='plan'&&p.linkId===x.id?'selected':''}>Plan: ${escHtml(x.name||'')}</option>`).join('');
+    const miles = (appData.milestones || []).filter(m => (parseFloat(m.targetAmount)||0) > 0 && m.status !== 'Done').map(m => `<option value="milestone:${m.id}" ${p.linkType==='milestone'&&p.linkId===m.id?'selected':''}>Milestone: ${escHtml(m.name||'')}</option>`).join('');
+    return `<option value="none" ${(!p.linkType||p.linkType==='none')?'selected':''}>— Not linked</option>
+            <option value="wealthGoal" ${p.linkType==='wealthGoal'?'selected':''}>Wealth Goal</option>${plans}${miles}`;
+  };
+  const rows = appData.pockets.map(p => {
+    const val = pocketValueAUD(p);
+    const tgt = pocketTargetAUD(p);
+    const pct = tgt > 0 ? Math.min(100, val / tgt * 100) : 0;
+    const barColor = pct >= 100 ? 'var(--ok)' : pct >= 50 ? 'var(--gold)' : 'var(--amber)';
+    const progress = tgt > 0
+      ? `<div style="min-width:110px;">
+           <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">A$${fmtMoney(val)} / A$${fmtMoney(tgt)} (${pct.toFixed(0)}%)</div>
+           <div style="height:6px;background:var(--bdr);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${barColor};border-radius:3px;"></div></div>
+         </div>`
+      : '<span style="font-size:11px;color:var(--muted);">—</span>';
+    const manualDisabled = (p.sourceType && p.sourceType !== 'manual') ? 'disabled title="Value comes from the linked source"' : '';
+    return `<tr>
+      <td><input type="text" value="${escHtml(p.name||'')}" maxlength="40" style="width:110px;"
+            onchange="updPocket('${p.id}','name',this.value)"></td>
+      <td><select onchange="updPocketSource('${p.id}',this.value)" style="font-size:11px;max-width:160px;">${sourceOpts(p)}</select></td>
+      <td><input type="number" value="${(p.sourceType&&p.sourceType!=='manual') ? val.toFixed(0) : (p.amount||0)}" style="width:85px;text-align:right;" ${manualDisabled}
+            onchange="updPocket('${p.id}','amount',+this.value)"></td>
+      <td><select onchange="updPocketLink('${p.id}',this.value)" style="font-size:11px;max-width:170px;">${linkOpts(p)}</select></td>
+      <td>${progress}</td>
+      <td><button class="btn-del" onclick="deletePocket('${p.id}')">×</button></td>
+    </tr>`;
+  }).join('');
+  wrap.innerHTML = `<div style="overflow-x:auto;"><table class="pl-tbl">
+    <thead><tr><th>Pocket</th><th>Source</th><th>Value (A$)</th><th>Linked Goal</th><th>Progress</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+
+function addPocket() {
+  if (!Array.isArray(appData.pockets)) appData.pockets = [];
+  appData.pockets.push({ id: pkUID(), name: 'New Pocket', sourceType: 'manual', sourceId: '', amount: 0, currency: 'AUD', linkType: 'none', linkId: '' });
+  save(); renderPockets();
+}
+function updPocket(id, field, val) {
+  const p = (appData.pockets || []).find(x => x.id === id);
+  if (!p) return; p[field] = val; save(); renderPockets(); renderPlans();
+}
+function updPocketSource(id, val) {
+  const p = (appData.pockets || []).find(x => x.id === id);
+  if (!p) return;
+  if (val === 'manual') { p.sourceType = 'manual'; p.sourceId = ''; }
+  else { const [t, sid] = val.split(':'); p.sourceType = t; p.sourceId = sid; }
+  save(); renderPockets(); renderPlans();
+}
+function updPocketLink(id, val) {
+  const p = (appData.pockets || []).find(x => x.id === id);
+  if (!p) return;
+  if (val === 'none' || val === 'wealthGoal') { p.linkType = val; p.linkId = ''; }
+  else { const [t, lid] = val.split(':'); p.linkType = t; p.linkId = lid; }
+  save(); renderPockets(); renderPlans();
+}
+function deletePocket(id) {
+  appData.pockets = (appData.pockets || []).filter(x => x.id !== id);
+  save(); renderPockets(); renderPlans();
 }
 
 // ─── S2: initPersonalFinance — called on load and on PF tab click ──────────
@@ -4153,9 +4448,60 @@ function VISA_UID() { return 'v' + Date.now() + Math.random().toString(36).slice
 
 function initVisa() {
   if (!Array.isArray(appData.milestones)) appData.milestones = [];
+  // v2.6: restore the persisted wealth goal into the inputs (was lost on refresh)
+  const wg = appData.wealthGoal || {};
+  const tEl = document.getElementById('wealthTarget');
+  const dEl = document.getElementById('wealthTargetDate');
+  if (tEl && wg.target) tEl.value = wg.target;
+  if (dEl && wg.targetDate) dEl.value = wg.targetDate;
   renderVisaCountdown();
   renderMilestones();
   renderWealthTrajectory();
+}
+
+// v2.6: persist the wealth goal so it survives refresh / syncs across devices
+function saveWealthGoal() {
+  if (!appData.wealthGoal) appData.wealthGoal = { target: 0, targetDate: '' };
+  appData.wealthGoal.target = parseFloat((document.getElementById('wealthTarget') || {}).value) || 0;
+  appData.wealthGoal.targetDate = (document.getElementById('wealthTargetDate') || {}).value || '';
+  save();
+  renderWealthTrajectory();
+}
+
+// v2.6: monthly savings estimate that learns from actual behaviour.
+// Income side: average of the last 3 months of actual income-log entries (AUD);
+// falls back to settings.monthlySalary when the log is empty.
+// Spend side: average monthly spend across the last 3 months that have data.
+// Returns { value, incomeSource, monthsOfSpendData }.
+function estimateMonthlySavings() {
+  const s = appData.settings || {};
+  const now = new Date();
+  const monthKeys = [];
+  for (let i = 1; i <= 3; i++) {
+    const ref = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    monthKeys.push(ref.getFullYear() + '-' + String(ref.getMonth() + 1).padStart(2, '0'));
+  }
+  // Actual income from the income log
+  let incTotal = 0, incMonths = 0;
+  monthKeys.forEach(key => {
+    const monthInc = (appData.income || []).filter(e => (e.date || '').startsWith(key))
+      .reduce((sum, e) => sum + toAUD(parseFloat(e.amount) || 0, e.currency || 'AUD'), 0);
+    if (monthInc > 0) { incTotal += monthInc; incMonths++; }
+  });
+  const income = incMonths > 0 ? incTotal / incMonths : (parseFloat(s.monthlySalary) || 0);
+  // Actual spend from the spending log
+  let spendTotal = 0, spendMonths = 0;
+  monthKeys.forEach(key => {
+    const monthSpend = (appData.spending || []).filter(x => (x.date || '').startsWith(key))
+      .reduce((sum, x) => sum + toAUD(parseFloat(x.amount) || 0, x.currency || 'AUD'), 0);
+    if (monthSpend > 0) { spendTotal += monthSpend; spendMonths++; }
+  });
+  const avgSpend = spendMonths > 0 ? spendTotal / spendMonths : 0;
+  return {
+    value: income - avgSpend,
+    incomeSource: incMonths > 0 ? 'income log (3m avg)' : 'salary (Settings)',
+    monthsOfSpendData: spendMonths
+  };
 }
 
 function renderVisaCountdown() {
@@ -4322,30 +4668,25 @@ function renderWealthTrajectory() {
   const creditLiab = (appData.cards || []).filter(c => c.type === 'Credit').reduce((s, c) => s + toA(c.balance, c.currency), 0);
   const currentNW = assets - liabs - creditLiab;
 
-  // Estimated monthly savings = salary − avg monthly spend (last 3 months)
-  const salary = parseFloat(s.monthlySalary) || 0;
-  const spend = appData.spending || [];
-  const now = new Date();
-  let spend3m = 0, monthsWithData = 0;
-  for (let i = 1; i <= 3; i++) {
-    const ref = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = ref.getFullYear() + '-' + String(ref.getMonth() + 1).padStart(2, '0');
-    const monthSpend = spend.filter(x => (x.date || '').startsWith(key)).reduce((s, x) => s + toAUD(parseFloat(x.amount) || 0, x.currency || 'AUD'), 0);
-    if (monthSpend > 0) { spend3m += monthSpend; monthsWithData++; }
-  }
-  const avgMonthlySpend = monthsWithData > 0 ? spend3m / monthsWithData : 0;
-  const monthlySavings = salary - avgMonthlySpend;
+  // v2.6: behaviour-learning estimate — actual income (income log) − actual spend.
+  // Refines automatically as income and spending entries accumulate.
+  const est = estimateMonthlySavings();
+  const monthlySavings = est.value;
 
   const today = new Date(); today.setHours(0,0,0,0);
   const expiry = new Date(s.visaExpiry); expiry.setHours(0,0,0,0);
   const monthsToExpiry = Math.max(0, Math.round((expiry - today) / (30.44 * 86400000)));
   const projectedNW = currentNW + monthlySavings * monthsToExpiry;
 
-  // Optional wealth goal
+  // Optional wealth goal — input values win; fall back to the persisted goal (v2.6)
   const goalEl = document.getElementById('wealthTarget');
   const goalDateEl = document.getElementById('wealthTargetDate');
-  const goal = goalEl ? (parseFloat(goalEl.value) || 0) : 0;
-  const goalDateStr = goalDateEl ? goalDateEl.value : '';
+  const wg = appData.wealthGoal || {};
+  const goal = (goalEl && parseFloat(goalEl.value)) || wg.target || 0;
+  const goalDateStr = (goalDateEl && goalDateEl.value) || wg.targetDate || '';
+  // v2.6: pockets earmarked for the wealth goal
+  const goalPockets = (appData.pockets || []).filter(p => p.linkType === 'wealthGoal')
+    .reduce((sum, p) => sum + pocketValueAUD(p), 0);
   let goalHtml = '';
   if (goal > 0 && goalDateStr) {
     const goalDate = new Date(goalDateStr); goalDate.setHours(0,0,0,0);
@@ -4356,6 +4697,7 @@ function renderWealthTrajectory() {
       <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--bdr); font-size:12px;">
         <div style="font-weight:600; margin-bottom:4px;">Wealth Goal: AUD ${Number(goal).toLocaleString()} by ${goalDateStr}</div>
         <div>Required monthly saving: <strong style="color:${feasible?'var(--ok)':'var(--err)'};">${fmtMoney(toBase(required,'AUD'), s.baseCurrency)}</strong></div>
+        ${goalPockets > 0 ? `<div>Earmarked in savings pockets: <strong style="color:var(--ok);">${fmtMoney(toBase(goalPockets,'AUD'), s.baseCurrency)}</strong></div>` : ''}
         <div style="color:var(--muted);">${feasible ? '✓ Achievable at your current savings rate.' : '⚠ Higher than your current estimated savings — review expenses or salary.'}</div>
       </div>`;
   }
@@ -4376,7 +4718,7 @@ function renderWealthTrajectory() {
       <div style="background:var(--bg); border:1px solid var(--bdr); border-radius:6px; padding:12px; text-align:center;">
         <div style="font-size:10px; color:var(--muted); margin-bottom:4px;">Est. Monthly Savings</div>
         <div style="font-size:18px; font-weight:700; color:${monthlySavings>=0?'var(--ok)':'var(--err)'};">${fmtMoney(toBase(monthlySavings,'AUD'), s.baseCurrency)}</div>
-        <div style="font-size:10px; color:var(--muted);">salary − avg 3m spend</div>
+        <div style="font-size:10px; color:var(--muted);">${est.incomeSource} − avg spend${est.monthsOfSpendData === 0 ? ' · ⚠ no spending data yet — add transactions to refine' : ` (${est.monthsOfSpendData}m data)`}</div>
       </div>
     </div>
     ${goalHtml}`;
@@ -4634,7 +4976,8 @@ async function resetAllData() {
   try {
     await sbUpsert({});
   } catch (e) { /* continue regardless */ }
-  // Clear localStorage
+  // Clear localStorage (per-profile key + legacy shared key)
+  localStorage.removeItem(dataKey());
   localStorage.removeItem('financeHub_data');
   appData = migrate(initData());
   save();
@@ -4703,12 +5046,38 @@ async function sha256(str) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
-// Render login body based on whether a password has been set
+// S2.6: which profile is selected on the login screen (before password entry)
+let loginSelectedUserId = null;
+
+// All main tabs — used by page-permission checkboxes and applyPagePermissions()
+const ALL_TABS = [
+  ['home','Home'], ['personal-finance','Personal Finance'], ['investments','Investments'],
+  ['income','Income'], ['tax','Tax'], ['ai-chat','AI Chat'], ['settings','Settings'], ['updates','Updates']
+];
+
+// Hide tab buttons this profile isn't allowed to see (pages: null = all pages)
+function applyPagePermissions() {
+  const prof = activeProfile();
+  const allowed = (prof && Array.isArray(prof.pages) && prof.pages.length)
+    ? prof.pages : ALL_TABS.map(t => t[0]);
+  let activeHidden = false, firstAllowedBtn = null;
+  document.querySelectorAll('#mainTabs .tab').forEach(btn => {
+    const ok = allowed.includes(btn.dataset.tab);
+    btn.style.display = ok ? '' : 'none';
+    if (ok && !firstAllowedBtn) firstAllowedBtn = btn;
+    if (!ok && btn.classList.contains('active')) activeHidden = true;
+  });
+  if (activeHidden && firstAllowedBtn) firstAllowedBtn.click();
+}
+
+// Render login body — profile selector (if >1 profile) → password step
 function renderLoginOverlay() {
   const body = document.getElementById('loginBody');
   if (!body) return;
-  const isFirstLaunch = !appData.authHash;
-  if (isFirstLaunch) {
+  const profiles = getProfiles();
+
+  // First launch: no profiles and no legacy hash → create password (creates Michael profile)
+  if (!profiles.length && !appData.authHash) {
     body.innerHTML = `
       <p style="font-size:13px; font-weight:600; margin-bottom:16px; text-align:center;">Create your password</p>
       <p style="font-size:11px; color:var(--muted); margin-bottom:16px; line-height:1.6; text-align:center;">This is your first time opening Finance Hub. Set a password to protect your data.</p>
@@ -4719,21 +5088,48 @@ function renderLoginOverlay() {
              onkeydown="if(event.key==='Enter')createPassword()">
       <div id="loginError" class="login-err"></div>
       <button class="login-btn" onclick="createPassword()">Create Password</button>`;
-  } else {
-    body.innerHTML = `
-      <p style="font-size:13px; font-weight:600; margin-bottom:16px; text-align:center;">Welcome back</p>
-      <label class="login-label">Password</label>
-      <input type="password" id="loginPassword" class="login-input" placeholder="Enter your password" autocomplete="current-password"
-             onkeydown="if(event.key==='Enter')login()" autofocus>
-      <div id="loginError" class="login-err"></div>
-      <button class="login-btn" onclick="login()">Enter</button>`;
+    return;
   }
+
+  // Multiple profiles → avatar-style selector first
+  if (profiles.length > 1 && !loginSelectedUserId) {
+    body.innerHTML = `
+      <p style="font-size:13px; font-weight:600; margin-bottom:16px; text-align:center;">Who's signing in?</p>
+      <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:center; margin-bottom:8px;">
+        ${profiles.map(p => `
+          <button class="profile-avatar-btn" onclick="selectLoginProfile('${escHtml(p.userId)}')">
+            <span class="profile-avatar">${escHtml((p.name || '?').charAt(0).toUpperCase())}</span>
+            <span class="profile-avatar-name">${escHtml(p.name || p.userId)}</span>
+          </button>`).join('')}
+      </div>`;
+    return;
+  }
+
+  // Single profile (or one already selected) → password step
+  const prof = profiles.find(p => p.userId === loginSelectedUserId) || profiles[0] || null;
+  const name = prof ? prof.name : 'Michael';
+  body.innerHTML = `
+    <p style="font-size:13px; font-weight:600; margin-bottom:16px; text-align:center;">Welcome back${name ? ', ' + escHtml(name) : ''}</p>
+    <label class="login-label">Password</label>
+    <input type="password" id="loginPassword" class="login-input" placeholder="Enter your password" autocomplete="current-password"
+           onkeydown="if(event.key==='Enter')login()" autofocus>
+    <div id="loginError" class="login-err"></div>
+    <button class="login-btn" onclick="login()">Enter</button>
+    ${profiles.length > 1 ? `<button class="btn" style="width:100%;margin-top:8px;background:var(--card);border:1px solid var(--bdr);" onclick="loginSelectedUserId=null;renderLoginOverlay()">← Switch profile</button>` : ''}`;
+  const inp = document.getElementById('loginPassword');
+  if (inp) inp.focus();
+}
+
+function selectLoginProfile(userId) {
+  loginSelectedUserId = userId;
+  renderLoginOverlay();
 }
 
 // Called after loadApp() — show or hide the overlay
 function checkAuth() {
   if (sessionStorage.getItem('hubSession') === 'authenticated') {
     document.getElementById('loginOverlay').style.display = 'none';
+    applyPagePermissions();
     return;
   }
   renderLoginOverlay();
@@ -4743,9 +5139,21 @@ async function login() {
   const pw = (document.getElementById('loginPassword') || {}).value || '';
   if (!pw) return;
   const hash = await sha256(pw);
-  if (hash === appData.authHash) {
+  const profiles = getProfiles();
+  const prof = profiles.find(p => p.userId === loginSelectedUserId) || profiles[0] || null;
+  const expected = prof ? prof.authHash : appData.authHash;
+  if (hash === expected) {
+    const userId = prof ? prof.userId : 'michael-finance-hub';
     sessionStorage.setItem('hubSession', 'authenticated');
+    sessionStorage.setItem('hubUser', userId);
+    if (userId !== activeUserId) {
+      // Switch runtime identity, then load that profile's own Supabase row
+      activeUserId = userId;
+      await loadApp();
+    }
     document.getElementById('loginOverlay').style.display = 'none';
+    applyPagePermissions();
+    initHome();
   } else {
     const err = document.getElementById('loginError');
     if (err) { err.textContent = 'Incorrect password.'; err.style.display = 'block'; }
@@ -4761,13 +5169,20 @@ async function createPassword() {
   if (!pw) { if (err) { err.textContent = 'Please enter a password.'; err.style.display = 'block'; } return; }
   if (pw !== pw2) { if (err) { err.textContent = 'Passwords do not match.'; err.style.display = 'block'; } return; }
   appData.authHash = await sha256(pw);
+  // S2.6: create the Michael profile in the registry
+  if (!getProfiles().length) {
+    saveProfiles([{ name: 'Michael', userId: 'michael-finance-hub', authHash: appData.authHash, pages: null }]);
+  }
   save();
   sessionStorage.setItem('hubSession', 'authenticated');
+  sessionStorage.setItem('hubUser', activeUserId);
   document.getElementById('loginOverlay').style.display = 'none';
+  applyPagePermissions();
 }
 
 function logout() {
-  sessionStorage.removeItem('hubSession');
+  sessionStorage.clear();
+  activeUserId = 'michael-finance-hub';
   location.reload();
 }
 
@@ -4785,12 +5200,103 @@ async function changePassword() {
   if (!cur || !nw || !conf) { showMsg('All three fields are required.', false); return; }
   if (nw !== conf)           { showMsg('New passwords do not match.', false); return; }
   const curHash = await sha256(cur);
-  if (curHash !== appData.authHash) { showMsg('Current password is incorrect.', false); return; }
-  appData.authHash = await sha256(nw);
+  const prof = activeProfile();
+  const expected = prof ? prof.authHash : appData.authHash;
+  if (curHash !== expected) { showMsg('Current password is incorrect.', false); return; }
+  const newHash = await sha256(nw);
+  appData.authHash = newHash;
+  // S2.6: keep the profile registry in sync
+  const profiles = getProfiles();
+  const idx = profiles.findIndex(p => p.userId === activeUserId);
+  if (idx !== -1) { profiles[idx].authHash = newHash; saveProfiles(profiles); }
   save();
   // Clear fields
   ['pwCurrent','pwNew','pwConfirm'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   showMsg('Password updated.', true);
+}
+
+// ─── S2.6: Profile management (Settings → Profiles) ───────────────────────
+function renderProfilesSection() {
+  const wrap = document.getElementById('profilesListWrap');
+  if (!wrap) return;
+  const profiles = getProfiles();
+  if (!profiles.length) {
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--muted);">No profiles yet — created automatically on first login.</p>';
+    return;
+  }
+  wrap.innerHTML = profiles.map(p => {
+    const allowed = (Array.isArray(p.pages) && p.pages.length) ? p.pages : ALL_TABS.map(t => t[0]);
+    const isActive = p.userId === activeUserId;
+    const checks = ALL_TABS.map(([id, label]) => `
+      <label style="display:inline-flex; align-items:center; gap:4px; font-size:11px; margin:2px 8px 2px 0; cursor:pointer;">
+        <input type="checkbox" style="width:auto;" ${allowed.includes(id) ? 'checked' : ''}
+               onchange="toggleProfilePage('${escHtml(p.userId)}','${id}',this.checked)"> ${label}
+      </label>`).join('');
+    return `
+      <div style="border:1px solid var(--bdr); border-radius:8px; padding:10px 12px; margin-bottom:8px; background:var(--bg);">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+          <div>
+            <strong style="font-size:13px;">${escHtml(p.name || p.userId)}</strong>
+            ${isActive ? '<span style="font-size:10px; font-weight:600; padding:1px 7px; border-radius:8px; background:var(--ok-bg); color:var(--ok); margin-left:6px;">ACTIVE</span>' : ''}
+            <div style="font-size:10px; color:var(--muted);">${escHtml(p.userId)}</div>
+          </div>
+          ${isActive ? '' : `<button class="btn" style="font-size:11px; padding:3px 10px; background:var(--err); color:#fff;" onclick="removeProfile('${escHtml(p.userId)}')">Remove</button>`}
+        </div>
+        <div style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--bdr);">
+          <span style="font-size:10px; color:var(--muted); display:block; margin-bottom:2px;">Visible pages:</span>
+          ${checks}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleProfilePage(userId, tabId, checked) {
+  const profiles = getProfiles();
+  const p = profiles.find(x => x.userId === userId);
+  if (!p) return;
+  let pages = (Array.isArray(p.pages) && p.pages.length) ? p.pages.slice() : ALL_TABS.map(t => t[0]);
+  if (checked) { if (!pages.includes(tabId)) pages.push(tabId); }
+  else {
+    pages = pages.filter(x => x !== tabId);
+    if (!pages.length) { renderProfilesSection(); return; }   // must keep at least one page
+  }
+  p.pages = pages;
+  saveProfiles(profiles);
+  if (userId === activeUserId) applyPagePermissions();
+  renderProfilesSection();
+}
+
+async function addProfile() {
+  const name = ((document.getElementById('npName') || {}).value || '').trim();
+  const pw   = (document.getElementById('npPassword') || {}).value || '';
+  const pw2  = (document.getElementById('npConfirm') || {}).value || '';
+  const msg  = document.getElementById('npMsg');
+  function showMsg(text, ok) {
+    if (!msg) return;
+    msg.textContent = text;
+    msg.style.color = ok ? 'var(--ok)' : 'var(--err)';
+    msg.style.display = 'block';
+  }
+  if (!name)        { showMsg('Please enter a profile name.', false); return; }
+  if (!pw)          { showMsg('Please enter a password.', false); return; }
+  if (pw !== pw2)   { showMsg('Passwords do not match.', false); return; }
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  if (!slug)        { showMsg('Name must contain letters or numbers.', false); return; }
+  const userId = 'michael-finance-hub-' + slug;
+  const profiles = getProfiles();
+  if (profiles.some(p => p.userId === userId)) { showMsg('A profile with that name already exists.', false); return; }
+  profiles.push({ name, userId, authHash: await sha256(pw), pages: null });
+  saveProfiles(profiles);
+  ['npName','npPassword','npConfirm'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  showMsg('Profile created. Their cloud data row is created the first time they save.', true);
+  renderProfilesSection();
+}
+
+function removeProfile(userId) {
+  if (userId === activeUserId) return;   // cannot remove the profile you're logged in as
+  if (!confirm('Remove this profile from this device? Their cloud data is NOT deleted — re-adding a profile with the same name restores access to it.')) return;
+  saveProfiles(getProfiles().filter(p => p.userId !== userId));
+  renderProfilesSection();
 }
 
 // ─── S2.2: AI Chat ─────────────────────────────────────────────────────────
@@ -4974,6 +5480,85 @@ async function askChatAI(prompt) {
 function initHome() {
   initPersonalFinance();   // seeds budget/cards/FX so Home cards have data
   renderHome();
+  loadHomeNews(false);     // v2.6: auto-refresh top news on every reload (cached 60 min)
+}
+
+// ─── v2.6: Top News Picks (Home) ──────────────────────────────────────────
+// Sources: NewsAPI when a key is set in Settings; otherwise Google News RSS
+// (Tech/AI · Finance · Global: US/Indonesia/Australia/Singapore) via a CORS
+// proxy. Cached in localStorage for 60 minutes; ⟳ Refresh forces a re-fetch.
+const NEWS_CACHE_KEY = 'financeHub_newsCache';
+const NEWS_FEEDS = [
+  { tag: 'Tech/AI',  url: 'https://news.google.com/rss/search?q=technology+OR+%22artificial+intelligence%22+when:1d&hl=en-US&gl=US&ceid=US:en' },
+  { tag: 'Finance',  url: 'https://news.google.com/rss/search?q=finance+OR+markets+OR+economy+when:1d&hl=en-AU&gl=AU&ceid=AU:en' },
+  { tag: 'Global',   url: 'https://news.google.com/rss/search?q=Indonesia+OR+Singapore+OR+Australia+OR+%22United+States%22+when:1d&hl=en-SG&gl=SG&ceid=SG:en' }
+];
+let newsBusy = false;
+
+async function loadHomeNews(force) {
+  const el = document.getElementById('homeNewsBody');
+  if (!el || newsBusy) return;
+  // Serve from cache when fresh (<60 min) and not forced
+  try {
+    const cache = JSON.parse(localStorage.getItem(NEWS_CACHE_KEY) || 'null');
+    if (!force && cache && cache.items && (Date.now() - cache.fetchedAt) < 3600000) {
+      renderHomeNews(cache.items, cache.fetchedAt);
+      return;
+    }
+  } catch { /* re-fetch */ }
+  newsBusy = true;
+  el.innerHTML = '<span style="color:var(--muted);">⟳ Fetching today\'s top stories…</span>';
+  let items = [];
+  try {
+    const key = (appData.settings || {}).newsApiKey;
+    if (key) {
+      // NewsAPI path (note: free tier only permits localhost origins)
+      try {
+        const q = encodeURIComponent('technology OR finance OR "artificial intelligence" OR Indonesia OR Singapore OR Australia');
+        const r = await fetch(`https://newsapi.org/v2/everything?q=${q}&language=en&sortBy=publishedAt&pageSize=9&apiKey=${key}`);
+        if (r.ok) {
+          const j = await r.json();
+          items = (j.articles || []).map(a => ({ title: a.title, link: a.url, source: (a.source || {}).name || '', tag: 'News' }));
+        }
+      } catch { /* fall through to RSS */ }
+    }
+    if (!items.length) {
+      // Google News RSS via CORS proxy — 3 stories per topic
+      const results = await Promise.allSettled(NEWS_FEEDS.map(async f => {
+        const r = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(f.url));
+        if (!r.ok) throw new Error('feed ' + r.status);
+        const xml = new DOMParser().parseFromString(await r.text(), 'text/xml');
+        return Array.from(xml.querySelectorAll('item')).slice(0, 3).map(it => ({
+          title: (it.querySelector('title') || {}).textContent || '',
+          link:  (it.querySelector('link')  || {}).textContent || '',
+          source: ((it.querySelector('source') || {}).textContent || '').trim(),
+          tag: f.tag
+        }));
+      }));
+      results.forEach(res => { if (res.status === 'fulfilled') items = items.concat(res.value); });
+    }
+  } catch (e) { console.error('loadHomeNews:', e); }
+  newsBusy = false;
+  if (!items.length) {
+    el.innerHTML = '<span style="color:var(--muted);">Couldn\'t fetch news right now (network or proxy unavailable). Try ⟳ Refresh, or add a NewsAPI key in Settings.</span>';
+    return;
+  }
+  const payload = { fetchedAt: Date.now(), items };
+  try { localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(payload)); } catch { /* quota */ }
+  renderHomeNews(items, payload.fetchedAt);
+}
+
+function renderHomeNews(items, fetchedAt) {
+  const el = document.getElementById('homeNewsBody');
+  if (!el) return;
+  const tagColor = { 'Tech/AI': 'var(--n1)', 'Finance': 'var(--gold)', 'Global': 'var(--ok)', 'News': 'var(--n1)' };
+  el.innerHTML = items.slice(0, 9).map(it => `
+    <div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--bdr);">
+      <span style="flex-shrink:0; font-size:9px; font-weight:700; letter-spacing:.04em; color:#fff; background:${tagColor[it.tag] || 'var(--n1)'}; padding:2px 7px; border-radius:8px;">${escHtml(it.tag)}</span>
+      <span style="flex:1; line-height:1.45;">${escHtml(it.title)}${it.source ? ` <span style="color:var(--muted); font-size:10px;">— ${escHtml(it.source)}</span>` : ''}</span>
+      <a href="${escHtml(it.link)}" target="_blank" rel="noopener" class="btn" style="flex-shrink:0; font-size:10px; padding:2px 9px; text-decoration:none;">Open ↗</a>
+    </div>`).join('') +
+    `<div style="font-size:10px; color:var(--muted); margin-top:6px;">Updated ${new Date(fetchedAt).toLocaleTimeString()}</div>`;
 }
 
 function renderHome() {
@@ -5128,7 +5713,9 @@ function renderHomePlansCard() {
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────
-loadApp().then(() => { initHome(); checkAuth(); renderMarketStrip(false); });
+// S2.6: restore the profile identity for this browser session before loading data
+activeUserId = sessionStorage.getItem('hubUser') || activeUserId;
+loadApp().then(() => { migrateProfilesRegistry(); initHome(); checkAuth(); renderMarketStrip(false); });
 </script>
 </body>
 </html>
