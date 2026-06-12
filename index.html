@@ -3747,7 +3747,7 @@ async function autoFetchTickerInfo(ticker, portKey, holdId) {
   const holdings = (port[portKey] && port[portKey].holdings) || [];
   const h = holdings.find(x => x.id === holdId);
   if (!h) return;
-  const suffix = PORT_YF_SUFFIX[portKey] || '';
+  const suffix = exchangeSuffix(portKey, (port[portKey] && port[portKey].exchange) || '');
   const sym = (ticker.includes('.') || ticker.includes('-')) ? ticker : ticker + suffix;
   try {
     const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=1d`);
@@ -3794,6 +3794,13 @@ const COINGECKO_IDS = {
 // Map portfolio key → Yahoo exchange suffix + currency code for crypto
 const PORT_YF_SUFFIX = { idr: '.JK', aud: '.AX', usd: '' };
 const PORT_CG_CCY    = { idr: 'idr', usd: 'usd', aud: 'aud' };
+// Derive Yahoo suffix for any portfolio key (built-in or custom)
+function exchangeSuffix(portKey, exchange) {
+  if (PORT_YF_SUFFIX[portKey] !== undefined) return PORT_YF_SUFFIX[portKey];
+  if (exchange === 'ASX') return '.AX';
+  if (exchange === 'IDX') return '.JK';
+  return ''; // NYSE, NASDAQ, SGX, Crypto, ETF, Other
+}
 // Market overview indices: [yahoo symbol, display name]
 const MKT_INDICES = [
   ['^AXJO',  'ASX 200'],
@@ -3898,16 +3905,30 @@ async function refreshAllPrices() {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Refreshing…'; }
   const p = store('portfolios') || {};
   let ok = 0, stale = 0;
-  // Holdings: price currency follows the portfolio
-  for (const key of ['idr', 'usd', 'aud']) {
+  // Holdings: price currency follows the portfolio (all keys including custom)
+  for (const key of Object.keys(p)) {
     const holdings = (p[key] && p[key].holdings) ? p[key].holdings : [];
+    const portExchange = (p[key] && p[key].exchange) || '';
+    const cgCcy = PORT_CG_CCY[key] || (p[key] && p[key].currency ? p[key].currency.toLowerCase() : 'usd');
     for (const h of holdings) {
       if (!h.ticker) continue;
       try {
-        if (h.type === 'Crypto') h.currentPrice = await fetchCryptoPrice(h.ticker, PORT_CG_CCY[key]);
-        else                     h.currentPrice = (await fetchStockPrice(h.ticker, key)).price;
+        if (h.type === 'Crypto') {
+          h.currentPrice = await fetchCryptoPrice(h.ticker, cgCcy);
+        } else {
+          // Use raw Yahoo fetch so we can fill name + price in one call
+          const suffix = exchangeSuffix(key, portExchange);
+          const sym = (h.ticker.includes('.') || h.ticker.includes('-')) ? h.ticker.toUpperCase() : h.ticker.toUpperCase() + suffix;
+          const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=1d`);
+          const j = r.ok ? await r.json() : null;
+          const meta = j && j.chart && j.chart.result && j.chart.result[0] && j.chart.result[0].meta;
+          if (meta && meta.regularMarketPrice) {
+            h.currentPrice = meta.regularMarketPrice;
+            if (meta.shortName && !h.name) h.name = meta.shortName;
+          }
+        }
         ok++;
-      } catch (e) { stale++; } // keep last known price
+      } catch (e) { stale++; }
     }
   }
   store('portfolios', p);
@@ -3917,8 +3938,18 @@ async function refreshAllPrices() {
     if (!w.ticker) continue;
     const isCrypto = !!COINGECKO_IDS[(w.ticker || '').trim().toUpperCase()];
     try {
-      if (isCrypto) w.currentPrice = await fetchCryptoPrice(w.ticker, 'usd');
-      else          w.currentPrice = (await fetchStockPrice(w.ticker, 'usd')).price;
+      if (isCrypto) {
+        w.currentPrice = await fetchCryptoPrice(w.ticker, 'usd');
+      } else {
+        const sym = w.ticker.trim().toUpperCase();
+        const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=1d`);
+        const j = r.ok ? await r.json() : null;
+        const meta = j && j.chart && j.chart.result && j.chart.result[0] && j.chart.result[0].meta;
+        if (meta && meta.regularMarketPrice) {
+          w.currentPrice = meta.regularMarketPrice;
+          if (meta.shortName && !w.name) w.name = meta.shortName;
+        }
+      }
       ok++;
     } catch (e) { stale++; }
   }
@@ -4831,8 +4862,10 @@ function confirmAddPortfolio() {
   if (tabs) {
     const btn = document.createElement('button');
     btn.className = 'inv-port-tab';
-    btn.textContent = name + (currency ? ` (${currency})` : '');
-    btn.onclick = function() { showInvPortfolio(key, this); };
+    btn.style.cssText = 'display:inline-flex;align-items:center;gap:4px;';
+    btn.innerHTML = escHtml(name + (currency ? ` (${currency})` : '')) +
+      `<span onclick="event.stopPropagation();deletePortfolio('${key}')" title="Delete portfolio" style="margin-left:2px;opacity:0.5;font-size:10px;line-height:1;cursor:pointer;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">✕</span>`;
+    btn.onclick = function(e) { if (e.target.tagName !== 'SPAN') showInvPortfolio(key, this); };
     tabs.appendChild(btn);
   }
   closeAddPortfolioWizard();
@@ -4876,6 +4909,16 @@ function renderCombinedPortfolio() {
     ${rows || '<p style="font-size:12px;color:var(--muted);">No holdings across any portfolio.</p>'}`;
 }
 
+function deletePortfolio(key) {
+  if (['idr','usd','aud'].includes(key)) return; // protect built-ins
+  if (!confirm(`Delete portfolio "${(store('portfolios')||{})[key]?.name || key}"? This cannot be undone.`)) return;
+  const p = store('portfolios') || {};
+  delete p[key];
+  store('portfolios', p);
+  save();
+  initInvestments(); // rebuilds tabs + switches to Combined
+}
+
 function initInvestments() {
   // Lazy seed — also done in migrate(), this is a safety net
   const p = store('portfolios') || { idr: { holdings: [] }, usd: { holdings: [] }, aud: { holdings: [] } };
@@ -4894,8 +4937,10 @@ function initInvestments() {
     Object.keys(p).filter(k => !['idr','usd','aud'].includes(k)).forEach(k => {
       const btn = document.createElement('button');
       btn.className = 'inv-port-tab';
-      btn.textContent = (p[k].name || k) + (p[k].currency ? ` (${p[k].currency})` : '');
-      btn.onclick = function() { showInvPortfolio(k, this); };
+      btn.style.cssText = 'display:inline-flex;align-items:center;gap:4px;';
+      btn.innerHTML = escHtml((p[k].name || k) + (p[k].currency ? ` (${p[k].currency})` : '')) +
+        `<span onclick="event.stopPropagation();deletePortfolio('${k}')" title="Delete portfolio" style="margin-left:2px;opacity:0.5;font-size:10px;line-height:1;cursor:pointer;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">✕</span>`;
+      btn.onclick = function(e) { if (e.target.tagName !== 'SPAN') showInvPortfolio(k, this); };
       tabs.appendChild(btn);
     });
   }
