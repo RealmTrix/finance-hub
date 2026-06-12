@@ -710,12 +710,14 @@ th {
 [data-ui="modern"] .btn, [data-ui="modern"] .login-btn { border-radius:8px; transition:transform .15s ease, box-shadow .15s ease, background .15s ease, opacity .15s ease; }
 [data-ui="modern"] .btn:hover, [data-ui="modern"] .login-btn:hover { transform:translateY(-1px); box-shadow:0 3px 10px rgba(15,23,42,.15); }
 [data-ui="modern"] .btn:active { transform:translateY(0) scale(.97); }
-[data-ui="modern"] .btn-primary { background:linear-gradient(135deg, var(--gold) 0%, color-mix(in srgb, var(--gold) 85%, #fff) 100%); border-color:transparent; color:#fff; }
+[data-ui="modern"] .btn-primary { background:linear-gradient(135deg, var(--gold) 0%, color-mix(in srgb, var(--gold) 85%, #fff) 100%); border-color:transparent; color:var(--n1); font-weight:600; }
 [data-ui="modern"] .btn-primary:hover { background:linear-gradient(135deg, color-mix(in srgb, var(--gold) 88%, #fff) 0%, color-mix(in srgb, var(--gold) 72%, #fff) 100%); }
 [data-ui="modern"] .pf-subtab, [data-ui="modern"] .inv-subtab { transition:background .2s ease, color .2s ease, transform .15s ease; border-radius:8px 8px 0 0; }
-[data-ui="modern"] .tab { border-radius:999px; margin:6px 2px; padding:7px 14px; border-bottom:2px solid transparent; color:rgba(255,255,255,.55); transition:background .15s, color .15s; }
+[data-ui="modern"] .tab { border-radius:999px; margin:6px 2px; padding:7px 14px; border-bottom:2px solid transparent; color:rgba(255,255,255,.55); transition:background .15s, color .15s; touch-action:manipulation; }
 [data-ui="modern"] .tab:hover { background:rgba(255,255,255,.08); color:rgba(255,255,255,.9); }
-[data-ui="modern"] .tab.active { background:var(--gold); border-bottom-color:transparent; color:#fff; }
+[data-ui="modern"] .tab.active { background:var(--gold); border-bottom-color:transparent; color:var(--n1); font-weight:600; }
+[data-ui="modern"] .btn { touch-action:manipulation; }
+[data-ui="modern"] .btn:focus-visible, [data-ui="modern"] .tab:focus-visible, [data-ui="modern"] .pf-subtab:focus-visible, [data-ui="modern"] .inv-subtab:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
 [data-ui="modern"] .tab-panel { animation:hubFadeIn .3s ease both; }
 [data-ui="modern"] .pf-panel { animation:hubFadeIn .25s ease both; }
 [data-ui="modern"] input, [data-ui="modern"] select, [data-ui="modern"] textarea { transition:border-color .2s ease, box-shadow .2s ease; border-radius:8px; }
