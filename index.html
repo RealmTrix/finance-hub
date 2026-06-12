@@ -1,4 +1,4 @@
-<!-- Finance Hub v2.6 — Session 2.6: Multi-Profile Login + Pockets + News + Modern UI -->
+<!-- Finance Hub v2.7 — Strategy X-Ray + Modern UI Redesign -->
 <!-- Project Kangaroo | michael-finance-hub -->
 <!-- Built: May 2026 | Sessions: 9 planned -->
 <!DOCTYPE html>
@@ -691,13 +691,31 @@ th {
 .profile-avatar-name { font-size:12px; font-weight:600; color:var(--txt); }
 
 /* ── S2.6: Modern UI mode — scoped to [data-ui="modern"], Basic mode untouched ── */
-[data-ui="modern"] .card { border-radius:14px; box-shadow:0 1px 3px rgba(15,23,42,.06), 0 4px 16px rgba(15,23,42,.05); transition:box-shadow .25s ease, transform .25s ease; }
-[data-ui="modern"] .card:hover { box-shadow:0 2px 6px rgba(15,23,42,.08), 0 10px 28px rgba(15,23,42,.09); transform:translateY(-1px); }
+/* ── S2.7b: Modern UI v2 — gradient card borders, pill tabs, clamp() metrics, accent striping ── */
+[data-ui="modern"] .card {
+  position:relative;
+  border-radius:14px;
+  border:1px solid transparent;
+  background:linear-gradient(var(--card), var(--card)) padding-box,
+             linear-gradient(160deg, color-mix(in srgb, var(--gold) 55%, transparent), color-mix(in srgb, var(--bdr) 65%, transparent) 40%, transparent 80%) border-box;
+  box-shadow:0 1px 2px rgba(15,23,42,.04);
+  transition:box-shadow .25s ease, transform .25s ease;
+}
+[data-ui="modern"] .card:hover { transform:translateY(-1px); box-shadow:0 0 0 1px rgba(184,134,11,.3), 0 2px 8px rgba(15,23,42,.06); }
+[data-ui="modern"] .card::before { content:''; position:absolute; top:0; left:0; right:0; height:12px; background:linear-gradient(180deg, color-mix(in srgb, var(--n1) 7%, transparent), transparent); border-radius:14px 14px 0 0; pointer-events:none; }
+[data-ui="modern"] .home-big    { font-size:clamp(28px, 4.5vw, 38px); font-weight:800; letter-spacing:-.02em; }
+[data-ui="modern"] .nw-big      { font-size:clamp(24px, 3.5vw, 32px); font-weight:800; letter-spacing:-.02em; }
+[data-ui="modern"] .inv-sum-val { font-size:clamp(17px, 2.2vw, 22px); font-weight:800; letter-spacing:-.01em; }
+[data-ui="modern"] table tr:nth-child(even) td { background:rgba(184,134,11,.03); }
 [data-ui="modern"] .btn, [data-ui="modern"] .login-btn { border-radius:8px; transition:transform .15s ease, box-shadow .15s ease, background .15s ease, opacity .15s ease; }
 [data-ui="modern"] .btn:hover, [data-ui="modern"] .login-btn:hover { transform:translateY(-1px); box-shadow:0 3px 10px rgba(15,23,42,.15); }
 [data-ui="modern"] .btn:active { transform:translateY(0) scale(.97); }
-[data-ui="modern"] .tab, [data-ui="modern"] .pf-subtab, [data-ui="modern"] .inv-subtab { transition:background .2s ease, color .2s ease, transform .15s ease; border-radius:8px 8px 0 0; }
-[data-ui="modern"] .tab:hover { transform:translateY(-1px); }
+[data-ui="modern"] .btn-primary { background:linear-gradient(135deg, var(--gold) 0%, color-mix(in srgb, var(--gold) 85%, #fff) 100%); border-color:transparent; color:#fff; }
+[data-ui="modern"] .btn-primary:hover { background:linear-gradient(135deg, color-mix(in srgb, var(--gold) 88%, #fff) 0%, color-mix(in srgb, var(--gold) 72%, #fff) 100%); }
+[data-ui="modern"] .pf-subtab, [data-ui="modern"] .inv-subtab { transition:background .2s ease, color .2s ease, transform .15s ease; border-radius:8px 8px 0 0; }
+[data-ui="modern"] .tab { border-radius:999px; margin:6px 2px; padding:7px 14px; border-bottom:2px solid transparent; color:rgba(255,255,255,.55); transition:background .15s, color .15s; }
+[data-ui="modern"] .tab:hover { background:rgba(255,255,255,.08); color:rgba(255,255,255,.9); }
+[data-ui="modern"] .tab.active { background:var(--gold); border-bottom-color:transparent; color:#fff; }
 [data-ui="modern"] .tab-panel { animation:hubFadeIn .3s ease both; }
 [data-ui="modern"] .pf-panel { animation:hubFadeIn .25s ease both; }
 [data-ui="modern"] input, [data-ui="modern"] select, [data-ui="modern"] textarea { transition:border-color .2s ease, box-shadow .2s ease; border-radius:8px; }
@@ -1040,20 +1058,44 @@ th {
 
     <!-- Strategy sub-tab (S6) -->
     <div id="inv-strategy" class="inv-panel" style="display:none">
-      <div class="card">
-        <div class="card-title">💡 Strategy &amp; Q&amp;A</div>
-        <p style="font-size:11px; color:var(--muted); margin-bottom:10px;">Ask about your portfolio or market conditions. Your live holdings and watchlist are sent as context.</p>
-        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
-          <button class="quick-prompt" onclick="quickStrategy('Should I rebalance?')">Should I rebalance?</button>
-          <button class="quick-prompt" onclick="quickStrategy(&quot;What's my concentration risk?&quot;)">What's my concentration risk?</button>
-          <button class="quick-prompt" onclick="quickStrategy('Suggest 3 ideas for my AUD portfolio')">Suggest 3 ideas for my AUD portfolio</button>
+
+      <!-- S2.7a — A: Finance Health (mirror of Income tab stress score) -->
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-title">🩺 Finance Health</div>
+        <div id="xrayStressBody" style="color:var(--muted); font-size:12px;">Loading…</div>
+        <div style="margin-top:10px;">
+          <button id="xrayCommentBtn" class="btn" style="font-size:11px; padding:4px 10px;" onclick="xrayHealthComment()">✨ AI commentary</button>
+          <div id="xrayCommentOut" style="font-size:12px; margin-top:8px;"></div>
         </div>
-        <textarea id="stratInput" rows="2" placeholder="Ask about your portfolio or market conditions" style="width:100%; box-sizing:border-box; resize:vertical;"></textarea>
-        <div style="margin-top:8px;">
-          <button class="btn" style="font-size:11px; padding:5px 12px;" onclick="askStrategy()">Ask</button>
-        </div>
-        <div id="invStrategyOutput"></div>
       </div>
+
+      <!-- S2.7a — B: Holdings X-Ray (pure JS) -->
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-title">🔬 Holdings X-Ray</div>
+        <div id="xrayHoldingsBody" style="font-size:12px; color:var(--muted);">Loading…</div>
+      </div>
+
+      <!-- S2.7a — C: Cash & Macro (pure JS) -->
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-title">💵 Cash &amp; Macro</div>
+        <div id="xrayCashMacroBody" style="font-size:12px; color:var(--muted);">Loading…</div>
+      </div>
+
+      <!-- S2.7a — D: Strategy Artifact (AI, persistable) -->
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-title">🧭 Strategy Artifact</div>
+        <input id="xrayWhatIf" placeholder="What-if scenario (e.g. Buy 100 AAPL at $195 or Sell all CBA)" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+        <button id="xrayGenBtn" class="btn" style="font-size:11px; padding:5px 12px;" onclick="generateStrategyPlan()">✨ Generate Strategy Plan</button>
+        <div id="xrayPlanOut"></div>
+        <div class="ai-disclaimer">This is AI-generated analysis, not financial advice.</div>
+      </div>
+
+      <!-- S2.7a — Saved Plans -->
+      <div class="card">
+        <div class="card-title">🗂 Saved Plans</div>
+        <div id="xraySavedPlans" style="font-size:12px; color:var(--muted);">No saved plans yet.</div>
+      </div>
+
     </div>
 
     <!-- Signals sub-tab (S6B) -->
@@ -1458,7 +1500,7 @@ th {
     </div>
 
     <div class="ver-footer">
-      <span id="versionDisplay">Finance Hub v2.6 — Profiles + Pockets + News</span>
+      <span id="versionDisplay">Finance Hub v2.7 — Strategy X-Ray + Modern UI</span>
       <span id="lastSavedDisplay" style="color:var(--muted)">–</span>
     </div>
   </div>
@@ -1830,7 +1872,7 @@ Date,Description,Amount
     </div>
 
     <div class="ver-footer">
-      <span>Finance Hub v2.6</span>
+      <span>Finance Hub v2.7</span>
       <span>v2.1 roadmap complete — Multi-Profile + Pockets + News + Modern UI</span>
     </div>
   </div>
@@ -1971,6 +2013,8 @@ function migrate(d) {
   // S2.6: persisted wealth goal (was input-only and lost on refresh) + savings pockets
   if (!d.wealthGoal || typeof d.wealthGoal !== 'object') d.wealthGoal = { target: 0, targetDate: '' };
   if (!Array.isArray(d.pockets)) d.pockets = [];
+  // S2.7a: strategy X-ray plans — non-critical key, lazy seed only (no schema bump)
+  if (!d.strategyPlans || typeof d.strategyPlans !== 'object') d.strategyPlans = {};
   d.schemaVersion = 11;
   return d;
 }
@@ -3897,6 +3941,7 @@ function showInvSubTab(id, el) {
   if (panel) panel.style.display = '';
   el.classList.add('active');
   if (id === 'inv-report') renderMonthlyReport();
+  if (id === 'inv-strategy') renderXray();   // S2.7a: Portfolio X-Ray
   if (id === 'inv-signals') { renderSignalWatchlist(); renderSignalBrief(); renderTradeLog(); }
 }
 
@@ -4026,6 +4071,384 @@ function quickStrategy(q) {
   if (input) input.value = q;
   askStrategy();
 }
+
+// ─── S2.7a: Portfolio X-Ray (Strategy sub-tab) ─────────────────────────────
+let xrayCommentCache = null;   // session-cached AI commentary (Section A)
+let xrayCharts = {};           // Chart.js instances by canvas id
+let chartJsLoading = null;
+
+function ensureChartJs() {
+  if (window.Chart) return Promise.resolve();
+  if (chartJsLoading) return chartJsLoading;
+  chartJsLoading = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+    s.onload = () => res();
+    s.onerror = () => { chartJsLoading = null; rej(new Error('Chart.js failed to load')); };
+    document.head.appendChild(s);
+  });
+  return chartJsLoading;
+}
+
+function renderXray() {
+  // A: mirror the Income tab stress score — same pattern as the Home card (no logic duplicated)
+  const xs = document.getElementById('xrayStressBody');
+  if (xs) {
+    renderStressScore();   // renders into #stressScoreBody (Income tab, hidden)
+    const src = document.getElementById('stressScoreBody');
+    xs.innerHTML = (src && src.innerHTML) ? src.innerHTML : '<span style="color:var(--muted);">Unavailable</span>';
+  }
+  const co = document.getElementById('xrayCommentOut');
+  if (co && xrayCommentCache) co.innerHTML = `<div class="ai-card"><div class="ai-output">${escHtml(xrayCommentCache)}</div></div>`;
+  renderXrayHoldings();
+  renderXrayCashMacro();
+  // D: re-render this month's saved plan if one exists (persistable artifact)
+  const out = document.getElementById('xrayPlanOut');
+  const cur = (store('strategyPlans') || {})[monthKeyNow()];
+  if (out && cur) { out.innerHTML = renderStrategyArtifact(cur, 'live'); drawPlanCharts(cur.plan, 'live'); }
+  renderSavedPlans();
+}
+
+async function xrayHealthComment() {
+  const out = document.getElementById('xrayCommentOut');
+  const btn = document.getElementById('xrayCommentBtn');
+  if (!out) return;
+  if (xrayCommentCache) { out.innerHTML = `<div class="ai-card"><div class="ai-output">${escHtml(xrayCommentCache)}</div></div>`; return; }
+  const src = document.getElementById('stressScoreBody');
+  const snap = src ? src.textContent.replace(/\s+/g, ' ').trim().slice(0, 600) : '';
+  out.innerHTML = '<span style="color:var(--muted);">⏳ Thinking…</span>';
+  if (btn) btn.disabled = true;
+  try {
+    const t = await askChatAI(`You are a personal finance strategist. In ONE sentence (max 30 words, plain text, no preamble), comment on this financial stress score snapshot: "${snap}"`, { model: 'claude-sonnet-4-6', max_tokens: 100 });
+    xrayCommentCache = (t || '').trim();
+    out.innerHTML = `<div class="ai-card"><div class="ai-output">${escHtml(xrayCommentCache)}</div></div>`;
+  } catch (e) {
+    out.innerHTML = `<span style="color:var(--err);">${escHtml(e.message)}</span>`;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// B: Holdings X-Ray — pure JS, no AI call
+function renderXrayHoldings() {
+  const el = document.getElementById('xrayHoldingsBody');
+  if (!el) return;
+  const data = gatherPortfolioData();
+  const rows = [];
+  const exch = { ASX: 0, NYSE: 0, IDX: 0, Crypto: 0 };
+  ['idr','usd','aud'].forEach(k => {
+    const p = data.portfolios[k] || {};
+    (p.holdings || []).forEach(h => {
+      const audValue = toAUD(h.marketValue || 0, p.currency);
+      const audPnl   = toAUD(h.pnl || 0, p.currency);
+      rows.push({ ticker: h.ticker || '?', name: h.name || h.ticker || '?', audValue, audPnl, pnlPct: h.pnlPct });
+      const ex = (h.type === 'Crypto') ? 'Crypto' : (k === 'aud' ? 'ASX' : k === 'usd' ? 'NYSE' : 'IDX');
+      exch[ex] += audValue;
+    });
+  });
+  const total = data.combined.audValue || 0;
+  if (!rows.length || total <= 0) { el.innerHTML = '<span style="color:var(--muted);">No holdings yet — add them in the Portfolio sub-tab.</span>'; return; }
+  const fmtA = v => 'A$ ' + (v < 0 ? '−' : '') + Math.abs(Math.round(v)).toLocaleString('en-AU');
+  const top5   = rows.slice().sort((a,b) => b.audValue - a.audValue).slice(0, 5);
+  const best3  = rows.slice().sort((a,b) => b.audPnl - a.audPnl).slice(0, 3);
+  const worst3 = rows.slice().sort((a,b) => a.audPnl - b.audPnl).slice(0, 3);
+  const sec = t => `<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:10px 0 5px;">${t}</div>`;
+  let html = sec('Top 5 holdings · % of total A$' + Math.round(total).toLocaleString('en-AU'));
+  html += top5.map(r => {
+    const pct = total > 0 ? r.audValue / total * 100 : 0;
+    return `<div style="margin-bottom:6px;">
+      <div style="display:flex; justify-content:space-between; font-size:12px;"><span><strong>${escHtml(r.ticker)}</strong> <span style="color:var(--muted);">${escHtml(r.name)}</span></span><span>${pct.toFixed(1)}% · ${fmtA(r.audValue)}</span></div>
+      <div style="background:rgba(128,128,128,.15); border-radius:4px; overflow:hidden; margin-top:2px;"><div style="width:${Math.min(100, pct).toFixed(1)}%; background:#c9a227; height:6px;"></div></div>
+    </div>`;
+  }).join('');
+  html += sec('By exchange');
+  html += `<div style="display:flex; gap:6px; flex-wrap:wrap;">` + ['ASX','NYSE','IDX','Crypto'].map(x => {
+    const pct = total > 0 ? exch[x] / total * 100 : 0;
+    return `<span style="font-size:11px; border:1px solid rgba(128,128,128,.3); border-radius:10px; padding:3px 10px;"><strong>${x}</strong> ${pct.toFixed(1)}% <span style="color:var(--muted);">${fmtA(exch[x])}</span></span>`;
+  }).join('') + `</div>`;
+  const pnlRow = r => `<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;"><span><strong>${escHtml(r.ticker)}</strong></span><span style="color:${r.audPnl < 0 ? 'var(--err)' : 'var(--ok)'};">${fmtA(r.audPnl)}</span></div>`;
+  html += `<div style="display:flex; gap:18px; flex-wrap:wrap;">
+    <div style="flex:1; min-width:160px;">${sec('Best 3 (A$ P&amp;L)')}${best3.map(pnlRow).join('')}</div>
+    <div style="flex:1; min-width:160px;">${sec('Worst 3 (A$ P&amp;L)')}${worst3.map(pnlRow).join('')}</div>
+  </div>`;
+  el.innerHTML = html;
+}
+
+// C: Cash & Macro — pure JS, no AI call
+function xrayAvgMonthlySpendBase() {
+  const now = new Date(); const keys = [];
+  for (let i = 0; i < 3; i++) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); keys.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')); }
+  let total = 0; const seen = new Set();
+  (appData.spending || []).forEach(s => {
+    const mk = (s.date || '').slice(0, 7);
+    if (keys.includes(mk)) { total += toBase(s.amount || 0, s.currency || 'AUD'); seen.add(mk); }
+  });
+  return seen.size ? total / seen.size : 0;
+}
+
+function renderXrayCashMacro() {
+  const el = document.getElementById('xrayCashMacroBody');
+  if (!el) return;
+  const cash = (appData.cards || []).filter(c => c.type === 'Debit')
+    .reduce((s, c) => s + toBase(c.balance || 0, c.currency || 'AUD'), 0);
+  const burn = xrayAvgMonthlySpendBase();
+  const runway = burn > 0 ? cash / burn : null;
+  const sec = t => `<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:10px 0 5px;">${t}</div>`;
+  let html = sec('Cash');
+  html += `<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;"><span>Debit card cash (${baseSym()})</span><strong>${fmtMoney(cash)}</strong></div>`;
+  html += `<div style="display:flex; justify-content:space-between; font-size:12px;"><span>Runway (÷ avg monthly spend, last 3 mo)</span><strong>${runway == null ? '— no spending data' : runway.toFixed(1) + ' months'}</strong></div>`;
+  // Macro indices from appData.marketSnapshot.indices
+  const snap = appData.marketSnapshot || {};
+  const idx = snap.indices || {};
+  const stale = !snap.lastFetched || (Date.now() - new Date(snap.lastFetched).getTime()) > 12 * 3.6e6;
+  html += sec('Macro' + (stale ? ' <span style="font-size:9px; font-weight:700; color:#fff; background:#e0a800; padding:2px 7px; border-radius:8px; letter-spacing:.04em;">STALE &gt;12H</span>' : ''));
+  html += [['^AXJO','ASX 200'], ['^GSPC','S&amp;P 500'], ['^JKSE','Jakarta Composite']].map(([sym, label]) => {
+    const i = idx[sym];
+    if (!i || i.level == null) return `<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;"><span>${label}</span><span style="color:var(--muted);">–</span></div>`;
+    const chg = i.prevClose ? i.level - i.prevClose : 0;
+    const pct = i.prevClose ? chg / i.prevClose * 100 : 0;
+    return `<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;"><span>${label}</span><span><strong>${(+i.level).toLocaleString('en-AU', { maximumFractionDigits: 1 })}</strong> <span style="color:${chg < 0 ? 'var(--err)' : 'var(--ok)'};">${chg >= 0 ? '+' : ''}${pct.toFixed(2)}%</span></span></div>`;
+  }).join('');
+  // FX inline from appData.rates
+  const r = appData.rates || {};
+  const fx = (lbl, v, dp) => `<strong>${lbl}</strong> ${v ? (+v).toLocaleString('en-AU', { maximumFractionDigits: dp }) : '–'}`;
+  html += sec('FX') + `<div style="font-size:12px;">${fx('AUD/IDR', r.AUD_IDR, 0)} · ${fx('AUD/USD', r.AUD_USD, 4)} · ${fx('AUD/SGD', r.AUD_SGD, 4)}</div>`;
+  el.innerHTML = html;
+}
+
+// D: Strategy Artifact — what-if parsing + JS simulation (AI sees both snapshots)
+function parseWhatIfScenario(text) {
+  const m = text.match(/^\s*(buy|sell)\s+(all|[\d,]+(?:\.\d+)?)\s+(?:shares?\s+of\s+|units?\s+of\s+)?([A-Za-z0-9.\-]+)(?:\s+(?:at|@)\s*\$?\s*([\d,]+(?:\.\d+)?))?/i);
+  if (!m) return null;
+  return {
+    action: m[1].toLowerCase(),
+    qty: m[2].toLowerCase() === 'all' ? 'all' : parseFloat(m[2].replace(/,/g, '')),
+    ticker: m[3].toUpperCase(),
+    price: m[4] ? parseFloat(m[4].replace(/,/g, '')) : null
+  };
+}
+
+function simulateWhatIf(sc) {
+  // Works on a deep clone — NEVER mutates appData
+  const port = JSON.parse(JSON.stringify(appData.portfolios || { idr: { holdings: [] }, usd: { holdings: [] }, aud: { holdings: [] } }));
+  let cashDeltaAUD = 0, note = '';
+  let foundKey = null, found = null;
+  ['idr','usd','aud'].forEach(k => {
+    (((port[k] || {}).holdings) || []).forEach(h => {
+      if (!found && (h.ticker || '').toUpperCase() === sc.ticker) { found = h; foundKey = k; }
+    });
+  });
+  if (sc.action === 'sell') {
+    if (!found) throw new Error('No holding "' + sc.ticker + '" found to sell.');
+    const ccy = PORT_CURRENCIES[foundKey];
+    const qty = sc.qty === 'all' ? (found.qty || 0) : Math.min(sc.qty, found.qty || 0);
+    const px = sc.price != null ? sc.price : (found.currentPrice || 0);
+    cashDeltaAUD = toAUD(qty * px, ccy);
+    found.qty = (found.qty || 0) - qty;
+    if (found.qty <= 0) port[foundKey].holdings = port[foundKey].holdings.filter(h => h !== found);
+    note = 'Sold ' + qty + ' ' + sc.ticker + ' @ ' + px + ' ' + ccy + ' — proceeds ≈ A$' + Math.round(cashDeltaAUD).toLocaleString('en-AU') + ' assumed held as cash.';
+  } else {
+    if (sc.qty === 'all') throw new Error('Specify a quantity for a buy (e.g. "Buy 100 AAPL at $195").');
+    if (found) {
+      const ccy = PORT_CURRENCIES[foundKey];
+      const px = sc.price != null ? sc.price : (found.currentPrice || 0);
+      if (!px) throw new Error('No price known for ' + sc.ticker + ' — include "at $X".');
+      const oldCost = (found.avgBuyPrice || 0) * (found.qty || 0);
+      found.qty = (found.qty || 0) + sc.qty;
+      found.avgBuyPrice = (oldCost + px * sc.qty) / found.qty;
+      if (!found.currentPrice) found.currentPrice = px;
+      cashDeltaAUD = -toAUD(px * sc.qty, ccy);
+      note = 'Bought ' + sc.qty + ' more ' + sc.ticker + ' @ ' + px + ' ' + ccy + ' — cost ≈ A$' + Math.round(-cashDeltaAUD).toLocaleString('en-AU') + ' from cash.';
+    } else {
+      if (sc.price == null) throw new Error('"' + sc.ticker + '" is a new position — include a price (e.g. "at $195").');
+      const key = /\.AX$/i.test(sc.ticker) ? 'aud' : /\.JK$/i.test(sc.ticker) ? 'idr' : 'usd';
+      port[key].holdings.push({ id: 'sim', ticker: sc.ticker, name: sc.ticker, type: 'Stock', qty: sc.qty, avgBuyPrice: sc.price, currentPrice: sc.price });
+      cashDeltaAUD = -toAUD(sc.price * sc.qty, PORT_CURRENCIES[key]);
+      note = 'New position: ' + sc.qty + ' ' + sc.ticker + ' @ ' + sc.price + ' (' + PORT_CURRENCIES[key] + ') — cost ≈ A$' + Math.round(-cashDeltaAUD).toLocaleString('en-AU') + ' from cash.';
+    }
+  }
+  // Recompute totals on the clone (same maths as gatherPortfolioData)
+  const sim = { portfolios: {}, combined: { audCost: 0, audValue: 0 } };
+  ['idr','usd','aud'].forEach(k => {
+    const ccy = PORT_CURRENCIES[k];
+    let cost = 0, mv = 0; const hs = [];
+    (((port[k] || {}).holdings) || []).forEach(h => {
+      const c = (h.avgBuyPrice || 0) * (h.qty || 0), m = (h.currentPrice || 0) * (h.qty || 0);
+      cost += c; mv += m;
+      hs.push({ ticker: h.ticker, qty: h.qty, marketValue: +m.toFixed(2), pnl: +(m - c).toFixed(2), currency: ccy });
+    });
+    sim.portfolios[k] = { currency: ccy, marketValue: +mv.toFixed(2), audValue: +toAUD(mv, ccy).toFixed(2), holdings: hs };
+    sim.combined.audCost += toAUD(cost, ccy); sim.combined.audValue += toAUD(mv, ccy);
+  });
+  sim.combined.audCost = +sim.combined.audCost.toFixed(2);
+  sim.combined.audValue = +sim.combined.audValue.toFixed(2);
+  sim.cashDeltaAUD = +cashDeltaAUD.toFixed(2);
+  sim.note = note;
+  return sim;
+}
+
+// Read-only net worth mirror (same calc as the Home card — no nwHistory write)
+function xrayNetWorthAUD() {
+  const ccy = { idr: 'IDR', usd: 'USD', aud: 'AUD' };
+  const liquid = (appData.cards || []).filter(c => c.type !== 'Credit').reduce((s, c) => s + toAUD(c.balance || 0, c.currency || 'AUD'), 0);
+  let portfolio = 0;
+  ['idr','usd','aud'].forEach(k => {
+    (((appData.portfolios || {})[k] || {}).holdings || []).forEach(h => { portfolio += toAUD((h.currentPrice || 0) * (h.qty || 0), ccy[k]); });
+  });
+  const manual = (appData.assets || []).reduce((s, a) => s + toAUD(a.value || 0, a.currency || 'AUD'), 0);
+  const liabs = (appData.liabilities || []).reduce((s, l) => s + toAUD(l.value || 0, l.currency || 'AUD'), 0)
+              + (appData.cards || []).filter(c => c.type === 'Credit').reduce((s, c) => s + toAUD(c.balance || 0, c.currency || 'AUD'), 0);
+  return liquid + portfolio + manual - liabs;
+}
+
+function xrayParseJSON(raw) {
+  let t = (raw || '').replace(/```json/gi, '```').split('```').filter(x => x.trim()).join('');
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a === -1 || b === -1) throw new Error('AI did not return valid JSON — try again.');
+  try { return JSON.parse(t.slice(a, b + 1)); } catch (e) { throw new Error('Could not parse the AI plan JSON — try again.'); }
+}
+
+async function generateStrategyPlan() {
+  const out = document.getElementById('xrayPlanOut');
+  const btn = document.getElementById('xrayGenBtn');
+  const scenario = ((document.getElementById('xrayWhatIf') || {}).value || '').trim();
+  if (!out) return;
+  out.innerHTML = '<p style="color:var(--muted); font-size:12px;">⏳ Building strategy plan…</p>';
+  if (btn) btn.disabled = true;
+  try {
+    const current = gatherPortfolioData();
+    current.baseCurrency = appData.settings.baseCurrency;
+    const ctx = {
+      current,
+      netWorthAUD: +xrayNetWorthAUD().toFixed(2),
+      cashBase: +((appData.cards || []).filter(c => c.type === 'Debit').reduce((s, c) => s + toBase(c.balance || 0, c.currency || 'AUD'), 0)).toFixed(2),
+      baseCurrency: appData.settings.baseCurrency,
+      rates: appData.rates || {}
+    };
+    let prompt;
+    if (scenario) {
+      const sc = parseWhatIfScenario(scenario);
+      if (!sc) throw new Error('Could not parse the scenario — use e.g. "Buy 100 AAPL at $195" or "Sell all CBA".');
+      ctx.scenario = scenario;
+      ctx.simulated = simulateWhatIf(sc);
+      prompt = `You are a personal finance strategist. The user is considering: '${scenario}'. Current and simulated post-change snapshots are below. Reply with strict JSON only, no other text: { healthSentence, actionPlan: [3 strings], priceLevels: [{ticker, level, note}], stressTest: {currentNW, simulatedNW, deltaAUD, deltaPct}, concentration: [{label, pct}], whatIf: {audValueChange, concentrationChange, recommendation: 'go ahead|wait|avoid', reasoning} }.\n\nDATA:\n` + JSON.stringify(ctx);
+    } else {
+      prompt = `You are a personal finance strategist. Given the portfolio X-ray data below, produce a strategic plan. Reply with strict JSON only, no other text: { healthSentence, actionPlan: [3 strings], priceLevels: [{ticker, level, note}], stressTest: {currentNW, simulatedNW, deltaAUD, deltaPct}, concentration: [{label, pct}], whatIf: null }. stressTest assumes AUD/USD -10% and ASX -15%. Keep reasoning tight.\n\nDATA:\n` + JSON.stringify(ctx);
+    }
+    const raw = await askChatAI(prompt, { model: 'claude-sonnet-4-6', max_tokens: 1200 });
+    const plan = xrayParseJSON(raw);
+    const mk = monthKeyNow();
+    const plans = store('strategyPlans') || {};
+    plans[mk] = { plan, scenario: scenario || null, generatedAt: new Date().toISOString() };
+    store('strategyPlans', plans);   // store() → save() → pushToCloud() → sbUpsert()
+    out.innerHTML = renderStrategyArtifact(plans[mk], 'live');
+    drawPlanCharts(plan, 'live');
+    renderSavedPlans();
+  } catch (e) {
+    out.innerHTML = `<p style="color:var(--err); font-size:12px;">${escHtml(e.message)}</p>`;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function renderStrategyArtifact(entry, suffix) {
+  const p = entry.plan || {};
+  const st = p.stressTest || {};
+  const fmtA = v => (v == null || isNaN(+v)) ? '—' : 'A$ ' + (+v < 0 ? '−' : '') + Math.abs(Math.round(+v)).toLocaleString('en-AU');
+  const sec = t => `<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:10px 0 5px;">${t}</div>`;
+  let html = `<div class="ai-card">`;
+  html += `<div style="font-size:11px; color:var(--muted); margin-bottom:8px;">Generated ${new Date(entry.generatedAt).toLocaleString()}${entry.scenario ? ' · Scenario: ' + escHtml(entry.scenario) : ''}</div>`;
+  if (p.healthSentence) html += `<div style="font-size:13px; font-weight:600; margin-bottom:10px;">${escHtml(p.healthSentence)}</div>`;
+  if (p.whatIf) {
+    const rec = (p.whatIf.recommendation || '').toLowerCase();
+    const col = rec === 'go ahead' ? 'var(--ok)' : rec === 'avoid' ? 'var(--err)' : '#e0a800';
+    html += `<div style="margin-bottom:10px;">
+      <span style="display:inline-block; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#fff; background:${col}; padding:3px 10px; border-radius:10px;">${escHtml(p.whatIf.recommendation || '—')}</span>
+      <div style="font-size:12px; margin-top:6px;">${escHtml(p.whatIf.reasoning || '')}</div>
+      <div style="font-size:11px; color:var(--muted); margin-top:4px;">Value change: ${escHtml(String(p.whatIf.audValueChange != null ? p.whatIf.audValueChange : '—'))} · Concentration: ${escHtml(String(p.whatIf.concentrationChange != null ? p.whatIf.concentrationChange : '—'))}</div>
+    </div>`;
+  }
+  if (Array.isArray(p.actionPlan) && p.actionPlan.length) {
+    html += sec('Action plan');
+    html += p.actionPlan.map((a, i) => `<div style="display:flex; gap:8px; font-size:12px; margin-bottom:5px;"><span style="flex-shrink:0; font-weight:700; color:#c9a227;">${i + 1}.</span><span>${escHtml(String(a))}</span></div>`).join('');
+  }
+  if (Array.isArray(p.priceLevels) && p.priceLevels.length) {
+    html += sec('Price levels');
+    html += p.priceLevels.map(l => `<div style="font-size:12px; margin-bottom:3px;"><strong>${escHtml(l.ticker || '')}</strong> @ ${escHtml(String(l.level != null ? l.level : ''))} <span style="color:var(--muted);">— ${escHtml(l.note || '')}</span></div>`).join('');
+  }
+  html += sec('Stress test');
+  html += `<div style="font-size:12px; margin-bottom:4px;">${fmtA(st.currentNW)} → ${fmtA(st.simulatedNW)} <span style="color:${(+st.deltaAUD || 0) < 0 ? 'var(--err)' : 'var(--ok)'};">(${fmtA(st.deltaAUD)} / ${escHtml(String(st.deltaPct != null ? st.deltaPct : '—'))}%)</span></div>`;
+  html += `<div style="max-width:340px;"><canvas id="xrayBar_${suffix}" height="120"></canvas></div>`;
+  if (Array.isArray(p.concentration) && p.concentration.length) {
+    html += sec('Concentration');
+    html += `<div style="max-width:340px;"><canvas id="xrayDonut_${suffix}" height="150"></canvas></div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+async function drawPlanCharts(plan, suffix) {
+  try { await ensureChartJs(); } catch (e) { return; }   // charts are progressive enhancement
+  const palette = ['#c9a227', '#2e5e8c', '#4caf7d', '#d9534f', '#8884d8', '#b07aa1', '#6b7b8c'];
+  const donutEl = document.getElementById('xrayDonut_' + suffix);
+  if (donutEl && Array.isArray(plan.concentration) && plan.concentration.length) {
+    if (xrayCharts['d' + suffix]) xrayCharts['d' + suffix].destroy();
+    xrayCharts['d' + suffix] = new Chart(donutEl, {
+      type: 'doughnut',
+      data: { labels: plan.concentration.map(c => c.label), datasets: [{ data: plan.concentration.map(c => +c.pct || 0), backgroundColor: palette, borderWidth: 0 }] },
+      options: { plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } } }
+    });
+  }
+  const barEl = document.getElementById('xrayBar_' + suffix);
+  const st = plan.stressTest || {};
+  if (barEl && st.currentNW != null) {
+    if (xrayCharts['b' + suffix]) xrayCharts['b' + suffix].destroy();
+    xrayCharts['b' + suffix] = new Chart(barEl, {
+      type: 'bar',
+      data: { labels: ['Current NW', 'Simulated NW'], datasets: [{ data: [+st.currentNW || 0, +st.simulatedNW || 0], backgroundColor: ['#2e5e8c', '#c9a227'] }] },
+      options: { plugins: { legend: { display: false } }, scales: { y: { ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } } }
+    });
+  }
+}
+
+function renderSavedPlans() {
+  const el = document.getElementById('xraySavedPlans');
+  if (!el) return;
+  const plans = store('strategyPlans') || {};
+  const keys = Object.keys(plans).sort().reverse();
+  if (!keys.length) { el.innerHTML = '<span style="color:var(--muted);">No saved plans yet — generate one above.</span>'; return; }
+  el.innerHTML = keys.map(mk => {
+    const e = plans[mk];
+    const p = e.plan || {};
+    const preview = ((p.healthSentence || '') + (Array.isArray(p.actionPlan) && p.actionPlan[0] ? ' · 1. ' + p.actionPlan[0] : '')).slice(0, 180);
+    return `<div style="border:1px solid rgba(128,128,128,.3); border-radius:8px; padding:10px; margin-bottom:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleSavedPlan('${mk}')">
+        <strong style="font-size:12px;">${monthLabel(mk)}${e.scenario ? ' · what-if' : ''}</strong>
+        <span id="xraySavedChev_${mk}" style="color:var(--muted); font-size:11px;">▸ expand</span>
+      </div>
+      <div style="font-size:11px; color:var(--muted); margin-top:4px;">${escHtml(preview)}</div>
+      <div id="xraySaved_${mk}" style="display:none; margin-top:8px;"></div>
+    </div>`;
+  }).join('');
+}
+
+function toggleSavedPlan(mk) {
+  const box = document.getElementById('xraySaved_' + mk);
+  const chev = document.getElementById('xraySavedChev_' + mk);
+  if (!box) return;
+  if (box.style.display === 'none') {
+    const e = (store('strategyPlans') || {})[mk];
+    if (!e) return;
+    box.innerHTML = renderStrategyArtifact(e, mk);
+    box.style.display = '';
+    if (chev) chev.textContent = '▾ collapse';
+    drawPlanCharts(e.plan, mk);
+  } else {
+    box.style.display = 'none';
+    if (chev) chev.textContent = '▸ expand';
+  }
+}
+// ─── /S2.7a ────────────────────────────────────────────────────────────────
 
 // Morning briefing: render today's snapshot if present (written by the 5am task or manual refresh).
 function loadMorningBriefing() {
@@ -6054,10 +6477,13 @@ async function sendChatMessage() {
 }
 
 // Chat-specific proxy call — Haiku model, capped output, same Edge Function as askCoworkAI().
-async function askChatAI(prompt) {
+async function askChatAI(prompt, opts) {
   // Optional override: if a Claude API key is pasted in Settings, call Anthropic
   // directly from the browser. Default (empty) keeps the built-in proxy, whose
   // server-side key is preserved. Used by ALL AI features incl. Home news.
+  // S2.7a: opts = { model, max_tokens } — defaults unchanged (haiku / 500).
+  const mdl = (opts && opts.model) || 'claude-haiku-4-5-20251001';
+  const mtk = (opts && opts.max_tokens) || 500;
   const ownKey = (appData.settings || {}).claudeApiKey;
   if (ownKey) {
     const r2 = await fetch('https://api.anthropic.com/v1/messages', {
@@ -6068,7 +6494,7 @@ async function askChatAI(prompt) {
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true'
       },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 500, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: mdl, max_tokens: mtk, messages: [{ role: 'user', content: prompt }] })
     });
     if (!r2.ok) throw new Error('Claude API request failed (' + r2.status + ') — check the key in Settings');
     const j2 = await r2.json();
@@ -6081,7 +6507,7 @@ async function askChatAI(prompt) {
       'Authorization': 'Bearer ' + SUPABASE_KEY,
       'apikey': SUPABASE_KEY
     },
-    body: JSON.stringify({ prompt, data: [], model: 'claude-haiku-4-5-20251001', max_tokens: 500 })
+    body: JSON.stringify({ prompt, data: [], model: mdl, max_tokens: mtk })
   });
   if (!r.ok) {
     let detail = '';
