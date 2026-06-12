@@ -67,7 +67,22 @@ body {
 .hdr-logo { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
 .hdr-sub { font-size: 11px; color: rgba(255,255,255,0.55); }
 .hdr-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-#hubClock { flex-basis: 100%; text-align: right; font-size: 11px; color: rgba(255,255,255,.75); font-variant-numeric: tabular-nums; line-height: 1.2; }
+#hubClock { font-size: 11px; color: rgba(255,255,255,.75); font-variant-numeric: tabular-nums; line-height: 1.2; white-space: nowrap; }
+
+/* Mode chips (light/dark · modern/basic): text adapts to the current theme */
+.mode-chip { font-size: 11px; font-weight: 600; letter-spacing: .03em; padding: 4px 12px; border-radius: 12px; cursor: pointer;
+  background: #f5f1e8; color: #1a2433; border: 1px solid rgba(255,255,255,.35); }
+[data-theme="dark"] .mode-chip { background: #1a2433; color: #f5f1e8; border-color: rgba(255,255,255,.25); }
+.mode-chip:hover { opacity: .85; }
+
+/* User chip beside the logo */
+.user-chip { font-size: 11px; font-weight: 600; padding: 4px 11px; border-radius: 12px; margin-left: 12px;
+  background: rgba(255,255,255,.12); color: rgba(255,255,255,.9); border: 1px solid rgba(255,255,255,.25); white-space: nowrap; }
+.hdr-left { display: flex; align-items: center; }
+
+/* Sign out: red outline on transparent red */
+.signout-btn { font-size: 11px; font-weight: 600; background: rgba(220,53,69,.14); border: 1px solid #dc3545; color: #ff8b96; border-radius: 12px; padding: 4px 12px; cursor: pointer; }
+.signout-btn:hover { background: rgba(220,53,69,.28); }
 
 .accent-bar {
   height: 3px;
@@ -716,13 +731,14 @@ th {
       <div class="hdr-logo">Finance Hub</div>
       <div class="hdr-sub">Project Kangaroo</div>
     </div>
+    <span id="userChip" class="user-chip" style="display:none;">👤 <span id="userChipName"></span></span>
   </div>
   <div class="hdr-right">
     <span id="syncChip" class="sync-chip syncing">⟳ Connecting…</span>
-    <button class="theme-btn" onclick="toggleTheme()" title="Toggle dark mode">🌙</button>
-    <button class="theme-btn" id="uiModeBtn" onclick="toggleUiMode()" title="Toggle modern/basic UI">✨</button>
-    <button class="logout-btn" onclick="logout()" title="Lock and log out">🔒 Lock</button>
     <span id="hubClock"></span>
+    <button class="mode-chip" id="themeChip" onclick="toggleTheme()" title="Toggle light/dark mode">Light</button>
+    <button class="mode-chip" id="uiModeBtn" onclick="toggleUiMode()" title="Toggle modern/basic UI">Modern</button>
+    <button class="signout-btn" onclick="logout()" title="Sign out">Sign out</button>
   </div>
 </header>
 <div class="accent-bar"></div>
@@ -1248,6 +1264,7 @@ th {
         <button class="currency-btn active" onclick="setCurrency('AUD', this)">AUD</button>
         <button class="currency-btn" onclick="setCurrency('IDR', this)">IDR</button>
         <button class="currency-btn" onclick="setCurrency('USD', this)">USD</button>
+        <button class="currency-btn" onclick="setCurrency('SGD', this)">SGD</button>
       </div>
       <p style="font-size:11px;color:var(--muted);margin-top:6px;">All monetary values are stored in AUD and converted for display using live FX rates.</p>
 
@@ -1301,10 +1318,16 @@ th {
       <div class="section-heading" style="margin-top:16px;">API Keys</div>
       <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Required for Session 6B signal features. Free tier at newsapi.org (100 req/day).</p>
       <div class="settings-field">
-        <label>NewsAPI Key (optional — for signal news fetch)</label>
+        <label>NewsAPI Key (used by Home news + signal headlines)</label>
         <input type="text" id="newsApiKey" placeholder="Paste your NewsAPI key here" maxlength="100"
                onchange="saveSetting('newsApiKey', this.value)">
       </div>
+      <div class="settings-field">
+        <label>Claude API Key (optional — leave empty to keep using the built-in proxy)</label>
+        <input type="password" id="claudeApiKey" placeholder="sk-ant-… (only if you want to override the proxy)" maxlength="200"
+               onchange="saveSetting('claudeApiKey', this.value)">
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:4px;">All AI features (Chat, Reports, Signals, News curation) use the built-in Supabase proxy by default — its Claude key is stored server-side and is preserved. Paste a key here only if you ever need to switch to your own.</p>
 
       <div class="section-heading" style="margin-top:16px;">Market Data</div>
       <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
@@ -1409,6 +1432,10 @@ th {
 
         <!-- Step 1: Paste -->
         <div id="stmtStep1">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:12px;">
+            <label style="color:var(--muted); white-space:nowrap;">This statement is from:</label>
+            <select id="stmtAccountPre" style="font-size:12px; background:var(--bg); color:var(--txt); border:1px solid var(--bdr); border-radius:4px; padding:3px 6px;"></select>
+          </div>
           <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">Paste raw text from your AmEx statement (copy from PDF, app export, or email). Supported: AmEx table (Date | Date Processed | Description | Amount) · DD/MM/YYYY · CSV · Mon DD. Each transaction is auto-categorised for your review. Paste full statements freely — transactions already in your Spending log are flagged and skipped, so overlapping billing cycles (AmEx 28th vs your 15–14) are handled automatically.</p>
           <textarea id="stmtPasteArea" rows="10" style="width:100%; font-size:12px; font-family:monospace; padding:10px; border:1px solid var(--bdr); border-radius:6px; background:var(--bg); color:var(--txt); resize:vertical; box-sizing:border-box;"
             placeholder="Example:
@@ -1463,8 +1490,11 @@ Date,Description,Amount
   <!-- Updates -->
   <div id="tab-updates" class="tab-panel" style="display:none">
 
+    <!-- ── Feature Requests (first — most used) ──────────────────────────── -->
+    <div id="feat-req-card" class="card" style="border-left:3px solid var(--gold);"></div>
+
     <!-- ── v2.1 Roadmap ─────────────────────────────────────────────────── -->
-    <div class="card" style="border-left:3px solid var(--gold);">
+    <div class="card" style="margin-top:12px;">
       <div class="card-title" style="display:flex;align-items:center;gap:8px;">
         <span>🚀 v2.1 Roadmap</span>
         <span style="font-size:10px;font-weight:600;letter-spacing:.06em;padding:2px 8px;border-radius:10px;background:var(--ok-bg);color:var(--ok);">COMPLETE — v2.6</span>
@@ -1518,9 +1548,6 @@ Date,Description,Amount
         <strong style="color:var(--txt);">What's next (v3 candidates):</strong> TradingView webhook alerts merged into Signals · per-pocket auto-transfers from budget · scheduled news digest in AI Chat · CSV export per tab.
       </div>
     </div>
-
-    <!-- ── Feature Requests ──────────────────────────────────────────────── -->
-    <div id="feat-req-card" class="card" style="margin-top:12px;"></div>
 
     <!-- ── v1.0 Archive ──────────────────────────────────────────────────── -->
     <div class="card" style="margin-top:12px;">
@@ -1644,7 +1671,7 @@ Date,Description,Amount
           <ul style="margin:0;padding-left:16px;color:var(--muted);font-size:11px;line-height:1.8;">
             <li>Session 7 — Income tab + Tax tab fully implemented</li>
             <li>Financial Stress Score: daily salary accrual / daily burn (30d); GREEN/AMBER/RED</li>
-            <li>ATO FY2026 brackets + 2% Medicare levy; PAYG reconciliation; deduction tracker</li>
+            <li>ATO FY2026 brackets (Medicare levy removed — visa-exempt); PAYG reconciliation; deduction tracker</li>
           </ul>
         </div>
         <div style="padding:10px 0; border-bottom:1px solid var(--bdr);">
@@ -1962,6 +1989,7 @@ function saveSetting(key, value) {
 async function loadApp() {
   // Apply theme + UI mode immediately to avoid flash
   document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light');
+  setThemeChip();
   applyUiMode(localStorage.getItem('uiMode') || 'modern');
 
   // Load from localStorage first (instant). S2.6: per-profile key, with one-time
@@ -2013,6 +2041,7 @@ function renderSettings() {
   if ($id('nextPayDate'))  $id('nextPayDate').value  = s.nextPayDate  || '';
   if ($id('monthlySalary')) $id('monthlySalary').value = s.monthlySalary || '';
   if ($id('newsApiKey'))  $id('newsApiKey').value  = s.newsApiKey || '';
+  if ($id('claudeApiKey')) $id('claudeApiKey').value = s.claudeApiKey || '';
   if ($id('dailySnapshotToggle')) $id('dailySnapshotToggle').checked = !!s.dailySnapshotEnabled;
   if ($id('visaType'))     $id('visaType').value     = s.visaType     || '';
   if ($id('visaExpiry'))   $id('visaExpiry').value   = s.visaExpiry   || '';
@@ -2100,10 +2129,17 @@ function showTab(tabId, btn) {
 }
 
 // ─── Theme toggle ─────────────────────────────────────────────────────────
+function setThemeChip() {
+  const chip = document.getElementById('themeChip');
+  if (!chip) return;
+  const mode = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Dark' : 'Light';
+  chip.textContent = mode;
+}
 function toggleTheme() {
   const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('theme', next);
+  setThemeChip();
 }
 
 // ─── S2.6: Modern/Basic UI mode toggle ────────────────────────────────────
@@ -2111,7 +2147,7 @@ function applyUiMode(mode) {
   document.documentElement.setAttribute('data-ui', mode);
   const btn = document.getElementById('uiModeBtn');
   if (btn) {
-    btn.textContent = mode === 'modern' ? '✨' : '▢';
+    btn.textContent = mode === 'modern' ? 'Modern' : 'Basic';
     btn.title = mode === 'modern' ? 'Modern UI on — switch to Basic' : 'Basic UI on — switch to Modern';
   }
 }
@@ -2154,6 +2190,7 @@ function toAUD(amount, currency) {
   const r = appData.rates || {};
   if (currency === 'IDR') return amount / (r.AUD_IDR || 12000);   // offline fallback: 1 AUD = 12,000 IDR
   if (currency === 'USD') return amount / (r.AUD_USD || 0.65);    // offline fallback: 1 AUD = 0.65 USD
+  if (currency === 'SGD') return amount / (r.AUD_SGD || 0.85);    // offline fallback: 1 AUD = 0.85 SGD
   return amount;
 }
 function toBase(amount, fromCurrency) {
@@ -2163,6 +2200,7 @@ function toBase(amount, fromCurrency) {
   if (base === 'AUD') return aud;
   if (base === 'IDR') return aud * (r.AUD_IDR || 12000);   // offline fallback: 1 AUD = 12,000 IDR
   if (base === 'USD') return aud * (r.AUD_USD || 0.65);    // offline fallback: 1 AUD = 0.65 USD
+  if (base === 'SGD') return aud * (r.AUD_SGD || 0.85);    // offline fallback: 1 AUD = 0.85 SGD
   return aud;
 }
 function fmtMoney(amount, currency) {
@@ -2170,16 +2208,17 @@ function fmtMoney(amount, currency) {
   if (isNaN(amount)) return '–';
   if (c === 'IDR') return 'Rp ' + Math.round(amount).toLocaleString('id-ID');
   if (c === 'USD') return 'US$ ' + Math.abs(amount).toFixed(2);
+  if (c === 'SGD') return 'S$ ' + Math.abs(amount).toFixed(2);
   return 'A$ ' + Math.abs(amount).toFixed(2);
 }
 function baseSym() {
   const c = (appData.settings && appData.settings.baseCurrency) || 'AUD';
-  return c === 'IDR' ? 'Rp' : c === 'USD' ? 'US$' : 'A$';
+  return c === 'IDR' ? 'Rp' : c === 'USD' ? 'US$' : c === 'SGD' ? 'S$' : 'A$';
 }
 
 // ─── S2: FX Rates ─────────────────────────────────────────────────────────
 async function fetchFX() {
-  const FX_URL = 'https://api.frankfurter.app/latest?from=AUD&to=IDR,USD';
+  const FX_URL = 'https://api.frankfurter.app/latest?from=AUD&to=IDR,USD,SGD';
   const candidates = [FX_URL, 'https://corsproxy.io/?' + encodeURIComponent(FX_URL)];
   for (const url of candidates) {
     try {
@@ -2190,6 +2229,7 @@ async function fetchFX() {
       if (!appData.rates) appData.rates = {};
       appData.rates.AUD_IDR     = j.rates.IDR;
       appData.rates.AUD_USD     = j.rates.USD;
+      if (typeof j.rates.SGD === 'number') appData.rates.AUD_SGD = j.rates.SGD;
       appData.rates.lastFetched = new Date().toISOString();
       save();
       renderFXWidget(false);
@@ -2217,6 +2257,10 @@ function renderFXWidget(offline) {
     <div class="fx-pair">
       <span class="fx-lbl">1 AUD =</span>
       <span class="fx-val">${usd}&thinsp;USD</span>
+    </div>
+    <div class="fx-pair">
+      <span class="fx-lbl">1 AUD =</span>
+      <span class="fx-val">${r.AUD_SGD ? r.AUD_SGD.toFixed(4) : '–'}&thinsp;SGD</span>
     </div>
     <span class="fx-ts">${offline ? '<span class="fx-offline">⚠ Offline — cached</span>&nbsp;<a href="#" onclick="fetchFX();return false;" style="font-size:10px;color:var(--muted);">retry</a>&nbsp;' : ''}Updated ${ts}</span>`;
 }
@@ -2248,6 +2292,10 @@ function seedMonth(key) {
     const prev     = appData.budget[prevKey];
     const inc = {}; INC_CATS.forEach(k => inc[k] = { budget: prev?.income?.[k]?.budget   || 0, actual: 0 });
     const exp = {}; EXP_CATS.forEach(k => exp[k] = { budget: prev?.expenses?.[k]?.budget || 0, actual: 0 });
+    // Default the salary budget from Settings when there's nothing to carry forward
+    if (!inc.salary.budget && appData.settings && appData.settings.monthlySalary) {
+      inc.salary.budget = parseFloat(appData.settings.monthlySalary) || 0;
+    }
     appData.budget[key] = { income: inc, expenses: exp };
   }
 }
@@ -2296,6 +2344,27 @@ function computeIncomeActuals(mk) {
   return result;
 }
 
+// Expense actuals derived from the Spending log for a given cycle (15th → 14th).
+// Categories map by name to the budget rows; unknown/custom categories → 'other'.
+function computeExpenseActuals(mk) {
+  const [y, m] = mk.split('-').map(Number);
+  const start = new Date(y, m - 1, 15);
+  const end   = new Date(y, m, 14, 23, 59, 59);
+  const result = {};
+  EXP_CATS.forEach(k => result[k] = 0);
+  const keyByLabel = {};
+  EXP_CATS.forEach(k => keyByLabel[CAT_LBL[k].toLowerCase()] = k);
+  (appData.spending || []).forEach(e => {
+    if (!e.date) return;
+    const d = new Date(e.date);
+    if (d >= start && d <= end) {
+      const k = keyByLabel[(e.category || 'Other').toLowerCase()] || 'other';
+      result[k] += toAUD(parseFloat(e.amount) || 0, e.currency || 'AUD');
+    }
+  });
+  return result;
+}
+
 function renderBudget() {
   const sel  = document.getElementById('budgetMonth');
   const mk   = (sel && sel.value) ? sel.value : nowMonthKey();
@@ -2305,31 +2374,28 @@ function renderBudget() {
   const b       = appData.budget[mk];
   const base    = (appData.settings && appData.settings.baseCurrency) || 'AUD';
   const sym     = baseSym();
-  // Income actuals derived from the income log (Issue 8)
+  // Actuals: income from the Income log, expenses from the Spending log (both auto)
   const incActs = computeIncomeActuals(mk);
+  const expActs = computeExpenseActuals(mk);
 
-  // Compute totals (income actuals from log; expense actuals from manual entry)
+  // Compute totals (both actual columns are derived — only Budgeted is typed in)
   let tIB = 0, tIA = 0, tEB = 0, tEA = 0;
   INC_CATS.forEach(k => { tIB += b.income[k].budget || 0; tIA += incActs[k] || 0; });
-  EXP_CATS.forEach(k => { tEB += b.expenses[k].budget || 0; tEA += b.expenses[k].actual || 0; });
+  EXP_CATS.forEach(k => { tEB += b.expenses[k].budget || 0; tEA += expActs[k] || 0; });
 
   // brow: shared row builder. Income uses inverted variance (more = green).
   function brow(key, sec) {
     const e   = b[sec][key];
     const bud = e.budget || 0;
-    const act = sec === 'income' ? (incActs[key] || 0) : (e.actual || 0);
+    const act = sec === 'income' ? (incActs[key] || 0) : (expActs[key] || 0);
     const vrn = sec === 'income' ? act - bud : bud - act;  // income: surplus is positive/green
     const pct = bud > 0 ? Math.min(150, (act / bud) * 100) : 0;
     const col = pct > 100
       ? (sec === 'income' ? 'var(--ok)' : 'var(--err)')
       : pct > 80 ? 'var(--amber)' : 'var(--ok)';
-    const incomeActualAttr = sec === 'income'
-      ? '' // read-only for income (derived from income log)
-      : `<input type="number" min="0" step="10" value="${act || ''}" placeholder="0"
-              onchange="saveBudRow('${mk}','${sec}','${key}','actual',parseFloat(this.value)||0)">`;
-    const actualCell = sec === 'income'
-      ? `<td style="text-align:right;color:var(--muted);">${fmtMoney(act, 'AUD')}</td>`
-      : `<td>${incomeActualAttr}</td>`;
+    // Both Actual columns are derived automatically — income from the Income log,
+    // expenses from the Spending log. Only the Budgeted column is typed in.
+    const actualCell = `<td style="text-align:right;color:var(--muted);">${fmtMoney(act, 'AUD')}</td>`;
     return `
       <tr>
         <td>${CAT_LBL[key]}</td>
@@ -2348,29 +2414,23 @@ function renderBudget() {
   function bmobRow(key, sec) {
     const e   = b[sec][key];
     const bud = e.budget || 0;
-    const act = sec === 'income' ? (incActs[key] || 0) : (e.actual || 0);
+    const act = sec === 'income' ? (incActs[key] || 0) : (expActs[key] || 0);
     const vrn = sec === 'income' ? act - bud : bud - act;
     const pct = bud > 0 ? Math.min(150, (act / bud) * 100) : 0;
     const col = pct > 100
       ? (sec === 'income' ? 'var(--ok)' : 'var(--err)')
       : pct > 80 ? 'var(--amber)' : 'var(--ok)';
     const vrnSign = vrn >= 0 ? '+' : '';
-    const actualInput = sec === 'income'
-      ? `<div class="bmob-field">
+    const actualInput = `<div class="bmob-field">
           <span class="bmob-lbl">Actual A$ <span style="font-size:9px">(auto)</span></span>
           <div style="padding:9px 10px;font-size:15px;text-align:right;border:1px solid var(--bdr);border-radius:4px;background:var(--bg);color:var(--muted);">${fmtMoney(act,'AUD')}</div>
-         </div>`
-      : `<div class="bmob-field">
-          <span class="bmob-lbl">Actual A$</span>
-          <input type="number" inputmode="decimal" min="0" step="10" value="${act || ''}" placeholder="0"
-            onchange="saveBudRow('${mk}','${sec}','${key}','actual',parseFloat(this.value)||0)">
          </div>`;
     return `
       <div class="bmob-row">
         <div class="bmob-cat">${CAT_LBL[key]}</div>
         <div class="bmob-inputs">
           <div class="bmob-field">
-            <span class="bmob-lbl">Expected A$</span>
+            <span class="bmob-lbl">Budgeted A$</span>
             <input type="number" inputmode="decimal" min="0" step="10" value="${bud || ''}" placeholder="0"
               onchange="saveBudRow('${mk}','${sec}','${key}','budget',parseFloat(this.value)||0)">
           </div>
@@ -2392,13 +2452,13 @@ function renderBudget() {
     <table class="budget-tbl">
       <thead><tr>
         <th style="width:155px;text-align:left">Category</th>
-        <th>Expected (A$)</th>
+        <th>Budgeted (A$)</th>
         <th>Actual (A$)</th>
         <th>Variance (${sym})</th>
         <th style="width:88px">% Used</th>
       </tr></thead>
       <tbody>
-        <tr><td colspan="5" class="bsec">Income <span style="font-size:9px;font-weight:400;color:var(--muted)">(auto from Income tab)</span></td></tr>
+        <tr><td colspan="5" class="bsec">Income <span style="font-size:9px;font-weight:400;color:var(--muted)">(Budgeted is editable · Actual auto-fills from the Income tab)</span></td></tr>
         ${INC_CATS.map(k => brow(k, 'income')).join('')}
         <tr class="btot">
           <td>Total Income</td>
@@ -2407,7 +2467,7 @@ function renderBudget() {
           <td class="${(tIA - tIB) >= 0 ? 'ok' : 'bad'}">${fmtMoney(toBase(tIA - tIB, 'AUD'), base)}</td>
           <td></td>
         </tr>
-        <tr><td colspan="5" class="bsec">Expenses</td></tr>
+        <tr><td colspan="5" class="bsec">Expenses <span style="font-size:9px;font-weight:400;color:var(--muted)">(Budgeted is editable · Actual auto-fills from the Spending tab)</span></td></tr>
         ${EXP_CATS.map(k => brow(k, 'expenses')).join('')}
         <tr class="btot">
           <td>Total Expenses</td>
@@ -2510,6 +2570,7 @@ function renderCards() {
             <option value="AUD" ${c.currency === 'AUD' ? 'selected' : ''}>AUD</option>
             <option value="IDR" ${c.currency === 'IDR' ? 'selected' : ''}>IDR</option>
             <option value="USD" ${c.currency === 'USD' ? 'selected' : ''}>USD</option>
+            <option value="SGD" ${c.currency === 'SGD' ? 'selected' : ''}>SGD</option>
           </select>
         </td>
         <td><input type="number" step="0.01" value="${bal || ''}" placeholder="0"
@@ -2682,7 +2743,7 @@ function renderSpending() {
     const rowCats = (r.category && !catsNow.includes(r.category)) ? [r.category, ...catsNow] : catsNow;
     const catSel = (`<option value="">—</option>` + rowCats.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join(''))
       .replace(`value="${escHtml(r.category)}"`, `value="${escHtml(r.category)}" selected`);
-    const curSel = ['AUD','IDR','USD'].map(c =>
+    const curSel = ['AUD','IDR','USD','SGD'].map(c =>
       `<option value="${c}" ${r.currency === c ? 'selected' : ''}>${c}</option>`).join('');
     return `<tr>
       <td><input type="date" value="${escHtml(r.date||'')}"
@@ -2800,6 +2861,13 @@ function bulkAssignAccount() {
 let parsedStatementRows = [];
 
 function openStatementModal() {
+  // Pre-select which account this statement belongs to (defaults to AmEx/Credit)
+  const pre = document.getElementById('stmtAccountPre');
+  if (pre) {
+    const def = detectAmexCard();
+    pre.innerHTML = '<option value="">— Choose account —</option>' +
+      (appData.cards || []).map(c => `<option value="${c.id}" ${def && String(c.id) === String(def.id) ? 'selected' : ''}>${escHtml(c.name)}</option>`).join('');
+  }
   document.getElementById('stmtPasteArea').value = '';
   document.getElementById('stmtParseWarn').style.display = 'none';
   document.getElementById('stmtStep1').style.display = '';
@@ -2829,7 +2897,7 @@ function guessCategory(desc) {
   if (/rent|real estate|realestate|landlord/.test(d)) g = 'Rent';
   else if (/woolworths|ww metro|coles|aldi|iga|harris farm|foodland|costco/.test(d)) g = 'Groceries';
   else if (/restaurant|cafe|coffee|mcdonalds|mcdonald|kfc|domino|hungry jack|subway|grill|bistro|deliveroo|doordash|menulog|ubereats|uber eats|eatclub|bar |pub /.test(d)) g = 'Dining';
-  else if (/uber(?!.*eats)|didi|lyft|lime\W*ride|lime\*|taxi|train|bus|ferry|opal|myki|transport|parking|toll|fuel|petrol|shell|bp|caltex/.test(d)) g = 'Transport';
+  else if (/uber(?!.*eats)|didi|lyft|\bgrab\b|grab\*|lime\W*ride|lime\*|taxi|train|bus|ferry|opal|myki|transport|parking|toll|fuel|petrol|shell|bp|caltex/.test(d)) g = 'Transport';
   else if (/netflix|spotify|apple\.com\/bill|itunes|google play|amazon prime|stan|binge|foxtel|disney|youtube|chatgpt|openai|claude|anthropic|subscription/.test(d)) g = 'Subscriptions';
   else if (/amazon|ebay|kmart|target|myer|david jones|uniqlo|zara|cotton on|the iconic|asos/.test(d)) g = 'Shopping';
   else if (/chemist|pharmacy|doctor|gp |medical|hospital|health|dental|physio|optom/.test(d)) g = 'Healthcare';
@@ -2838,35 +2906,77 @@ function guessCategory(desc) {
   return cats.includes(g) ? g : 'Other';
 }
 
+// Clean a statement description: drop leading dates (the Date column already
+// has them), trailing "Value Date: …", "Card xx1234" suffixes, extra spaces.
+function cleanStatementDesc(desc) {
+  return (desc || '')
+    .replace(/^\s*\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\s*/, '')
+    .replace(/\s*Value Date:\s*\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\s*$/i, '')
+    .replace(/\s*Card\s+xx\d{2,6}\s*$/i, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+// Classify a statement line: 'transfer' = movement between your own accounts /
+// pockets / credit-card payments (wealth unchanged); 'credit' = refund or
+// discount (not an expense); 'expense' = a real spend.
+function classifyStatementLine(desc, moneyIn) {
+  if (/\btransfer (to|from)\b|fast transfer|payment received|payment thank\s?you|autopay|direct credit.*payment|bpay payment/i.test(desc)) return 'transfer';
+  if (moneyIn) return 'credit';
+  return 'expense';
+}
+
+// Match a transfer line against pocket/card account references (e.g. "xx0218").
+// Set each pocket's Account Ref in Wealth → Savings Pockets to enable this.
+function matchPocketRef(desc) {
+  const refMatch = (desc || '').match(/xx(\d{2,6})/i);
+  if (!refMatch) return '';
+  const ref = refMatch[0].toLowerCase();
+  const pocket = (appData.pockets || []).find(p => (p.accountRef || '').toLowerCase() === ref);
+  if (pocket) return pocket.name || '';
+  const card = (appData.cards || []).find(c => (c.name || '').toLowerCase().includes(ref));
+  return card ? card.name : '';
+}
+
 function parseAmexStatement(text) {
   const rows = [];
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-  // v2.6: AmEx pipe-table format first, e.g.
-  // |**27/05/2026**|28/05/2026|EATCLUB FINANCIAL PL    NEWSTEAD|28.99|
-  // Columns: Date | Date Processed | Description | Amount. We use the transaction
-  // date (col 1). Billing-cycle mismatch (AmEx 28th vs app 15–14) doesn't matter:
-  // each transaction lands on its own date, and duplicates from overlapping
-  // statement pastes are flagged in the preview and skipped on commit.
+  // Pipe-table formats — handles BOTH layouts by detecting which cell is which:
+  //   AmEx:     |**27/05/2026**|28/05/2026|EATCLUB FINANCIAL PL  NEWSTEAD|28.99|
+  //   CommBank: |11/06/2026|-42.00|Transfer to xx1767 CommBank app|
+  // Signed amounts (CommBank): "-" = spend, "+" = money in. Transfers between
+  // your own pockets/accounts and credit-card payments are classified as
+  // 'transfer' (wealth unchanged — excluded by default); credits/refunds as
+  // 'credit' (not an expense — excluded by default). Both can be re-ticked.
   const pipeLines = lines.filter(l => l.startsWith('|') && l.split('|').length >= 4);
   if (pipeLines.length >= 2) {
+    const amtRe2 = /^[+\-]?\$?[\d,]+\.\d{2}(\s*CR)?$/i;
     for (const line of pipeLines) {
       const cells = line.split('|').map(c => c.replace(/\*/g, '').trim()).filter(c => c !== '');
       if (cells.length < 3) continue;                                   // separator / empty rows
       if (/^date/i.test(cells[0]) || /^-+$/.test(cells[0])) continue;   // header / divider rows
-      const date = normaliseDate(cells[0]);
-      if (!date) continue;
-      // Description = everything between the date columns and the amount column
-      const last = cells[cells.length - 1];
-      const isCredit = /CR\s*$/i.test(last) || /^-/.test(last);
-      const amount = Math.abs(parseFloat(last.replace(/[^0-9.\-]/g, '')));
+      // Identify the cells by content, not position
+      const dateIdx = cells.findIndex(c => normaliseDate(c));
+      const amtIdx  = cells.findIndex(c => amtRe2.test(c));
+      if (dateIdx === -1 || amtIdx === -1) continue;
+      const date = normaliseDate(cells[dateIdx]);
+      const rawAmt = cells[amtIdx];
+      const amount = Math.abs(parseFloat(rawAmt.replace(/[^0-9.\-]/g, '')));
       if (!isFinite(amount) || amount <= 0) continue;
-      if (isCredit) continue;                                            // skip credits/reversals
-      // cells[1] may be the processed date — drop it if it parses as a date
-      const descCells = cells.slice(1, cells.length - 1).filter(c => !normaliseDate(c));
-      const description = descCells.join(' ').replace(/\s{2,}/g, ' ').trim();
+      const moneyIn = /^\+/.test(rawAmt) || /CR\s*$/i.test(rawAmt);
+      // Description = remaining cells that aren't dates or amounts
+      const description = cleanStatementDesc(
+        cells.filter((c, i) => i !== amtIdx && !normaliseDate(c)).join(' '));
       if (!description) continue;
-      rows.push({ date, description, amount: +amount.toFixed(2), category: guessCategory(description), include: true });
+      const kind = classifyStatementLine(description, moneyIn);
+      rows.push({
+        date, description, amount: +amount.toFixed(2),
+        category: kind === 'expense' ? guessCategory(description) : 'Other',
+        include: kind === 'expense',
+        kind,
+        pocketName: kind === 'transfer' ? matchPocketRef(description) : ''
+      });
     }
     if (rows.length) return rows;
   }
@@ -2878,7 +2988,7 @@ function parseAmexStatement(text) {
       const parts = lines[i].split(',');
       if (parts.length < 3) continue;
       const rawDate = parts[0].trim();
-      const desc = parts[1].trim();
+      const desc = cleanStatementDesc(parts[1]);
       const rawAmt = parts[2].replace(/[^0-9.\-]/g, '').trim();
       if (!rawDate || !desc || !rawAmt) continue;
       const date = normaliseDate(rawDate);
@@ -2922,6 +3032,8 @@ function parseAmexStatement(text) {
     }
 
     if (!date || !description) continue;
+    description = cleanStatementDesc(description);
+    if (!description) continue;
     rows.push({ date, description, amount: +amount.toFixed(2), category: guessCategory(description), include: true });
   }
   return rows;
@@ -2972,9 +3084,10 @@ function parseAndPreview() {
   parsedStatementRows.forEach(r => {
     if (isDuplicateTxn(r)) { r.dup = true; r.include = false; }
   });
-  // Auto-select the statement account: prefer a card named AmEx, else first Credit card
-  const amex = detectAmexCard();
-  if (amex) parsedStatementRows.forEach(r => { if (!r.cardId) r.cardId = amex.id; });
+  // Statement account: the Step-1 pre-selection wins, else auto-detect AmEx/Credit
+  const preSel = (document.getElementById('stmtAccountPre') || {}).value || '';
+  const defCard = preSel || (detectAmexCard() || {}).id || '';
+  if (defCard) parsedStatementRows.forEach(r => { if (!r.cardId) r.cardId = defCard; });
   renderParsedPreview(parsedStatementRows);
   document.getElementById('stmtStep1').style.display = 'none';
   document.getElementById('stmtStep2').style.display = '';
@@ -3012,7 +3125,7 @@ function renderParsedPreview(rows) {
   tbody.innerHTML = rows.map((r, i) => `
     <tr>
       <td style="white-space:nowrap;">${r.date}</td>
-      <td style="max-width:200px; word-break:break-word;">${r.description}${r.dup ? ' <span style="font-size:9px;font-weight:700;color:var(--amber);background:var(--amber-bg);padding:1px 5px;border-radius:6px;white-space:nowrap;">ALREADY IMPORTED</span>' : ''}</td>
+      <td style="max-width:200px; word-break:break-word;">${r.description}${r.dup ? ' <span style="font-size:9px;font-weight:700;color:var(--amber);background:var(--amber-bg);padding:1px 5px;border-radius:6px;white-space:nowrap;">ALREADY IMPORTED</span>' : ''}${r.kind === 'transfer' ? ` <span style="font-size:9px;font-weight:700;color:var(--n1);background:var(--bg);border:1px solid var(--bdr);padding:1px 5px;border-radius:6px;white-space:nowrap;" title="Movement between your own accounts — wealth unchanged, not an expense">⇄ TRANSFER${r.pocketName ? ' · ' + escHtml(r.pocketName) : ''}</span>` : ''}${r.kind === 'credit' ? ' <span style="font-size:9px;font-weight:700;color:var(--ok);background:var(--ok-bg);padding:1px 5px;border-radius:6px;white-space:nowrap;" title="Refund/credit — not an expense">CREDIT</span>' : ''}</td>
       <td style="text-align:right; white-space:nowrap;">$${r.amount.toFixed(2)}</td>
       <td>
         <select onchange="parsedStatementRows[${i}].category=this.value" style="font-size:11px; background:var(--bg); color:var(--txt); border:1px solid var(--bdr); border-radius:4px; padding:2px 4px;">
@@ -3161,7 +3274,7 @@ function renderWealth() {
     const typeOptsFull = ASSET_TYPES.map(t => `<option value="${t}">${t}</option>`).join('');
     const manualRows = appData.assets.map(a => {
       const tSel = typeOptsFull.replace(`value="${a.type}"`, `value="${a.type}" selected`);
-      const cSel = ['AUD','IDR','USD'].map(c =>
+      const cSel = ['AUD','IDR','USD','SGD'].map(c =>
         `<option value="${c}" ${a.currency === c ? 'selected' : ''}>${c}</option>`).join('');
       return `<tr>
         <td><input type="text" value="${escHtml(a.name||'')}" maxlength="50" style="width:130px;"
@@ -3194,7 +3307,7 @@ function renderWealth() {
   const liabsWrap = document.getElementById('liabsWrap');
   if (liabsWrap) {
     const manualRows = appData.liabilities.map(l => {
-      const cSel = ['AUD','IDR','USD'].map(c =>
+      const cSel = ['AUD','IDR','USD','SGD'].map(c =>
         `<option value="${c}" ${l.currency === c ? 'selected' : ''}>${c}</option>`).join('');
       return `<tr>
         <td><input type="text" value="${escHtml(l.name||'')}" maxlength="50" style="width:160px;"
@@ -3418,6 +3531,8 @@ function renderPockets() {
     return `<tr>
       <td><input type="text" value="${escHtml(p.name||'')}" maxlength="40" style="width:110px;"
             onchange="updPocket('${p.id}','name',this.value)"></td>
+      <td><input type="text" value="${escHtml(p.accountRef||'')}" maxlength="10" placeholder="xx0218" style="width:62px;font-size:11px;" title="Last digits shown on bank transfers (e.g. xx0218) — lets the statement parser identify pocket transfers"
+            onchange="updPocket('${p.id}','accountRef',this.value.trim())"></td>
       <td><select onchange="updPocketSource('${p.id}',this.value)" style="font-size:11px;max-width:160px;">${sourceOpts(p)}</select></td>
       <td><input type="number" value="${(p.sourceType&&p.sourceType!=='manual') ? val.toFixed(0) : (p.amount||0)}" style="width:85px;text-align:right;" ${manualDisabled}
             onchange="updPocket('${p.id}','amount',+this.value)"></td>
@@ -3427,7 +3542,7 @@ function renderPockets() {
     </tr>`;
   }).join('');
   wrap.innerHTML = `<div style="overflow-x:auto;"><table class="pl-tbl">
-    <thead><tr><th>Pocket</th><th>Source</th><th>Value (A$)</th><th>Linked Goal</th><th>Progress</th><th></th></tr></thead>
+    <thead><tr><th>Pocket</th><th>Acct Ref</th><th>Source</th><th>Value (A$)</th><th>Linked Goal</th><th>Progress</th><th></th></tr></thead>
     <tbody>${rows}</tbody></table></div>`;
 }
 
@@ -4493,6 +4608,7 @@ function renderIncomeTable() {
         <option value="AUD" ${(e.currency||'AUD')==='AUD'?'selected':''}>AUD</option>
         <option value="IDR" ${e.currency==='IDR'?'selected':''}>IDR</option>
         <option value="USD" ${e.currency==='USD'?'selected':''}>USD</option>
+        <option value="SGD" ${e.currency==='SGD'?'selected':''}>SGD</option>
       </select></td>
       <td><select style="font-size:11px;" onchange="updIncome('${e.id}','type',this.value)">
         ${INCOME_TYPES.map(t=>`<option value="${t}" ${e.type===t?'selected':''}>${t}</option>`).join('')}
@@ -4920,8 +5036,8 @@ function renderTaxEstimator() {
   else if (taxableIncome <= 180000) incomeTax = 29467 + (taxableIncome - 120000) * 0.37;
   else                              incomeTax = 51667 + (taxableIncome - 180000) * 0.45;
 
-  const medicareLevy = taxableIncome * 0.02;
-  const totalTax = incomeTax + medicareLevy;
+  // Medicare levy removed — not applicable (temporary visa holder, Medicare-exempt)
+  const totalTax = incomeTax;
   const netIncome = incomeRaw - totalTax;
   const effectiveRate = incomeRaw > 0 ? (totalTax / incomeRaw * 100) : 0;
   const marginalRate = taxableIncome <= 18200 ? 0 : taxableIncome <= 45000 ? 19 : taxableIncome <= 120000 ? 32.5 : taxableIncome <= 180000 ? 37 : 45;
@@ -4948,10 +5064,6 @@ function renderTaxEstimator() {
       <div class="card" style="padding:12px;">
         <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Income Tax</div>
         <div style="font-size:18px;font-weight:700;color:var(--err);">${fmt(incomeTax)}</div>
-      </div>
-      <div class="card" style="padding:12px;">
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Medicare Levy (2%)</div>
-        <div style="font-size:18px;font-weight:700;color:var(--err);">${fmt(medicareLevy)}</div>
       </div>
       <div class="card" style="padding:12px;">
         <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Total Tax</div>
@@ -5065,14 +5177,16 @@ function renderFeatureRequests() {
   if (!list.length) { el.innerHTML = '<p style="font-size:12px;color:var(--muted);">No requests yet.</p>'; return; }
   el.innerHTML = list.map(fr => {
     const badgeColor = fr.priority === 'Must have' ? 'var(--err)' : 'var(--amber)';
+    const isBug = (fr.type || '') === 'Bug report';
     return `<div style="padding:8px 0; border-top:1px solid var(--bdr); display:flex; gap:10px; align-items:flex-start;">
       <div style="flex:1;">
-        <div style="font-size:12px; font-weight:600;">${escHtml(fr.title)}
+        <div style="font-size:12px; font-weight:600;">${isBug ? '🐞 ' : '✨ '}${escHtml(fr.title)}
           <span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${badgeColor};color:#fff;margin-left:6px;">${fr.priority}</span>
         </div>
         ${fr.description ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${escHtml(fr.description)}</div>` : ''}
         <div style="font-size:10px;color:var(--muted);margin-top:2px;">${new Date(fr.submittedAt).toLocaleDateString()}</div>
       </div>
+      <button class="btn" style="font-size:10px;padding:2px 8px;" title="Copy a ready-to-paste agent prompt for this entry (rules included)" onclick="copyRequestPrompt('${fr.id}')">📋 Prompt</button>
       <button class="btn-del" onclick="deleteFeatureRequest('${fr.id}')">×</button>
     </div>`;
   }).join('');
@@ -5146,29 +5260,103 @@ function initUpdates() {
   const card = document.getElementById('feat-req-card');
   if (card && !document.getElementById('frList')) {
     card.innerHTML = `
-      <div class="card-title">⭐ Submitted Feature Requests</div>
+      <div class="card-title">⭐ Feature Requests &amp; Bug Reports</div>
+      <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">Log it here, then hit <strong>📋 Prompt</strong> on any entry — it copies a ready-to-paste agent prompt that already includes the efficiency model and surgical-edit rules.</p>
       <div id="frList"></div>
       <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--bdr);">
-        <div style="font-size:11px;font-weight:600;color:var(--txt);margin-bottom:8px;">Submit a new request</div>
+        <div style="font-size:11px;font-weight:600;color:var(--txt);margin-bottom:8px;">Submit a new entry</div>
+        <div class="settings-grid" style="margin-bottom:8px;">
+          <div class="settings-field">
+            <label>Type</label>
+            <select id="frType" style="width:100%;box-sizing:border-box;">
+              <option>Feature request</option>
+              <option>Bug report</option>
+            </select>
+          </div>
+          <div class="settings-field">
+            <label>Priority</label>
+            <select id="frPriority" style="width:100%;box-sizing:border-box;">
+              <option>Must have</option>
+              <option>Nice to have</option>
+            </select>
+          </div>
+        </div>
         <div class="settings-field" style="margin-bottom:8px;">
           <label>Title</label>
           <input type="text" id="frTitle" placeholder="e.g. Net worth chart over time" maxlength="80" style="width:100%;box-sizing:border-box;">
         </div>
-        <div class="settings-field" style="margin-bottom:8px;">
-          <label>Priority</label>
-          <select id="frPriority" style="width:100%;box-sizing:border-box;">
-            <option>Must have</option>
-            <option>Nice to have</option>
-          </select>
-        </div>
         <div class="settings-field" style="margin-bottom:10px;">
-          <label>Description</label>
-          <textarea id="frDesc" rows="2" placeholder="Describe what you want..." maxlength="400" style="width:100%;box-sizing:border-box;resize:vertical;font-size:12px;"></textarea>
+          <label>Description — for bugs: what you see, what you expected, which tab</label>
+          <textarea id="frDesc" rows="2" placeholder="Describe it…" maxlength="400" style="width:100%;box-sizing:border-box;resize:vertical;font-size:12px;"></textarea>
         </div>
-        <button class="btn" style="background:var(--n1);color:#fff;" onclick="submitFeatureRequest()">Submit</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn" style="background:var(--n1);color:#fff;" onclick="submitFeatureRequest()">Submit</button>
+          <button class="btn" onclick="copyAllRequestsPrompt()" title="Copies one combined session prompt covering every open entry">📋 Copy session prompt (all entries)</button>
+          <span id="frCopyMsg" style="font-size:11px;color:var(--ok);display:none;align-self:center;">Copied ✓</span>
+        </div>
       </div>`;
   }
   renderFeatureRequests();
+}
+
+// ─── Targeted agent-prompt generation (includes efficiency model + rules) ──
+const HUB_FILE_PATH = '/Users/michaelsutanto/Library/Mobile Documents/com~apple~CloudDocs/Realm Drive/AI for the World/Project Kangaroo/Finance/finance-hub.html';
+const HUB_PROMPT_RULES =
+`Read these two files before writing a single line of code:
+- /Users/michaelsutanto/Library/Mobile Documents/com~apple~CloudDocs/Realm Drive/AI for the World/Project Kangaroo/Finance/Finance Hub Handover — Fable Agent.md
+- /Users/michaelsutanto/Library/Mobile Documents/com~apple~CloudDocs/Realm Drive/AI for the World/Project Kangaroo/Finance/Finance Hub Update Notes.md
+
+File to edit: ${HUB_FILE_PATH}
+
+RULES (efficiency model — surgical edits only):
+1. Grep for the target function first — do not read the full file
+2. Read only 30–60 lines for context
+3. Edit only the targeted block — nothing else
+4. Do NOT bump version for a bug fix
+5. Do NOT touch sbGet, sbUpsert, pushToCloud, initData, migrate, save, store
+6. Update Finance Hub Update Notes.md with what changed
+7. Chat back the terminal deploy code when done`;
+
+function buildRequestPrompt(fr) {
+  const isBug = (fr.type || '') === 'Bug report';
+  return `${isBug ? 'BUG REPORT' : 'FEATURE REQUEST'} — Finance Hub
+
+${HUB_PROMPT_RULES}
+
+${isBug ? 'WHAT I SEE' : 'WHAT I WANT'}: ${fr.title}
+${fr.description ? 'DETAILS: ' + fr.description : ''}
+PRIORITY: ${fr.priority}
+
+Grep for the most relevant function(s) for the above, read the surrounding block, and make the smallest change that fully solves it.`;
+}
+
+function showFrCopied() {
+  const m = document.getElementById('frCopyMsg');
+  if (!m) return;
+  m.style.display = '';
+  setTimeout(() => { m.style.display = 'none'; }, 2000);
+}
+
+function copyRequestPrompt(id) {
+  const fr = (store('featureRequests') || []).find(f => f.id === id);
+  if (!fr) return;
+  navigator.clipboard.writeText(buildRequestPrompt(fr)).then(showFrCopied).catch(() => alert(buildRequestPrompt(fr)));
+}
+
+function copyAllRequestsPrompt() {
+  const list = store('featureRequests') || [];
+  if (!list.length) { alert('No entries yet — submit one first.'); return; }
+  const body = list.map((fr, i) =>
+    `${i + 1}. [${fr.type || 'Feature request'} · ${fr.priority}] ${fr.title}${fr.description ? '\n   ' + fr.description : ''}`).join('\n');
+  const prompt = `BUG REPORT / FEATURE REQUESTS — Finance Hub (combined session)
+
+${HUB_PROMPT_RULES}
+
+WORK THROUGH THESE IN ORDER:
+${body}
+
+For each item: grep the relevant function, read the surrounding block, make the smallest change that fully solves it, then move to the next.`;
+  navigator.clipboard.writeText(prompt).then(showFrCopied).catch(() => alert(prompt));
 }
 
 function toggleArchive() {
@@ -5184,9 +5372,10 @@ function submitFeatureRequest() {
   const title = (document.getElementById('frTitle')||{}).value || '';
   if (!title.trim()) return;
   const priority = (document.getElementById('frPriority')||{}).value || 'Nice to have';
+  const type = (document.getElementById('frType')||{}).value || 'Feature request';
   const desc = (document.getElementById('frDesc')||{}).value || '';
   const list = store('featureRequests') || [];
-  list.push({ id: Date.now().toString(), title: title.trim(), priority, description: desc.trim(), submittedAt: new Date().toISOString() });
+  list.push({ id: Date.now().toString(), title: title.trim(), priority, type, description: desc.trim(), submittedAt: new Date().toISOString() });
   store('featureRequests', list);
   save();
   ['frTitle','frDesc'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
@@ -5213,6 +5402,13 @@ const ALL_TABS = [
 // Hide tab buttons this profile isn't allowed to see (pages: null = all pages)
 function applyPagePermissions() {
   const prof = activeProfile();
+  // Show who's signed in (chip beside the logo)
+  const chip = document.getElementById('userChip');
+  const chipName = document.getElementById('userChipName');
+  if (chip && chipName) {
+    chipName.textContent = prof ? (prof.name || prof.userId) : 'Michael';
+    chip.style.display = '';
+  }
   const allowed = (prof && Array.isArray(prof.pages) && prof.pages.length)
     ? prof.pages : ALL_TABS.map(t => t[0]);
   let activeHidden = false, firstAllowedBtn = null;
@@ -5613,6 +5809,25 @@ async function sendChatMessage() {
 
 // Chat-specific proxy call — Haiku model, capped output, same Edge Function as askCoworkAI().
 async function askChatAI(prompt) {
+  // Optional override: if a Claude API key is pasted in Settings, call Anthropic
+  // directly from the browser. Default (empty) keeps the built-in proxy, whose
+  // server-side key is preserved. Used by ALL AI features incl. Home news.
+  const ownKey = (appData.settings || {}).claudeApiKey;
+  if (ownKey) {
+    const r2 = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ownKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 500, messages: [{ role: 'user', content: prompt }] })
+    });
+    if (!r2.ok) throw new Error('Claude API request failed (' + r2.status + ') — check the key in Settings');
+    const j2 = await r2.json();
+    return ((j2.content || [])[0] || {}).text || '';
+  }
   const r = await fetch(CLAUDE_PROXY_URL, {
     method: 'POST',
     headers: {
@@ -5645,6 +5860,7 @@ function initHome() {
 // NewsAPI dependency removed (free tier blocks non-localhost origins).
 // Cached per-day in localStorage for 60 minutes; ⟳ Refresh forces a re-fetch.
 const NEWS_CACHE_KEY = 'financeHub_newsCache';
+const DEFAULT_NEWS_API_KEY = 'aabb41a2b65e419d86ea75e1af180bdc';   // Michael's NewsAPI key (Settings overrides)
 const NEWS_FEEDS = [
   { tag: 'Tech/AI',  url: 'https://news.google.com/rss/search?q=technology+OR+%22artificial+intelligence%22+when:1d&hl=en-US&gl=US&ceid=US:en' },
   { tag: 'Finance',  url: 'https://news.google.com/rss/search?q=finance+OR+markets+OR+economy+when:1d&hl=en-AU&gl=AU&ceid=AU:en' },
@@ -5667,20 +5883,42 @@ async function loadHomeNews(force) {
   newsBusy = true;
   el.innerHTML = '<span style="color:var(--muted);">⟳ Fetching today\'s top stories…</span>';
   let items = [];
+  const failures = [];
   try {
-    // 1. Today's raw headlines (when:1d) — up to 8 per topic feed
-    const results = await Promise.allSettled(NEWS_FEEDS.map(async f => {
-      const r = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(f.url));
-      if (!r.ok) throw new Error('feed ' + r.status);
-      const xml = new DOMParser().parseFromString(await r.text(), 'text/xml');
-      return Array.from(xml.querySelectorAll('item')).slice(0, 8).map(it => ({
-        title: (it.querySelector('title') || {}).textContent || '',
-        link:  (it.querySelector('link')  || {}).textContent || '',
-        source: ((it.querySelector('source') || {}).textContent || '').trim(),
-        tag: f.tag
-      }));
-    }));
-    results.forEach(res => { if (res.status === 'fulfilled') items = items.concat(res.value); });
+    // 1. NewsAPI first (today only), using the key from Settings or the built-in default
+    const newsKey = (appData.settings || {}).newsApiKey || DEFAULT_NEWS_API_KEY;
+    try {
+      const q = encodeURIComponent('technology OR finance OR "artificial intelligence" OR Indonesia OR Singapore OR Australia');
+      const r = await fetch(`https://newsapi.org/v2/everything?q=${q}&language=en&from=${todayStr}&sortBy=publishedAt&pageSize=20&apiKey=${newsKey}`);
+      const j = r.ok ? await r.json() : null;
+      if (j && j.status === 'ok' && (j.articles || []).length) {
+        items = j.articles.map(a => ({ title: a.title || '', link: a.url || '', source: (a.source || {}).name || '', tag: 'News' }));
+      } else {
+        failures.push('NewsAPI: ' + (j && j.message ? j.message : 'HTTP ' + r.status));
+      }
+    } catch (e) { failures.push('NewsAPI: ' + (e.message || 'blocked — free tier only allows localhost origins')); }
+
+    // 2. Fallback — Google News RSS (when:1d = today) through two CORS proxies
+    if (!items.length) {
+      const proxies = [u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+                       u => 'https://corsproxy.io/?' + encodeURIComponent(u)];
+      for (const proxy of proxies) {
+        const results = await Promise.allSettled(NEWS_FEEDS.map(async f => {
+          const r = await fetch(proxy(f.url));
+          if (!r.ok) throw new Error('feed ' + r.status);
+          const xml = new DOMParser().parseFromString(await r.text(), 'text/xml');
+          return Array.from(xml.querySelectorAll('item')).slice(0, 8).map(it => ({
+            title: (it.querySelector('title') || {}).textContent || '',
+            link:  (it.querySelector('link')  || {}).textContent || '',
+            source: ((it.querySelector('source') || {}).textContent || '').trim(),
+            tag: f.tag
+          }));
+        }));
+        results.forEach(res => { if (res.status === 'fulfilled') items = items.concat(res.value); });
+        if (items.length) break;
+        failures.push('RSS proxy failed');
+      }
+    }
 
     // 2. Claude curates today's picks via the existing smooth-action proxy
     if (items.length > 8) {
@@ -5698,7 +5936,8 @@ async function loadHomeNews(force) {
   } catch (e) { console.error('loadHomeNews:', e); }
   newsBusy = false;
   if (!items.length) {
-    el.innerHTML = '<span style="color:var(--muted);">Couldn\'t fetch news right now (network or proxy unavailable). Try ⟳ Refresh.</span>';
+    el.innerHTML = '<span style="color:var(--muted);">Couldn\'t fetch news right now' +
+      (failures.length ? ' — ' + escHtml(failures.join(' · ')) : '') + '. Try ⟳ Refresh.</span>';
     return;
   }
   const payload = { fetchedAt: Date.now(), day: todayStr, items };
@@ -5776,23 +6015,28 @@ function renderHomeBudgetCard() {
   const el = document.getElementById('homeBudgetBody');
   if (!el) return;
   const fmt = v => 'A$ ' + Math.round(v).toLocaleString('en-AU');
-  const mk = monthKeyNow();
+  // Budget cycle runs 15th → 14th: before the 15th we're still in last month's cycle
+  const now = new Date();
+  const cycleRef = now.getDate() >= 15 ? now : new Date(now.getFullYear(), now.getMonth() - 1, 15);
+  const mk = cycleRef.getFullYear() + '-' + String(cycleRef.getMonth() + 1).padStart(2, '0');
   const b = (appData.budget || {})[mk];
-  if (!b) { el.innerHTML = '<span style="color:var(--muted);font-size:12px;">No budget for this month yet — open Personal Finance → Budget.</span>'; return; }
+  if (!b) { el.innerHTML = '<span style="color:var(--muted);font-size:12px;">No budget for this cycle yet — open Personal Finance → Budget.</span>'; return; }
   const incActs = (typeof computeIncomeActuals === 'function') ? computeIncomeActuals(mk) : {};
+  const expActs = (typeof computeExpenseActuals === 'function') ? computeExpenseActuals(mk) : {};
   let tIB = 0, tIA = 0, tEB = 0, tEA = 0;
   INC_CATS.forEach(k => { const e = (b.income   || {})[k] || {}; tIB += e.budget || 0; tIA += incActs[k] || 0; });
-  EXP_CATS.forEach(k => { const e = (b.expenses || {})[k] || {}; tEB += e.budget || 0; tEA += e.actual || 0; });
-  const now = new Date();
-  const dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const elapsedPct = Math.round(now.getDate() / dim * 100);
+  EXP_CATS.forEach(k => { const e = (b.expenses || {})[k] || {}; tEB += e.budget || 0; tEA += expActs[k] || 0; });
+  // Cycle elapsed: days since the 15th over the full 15th→14th cycle length
+  const cycleStart = new Date(cycleRef.getFullYear(), cycleRef.getMonth(), 15);
+  const cycleEnd   = new Date(cycleRef.getFullYear(), cycleRef.getMonth() + 1, 14, 23, 59, 59);
+  const elapsedPct = Math.min(100, Math.max(0, Math.round((now - cycleStart) / (cycleEnd - cycleStart) * 100)));
   const usedPct = tEB > 0 ? Math.round(tEA / tEB * 100) : 0;
   const onTrack = usedPct <= elapsedPct + 5;
   const tc = onTrack ? 'var(--ok)' : (usedPct <= elapsedPct + 15 ? 'var(--amber)' : 'var(--err)');
   el.innerHTML =
     '<div class="home-row"><span class="home-sub">Income (actual / budget)</span><strong>' + fmt(tIA) + ' / ' + fmt(tIB) + '</strong></div>' +
     '<div class="home-row"><span class="home-sub">Expenses (actual / budget)</span><strong>' + fmt(tEA) + ' / ' + fmt(tEB) + '</strong></div>' +
-    '<div class="home-row"><span class="home-sub">Month elapsed</span><strong>' + elapsedPct + '%</strong></div>' +
+    '<div class="home-row"><span class="home-sub">Cycle elapsed (15th–14th)</span><strong>' + elapsedPct + '%</strong></div>' +
     '<div class="home-row"><span class="home-sub">Expense budget used</span><strong style="color:' + tc + ';">' + usedPct + '%</strong></div>' +
     '<div style="margin-top:6px;font-size:12px;font-weight:600;color:' + tc + ';">' + (onTrack ? '✓ On track' : '⚠ Ahead of budget pace') + '</div>';
 }
