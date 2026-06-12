@@ -3829,7 +3829,7 @@ async function fetchStockPrice(ticker, marketKey) {
       const j = await r.json();
       const meta = j?.chart?.result?.[0]?.meta;
       if (!meta || typeof meta.regularMarketPrice !== 'number') continue;
-      return { price: meta.regularMarketPrice, prevClose: (typeof meta.chartPreviousClose === 'number' ? meta.chartPreviousClose : meta.previousClose) };
+      return { price: meta.regularMarketPrice, prevClose: (typeof meta.chartPreviousClose === 'number' ? meta.chartPreviousClose : meta.previousClose), name: meta.shortName || meta.longName || '' };
     } catch (e) { /* try next candidate */ }
   }
   throw new Error('YF ' + sym + ' unavailable');
@@ -3916,16 +3916,13 @@ async function refreshAllPrices() {
         if (h.type === 'Crypto') {
           h.currentPrice = await fetchCryptoPrice(h.ticker, cgCcy);
         } else {
-          // Use raw Yahoo fetch so we can fill name + price in one call
+          // Pre-compute the correct symbol (with exchange suffix) then pass marketKey='' so
+          // fetchStockPrice uses it as-is — preserving its CORS proxy fallback logic.
           const suffix = exchangeSuffix(key, portExchange);
           const sym = (h.ticker.includes('.') || h.ticker.includes('-')) ? h.ticker.toUpperCase() : h.ticker.toUpperCase() + suffix;
-          const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=1d`);
-          const j = r.ok ? await r.json() : null;
-          const meta = j && j.chart && j.chart.result && j.chart.result[0] && j.chart.result[0].meta;
-          if (meta && meta.regularMarketPrice) {
-            h.currentPrice = meta.regularMarketPrice;
-            if (meta.shortName && !h.name) h.name = meta.shortName;
-          }
+          const result = await fetchStockPrice(sym, '');
+          h.currentPrice = result.price;
+          if (result.name && !h.name) h.name = result.name;
         }
         ok++;
       } catch (e) { stale++; }
@@ -3941,14 +3938,9 @@ async function refreshAllPrices() {
       if (isCrypto) {
         w.currentPrice = await fetchCryptoPrice(w.ticker, 'usd');
       } else {
-        const sym = w.ticker.trim().toUpperCase();
-        const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=1d`);
-        const j = r.ok ? await r.json() : null;
-        const meta = j && j.chart && j.chart.result && j.chart.result[0] && j.chart.result[0].meta;
-        if (meta && meta.regularMarketPrice) {
-          w.currentPrice = meta.regularMarketPrice;
-          if (meta.shortName && !w.name) w.name = meta.shortName;
-        }
+        const result = await fetchStockPrice(w.ticker, '');
+        w.currentPrice = result.price;
+        if (result.name && !w.name) w.name = result.name;
       }
       ok++;
     } catch (e) { stale++; }
