@@ -1005,7 +1005,7 @@ th {
         </div>
         <div class="settings-field" style="margin-bottom:10px;">
           <label>Currency</label>
-          <select id="newPortCurrency">
+          <select id="newPortCurrency" onchange="(function(v){const ex=document.getElementById('newPortExchange');if(!ex)return;if(v==='IDR'&&!ex.value)ex.value='IDX';if(v==='AUD'&&!ex.value)ex.value='ASX';if(v==='USD'&&!ex.value)ex.value='NYSE';})(this.value)">
             <option value="AUD">AUD – Australian Dollar</option>
             <option value="USD">USD – US Dollar</option>
             <option value="IDR">IDR – Indonesian Rupiah</option>
@@ -1039,7 +1039,10 @@ th {
     <div class="card">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
         <div class="card-title" style="margin-bottom:0;">👁️ Watchlist</div>
-        <button class="btn" style="font-size:11px; padding:4px 10px;" onclick="addWatchItem()">+ Add</button>
+        <div style="display:flex;gap:6px;">
+          <button class="btn" style="font-size:11px; padding:4px 10px;" id="watchRefreshBtn" onclick="refreshWatchlistPrices(this)">⟳ Refresh</button>
+          <button class="btn" style="font-size:11px; padding:4px 10px;" onclick="addWatchItem()">+ Add</button>
+        </div>
       </div>
       <div id="invWatchlist"></div>
     </div>
@@ -1107,7 +1110,7 @@ th {
       <div class="card" style="margin-bottom:12px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
           <div class="card-title" style="margin-bottom:0;">🎯 Signal Watchlist</div>
-          <button class="btn" style="font-size:11px; padding:4px 10px;" onclick="addSignalWatch()">+ Add</button>
+          <span style="font-size:11px; color:var(--muted);">Auto-fed from Watchlist ↗</span>
         </div>
         <p style="font-size:11px; color:var(--muted); margin-bottom:10px;">Tickers scanned for short-term (1 day–2 week) signals. Stocks use the Yahoo Finance ticker as-is; crypto uses the CoinGecko ID.</p>
         <div id="sigWatchlist"></div>
@@ -1511,7 +1514,7 @@ th {
     <div id="statementModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:9999; align-items:flex-start; justify-content:center; padding:20px; overflow-y:auto;">
       <div style="background:var(--card); border:1px solid var(--bdr); border-radius:10px; padding:24px; width:100%; max-width:720px; margin:auto; box-shadow:0 8px 40px rgba(0,0,0,.3);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-          <div style="font-size:15px; font-weight:700; color:var(--txt);">📋 Import AmEx Statement</div>
+          <div style="font-size:15px; font-weight:700; color:var(--txt);">📋 Import Statement</div>
           <button class="btn" style="padding:3px 10px;" onclick="closeStatementModal()">✕</button>
         </div>
 
@@ -2328,9 +2331,11 @@ function fmtMoney(amount, currency) {
   const c = currency || (appData.settings && appData.settings.baseCurrency) || 'AUD';
   if (isNaN(amount)) return '–';
   if (c === 'IDR') return 'Rp ' + Math.round(amount).toLocaleString('id-ID');
-  if (c === 'USD') return 'US$ ' + Math.abs(amount).toFixed(2);
-  if (c === 'SGD') return 'S$ ' + Math.abs(amount).toFixed(2);
-  return 'A$ ' + Math.abs(amount).toFixed(2);
+  const abs = Math.abs(amount);
+  const fmt = abs.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (c === 'USD') return 'US$ ' + fmt;
+  if (c === 'SGD') return 'S$ '  + fmt;
+  return 'A$ ' + fmt;
 }
 function baseSym() {
   const c = (appData.settings && appData.settings.baseCurrency) || 'AUD';
@@ -2429,11 +2434,13 @@ function seedMonth(key) {
     const prev     = appData.budget[prevKey];
     const inc = {}; INC_CATS.forEach(k => inc[k] = { budget: prev?.income?.[k]?.budget   || 0, actual: 0 });
     const exp = {}; EXP_CATS.forEach(k => exp[k] = { budget: prev?.expenses?.[k]?.budget || 0, actual: 0 });
-    // Default the salary budget from Settings when there's nothing to carry forward
-    if (!inc.salary.budget && appData.settings && appData.settings.monthlySalary) {
-      inc.salary.budget = parseFloat(appData.settings.monthlySalary) || 0;
-    }
     appData.budget[key] = { income: inc, expenses: exp };
+  }
+  // Always sync salary budget from Settings if it's currently 0 and monthlySalary is set
+  const ms = parseFloat((appData.settings || {}).monthlySalary) || 0;
+  if (ms && appData.budget[key].income && !appData.budget[key].income.salary?.budget) {
+    appData.budget[key].income.salary = appData.budget[key].income.salary || { budget: 0, actual: 0 };
+    appData.budget[key].income.salary.budget = ms;
   }
 }
 function buildMonthOpts() {
@@ -3136,6 +3143,31 @@ function parseAmexStatement(text) {
     }
     return rows;
   }
+
+  // CommBank plain-text format: DD/MM/YYYY [+-]amount description
+  // e.g. "11/06/2026 -42.00 Transfer to xx1767 CommBank app"
+  const cbRe = /^(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s+([+\-]\$?[\d,]+\.\d{2})\s+(.+)$/;
+  for (const line of lines) {
+    const m = line.match(cbRe);
+    if (!m) continue;
+    const date = normaliseDate(m[1]);
+    if (!date) continue;
+    const rawAmt = m[2];
+    const amount = Math.abs(parseFloat(rawAmt.replace(/[^0-9.\-]/g, '')));
+    if (!isFinite(amount) || amount <= 0) continue;
+    const moneyIn = rawAmt.startsWith('+');
+    const description = cleanStatementDesc(m[3]);
+    if (!description) continue;
+    const kind = classifyStatementLine(description, moneyIn);
+    rows.push({
+      date, description, amount: +amount.toFixed(2),
+      category: kind === 'expense' ? guessCategory(description) : 'Other',
+      include: kind === 'expense',
+      kind,
+      pocketName: kind === 'transfer' ? matchPocketRef(description) : ''
+    });
+  }
+  if (rows.length) return rows;
 
   // Space-separated / plain-text format:
   // Patterns: DD/MM/YYYY or DD-MM-YYYY or Mon DD or Mon DD YYYY at start of line
@@ -4327,10 +4359,15 @@ function xrayNetWorthAUD() {
 }
 
 function xrayParseJSON(raw) {
-  let t = (raw || '').replace(/```json/gi, '```').split('```').filter(x => x.trim()).join('');
+  // Strip leading/trailing markdown fences (```json ... ``` or ``` ... ```)
+  let t = (raw || '').trim()
+    .replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+  // Strip any remaining inline fences
+  t = t.replace(/```json/gi, '').replace(/```/g, '');
+  // Extract outermost { ... }
   const a = t.indexOf('{'), b = t.lastIndexOf('}');
-  if (a === -1 || b === -1) throw new Error('AI did not return valid JSON — try again.');
-  try { return JSON.parse(t.slice(a, b + 1)); } catch (e) { throw new Error('Could not parse the AI plan JSON — try again.'); }
+  if (a === -1 || b === -1) throw new Error('AI did not return valid JSON — try again. Raw: ' + t.slice(0, 120));
+  try { return JSON.parse(t.slice(a, b + 1)); } catch (e) { throw new Error('Could not parse AI JSON: ' + e.message + ' — try again.'); }
 }
 
 async function generateStrategyPlan() {
@@ -4563,12 +4600,17 @@ function computeRSI(closes, period) {
 
 // Map a signal-watchlist item to a Yahoo symbol. Crypto uses CoinGecko id → symbol → SYM-USD.
 function yfSymbolForSignal(item) {
-  if (item.type === 'Crypto') {
-    const id = (item.ticker || '').trim().toLowerCase();
+  const ticker = (item.ticker || '').trim().toUpperCase();
+  // Crypto: map to SYM-USD
+  if (item.type === 'Crypto' || item.exchange === 'Crypto' || COINGECKO_IDS[ticker]) {
+    const id = COINGECKO_IDS[ticker] || ticker.toLowerCase();
     const sym = Object.keys(COINGECKO_IDS).find(k => COINGECKO_IDS[k] === id);
-    return (sym || (item.ticker || '').toUpperCase()) + '-USD';
+    return (sym || ticker) + '-USD';
   }
-  return (item.ticker || '').trim().toUpperCase();
+  // Use exchange field to determine suffix (supports watchlist items with exchange)
+  const suffix = exchangeSuffix('', item.exchange || '');
+  if (ticker.includes('.') || ticker.includes('-')) return ticker; // already has suffix
+  return ticker + suffix;
 }
 
 // Fetch ~30 days of daily closes + volumes from Yahoo Finance.
@@ -5036,7 +5078,7 @@ function renderHoldingRow(h, currency) {
   const typeOpts = HOLD_TYPES.map(t => `<option${h.type === t ? ' selected' : ''}>${escHtml(t)}</option>`).join('');
   return `<tr>
     <td><input type="text" value="${escHtml(h.ticker || '')}" style="width:65px" onchange="updHolding('${h.id}','ticker',this.value)" onblur="autoFetchTickerInfo(this.value,'${activePortfolio}','${h.id}')"></td>
-    <td><input type="text" value="${escHtml(h.name || '')}" style="width:110px" onchange="updHolding('${h.id}','name',this.value)"></td>
+    <td><input type="text" value="${escHtml(h.name || '')}" style="width:110px;color:var(--muted);background:transparent;border-color:transparent;" readonly title="Auto-fetched from ticker on blur / Refresh Prices"></td>
     <td><select onchange="updHolding('${h.id}','type',this.value)">${typeOpts}</select></td>
     <td><input type="number" value="${h.qty || 0}" min="0" step="any" style="width:68px" onchange="updHolding('${h.id}','qty',+this.value)"></td>
     <td><input type="number" value="${h.avgBuyPrice || 0}" min="0" step="any" style="width:90px" onchange="updHolding('${h.id}','avgBuyPrice',+this.value)"></td>
@@ -5086,7 +5128,7 @@ function renderWatchlist() {
   el.innerHTML = `<div style="overflow-x:auto;">
     <table class="inv-watch-tbl">
       <thead><tr>
-        <th>Ticker</th><th>Name</th><th>Tag</th>
+        <th>Ticker</th><th>Exchange</th><th>Name</th><th>Tag</th>
         <th>Current Price</th><th>Target Price</th><th>Notes</th><th title="Include in Signal Watchlist">Signal</th><th></th>
       </tr></thead>
       <tbody>${items.map(w => renderWatchRow(w)).join('')}</tbody>
@@ -5096,9 +5138,12 @@ function renderWatchlist() {
 function renderWatchRow(w) {
   const tagOpts = WATCH_TAGS.map(t => `<option${w.tag === t ? ' selected' : ''}>${escHtml(t)}</option>`).join('');
   const tagCls  = w.tag === 'Buy' ? 'tag-buy' : w.tag === 'Avoid' ? 'tag-avoid' : 'tag-watch';
+  const exchOpts = ['','ASX','NYSE','NASDAQ','IDX','SGX','Crypto','Other'].map(e =>
+    `<option value="${e}"${(w.exchange||'')=== e?' selected':''}>${e||'—'}</option>`).join('');
   return `<tr>
     <td><input type="text" value="${escHtml(w.ticker || '')}" style="width:65px" onchange="updWatchItem('${w.id}','ticker',this.value)" onblur="autoFetchWatchPrice(this.value,'${w.id}')"></td>
-    <td><input type="text" value="${escHtml(w.name || '')}" style="width:100px" onchange="updWatchItem('${w.id}','name',this.value)"></td>
+    <td><select style="width:80px" onchange="updWatchItem('${w.id}','exchange',this.value)">${exchOpts}</select></td>
+    <td><input type="text" value="${escHtml(w.name || '')}" style="width:100px;color:var(--muted);background:transparent;border-color:transparent;" readonly title="Auto-fetched from ticker on blur / Refresh Prices"></td>
     <td><select onchange="updWatchItem('${w.id}','tag',this.value)">${tagOpts}</select></td>
     <td><input type="number" value="${w.currentPrice || 0}" min="0" step="any" style="width:85px" onchange="updWatchItem('${w.id}','currentPrice',+this.value)"></td>
     <td><input type="number" value="${w.targetPrice || 0}" min="0" step="any" style="width:85px" onchange="updWatchItem('${w.id}','targetPrice',+this.value)"></td>
@@ -5110,7 +5155,7 @@ function renderWatchRow(w) {
 
 function addWatchItem() {
   const items = store('watchlist') || [];
-  items.push({ id: Date.now().toString(), ticker: '', name: '', tag: 'Watch', currentPrice: 0, targetPrice: 0, notes: '', inSignal: false });
+  items.push({ id: Date.now().toString(), ticker: '', name: '', tag: 'Watch', exchange: '', currentPrice: 0, targetPrice: 0, notes: '', inSignal: false });
   store('watchlist', items);
   save();
   renderWatchlist();
@@ -5129,6 +5174,31 @@ function deleteWatchItem(id) {
   renderWatchlist();
 }
 
+async function refreshWatchlistPrices(btn) {
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  const items = store('watchlist') || [];
+  let ok = 0, stale = 0;
+  for (const w of items) {
+    if (!w.ticker) continue;
+    const isCrypto = !!COINGECKO_IDS[(w.ticker || '').trim().toUpperCase()];
+    try {
+      if (isCrypto) {
+        w.currentPrice = await fetchCryptoPrice(w.ticker, 'usd');
+      } else {
+        const result = await fetchStockPrice(w.ticker, '');
+        w.currentPrice = result.price;
+        if (result.name && !w.name) w.name = result.name;
+      }
+      ok++;
+    } catch (e) { stale++; }
+  }
+  store('watchlist', items);
+  save();
+  renderWatchlist();
+  if (btn) { btn.disabled = false; btn.textContent = orig; }
+}
+
 function toggleWatchSignal(id, val) {
   const items = store('watchlist') || [];
   const w = items.find(x => x.id === id);
@@ -5137,7 +5207,7 @@ function toggleWatchSignal(id, val) {
   store('watchlist', items);
   // sync signal watchlist from all flagged items
   const signalItems = items.filter(x => x.inSignal).map(x => ({
-    id: x.id, ticker: x.ticker, name: x.name, tag: x.tag,
+    id: x.id, ticker: x.ticker, name: x.name, tag: x.tag, exchange: x.exchange || '',
     currentPrice: x.currentPrice, targetPrice: x.targetPrice, notes: x.notes
   }));
   store('signalWatchlist', signalItems);
@@ -6150,8 +6220,8 @@ function renderLoginOverlay() {
     return;
   }
 
-  // Multiple profiles → avatar-style selector first
-  if (profiles.length > 1 && !loginSelectedUserId) {
+  // One or more profiles → avatar-style selector first (even single profile, so other devices see who they're logging in as)
+  if (profiles.length >= 1 && !loginSelectedUserId) {
     body.innerHTML = `
       <p style="font-size:13px; font-weight:600; margin-bottom:16px; text-align:center;">Who's signing in?</p>
       <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:center; margin-bottom:8px;">
@@ -6596,21 +6666,9 @@ async function loadHomeNews(force) {
   let items = [];
   const failures = [];
   try {
-    // 1. NewsAPI first (today only), using the key from Settings or the built-in default
-    const newsKey = (appData.settings || {}).newsApiKey || DEFAULT_NEWS_API_KEY;
-    try {
-      const q = encodeURIComponent('"IPO" OR "acquisition" OR "merger" OR "goes public" OR "artificial intelligence" OR "AI model" OR "new technology" OR "breakthrough"');
-      const r = await fetch(`https://newsapi.org/v2/everything?q=${q}&language=en&from=${todayStr}&sortBy=publishedAt&pageSize=10&apiKey=${newsKey}`);
-      const j = r.ok ? await r.json() : null;
-      if (j && j.status === 'ok' && (j.articles || []).length) {
-        items = j.articles.map(a => ({ title: a.title || '', link: a.url || '', source: (a.source || {}).name || '', tag: 'News' }));
-      } else {
-        failures.push('NewsAPI: ' + (j && j.message ? j.message : 'HTTP ' + r.status));
-      }
-    } catch (e) { failures.push('NewsAPI: ' + (e.message || 'blocked — free tier only allows localhost origins')); }
-
-    // 2. Fallback — Google News RSS (when:1d = today) through two CORS proxies
-    if (!items.length) {
+    // Google News RSS (when:1d = today) through two CORS proxies
+    // (NewsAPI free tier blocks non-localhost origins — use RSS instead)
+    {
       const proxies = [u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
                        u => 'https://corsproxy.io/?' + encodeURIComponent(u)];
       for (const proxy of proxies) {
