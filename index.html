@@ -1,4 +1,4 @@
-<!-- Finance Hub v2.7 — Strategy X-Ray + Modern UI Redesign -->
+<!-- Finance Hub v2.8 — Portfolio Cash + Combined Holdings + Report Revamp -->
 <!-- Project Kangaroo | michael-finance-hub -->
 <!-- Built: May 2026 | Sessions: 9 planned -->
 <!DOCTYPE html>
@@ -1505,7 +1505,7 @@ th {
     </div>
 
     <div class="ver-footer">
-      <span id="versionDisplay">Finance Hub v2.7 — Strategy X-Ray + Modern UI</span>
+      <span id="versionDisplay">Finance Hub v2.8 — Portfolio Cash + Report</span>
       <span id="lastSavedDisplay" style="color:var(--muted)">–</span>
     </div>
   </div>
@@ -1877,7 +1877,7 @@ Date,Description,Amount
     </div>
 
     <div class="ver-footer">
-      <span>Finance Hub v2.7</span>
+      <span>Finance Hub v2.8</span>
       <span>v2.1 roadmap complete — Multi-Profile + Pockets + News + Modern UI</span>
     </div>
   </div>
@@ -2020,7 +2020,17 @@ function migrate(d) {
   if (!Array.isArray(d.pockets)) d.pockets = [];
   // S2.7a: strategy X-ray plans — non-critical key, lazy seed only (no schema bump)
   if (!d.strategyPlans || typeof d.strategyPlans !== 'object') d.strategyPlans = {};
-  d.schemaVersion = 11;
+  // S2.8: per-portfolio cash on hand (separate from daily-banking card balances)
+  if (d.portfolios && typeof d.portfolios === 'object') {
+    Object.keys(d.portfolios).forEach(k => {
+      const p = d.portfolios[k];
+      if (p && typeof p === 'object') {
+        if (typeof p.cash !== 'number') p.cash = parseFloat(p.cash) || 0;
+        if (!p.cashCurrency) p.cashCurrency = ((typeof PORT_CURRENCIES !== 'undefined' && PORT_CURRENCIES[k]) || p.currency || 'AUD');
+      }
+    });
+  }
+  d.schemaVersion = 12;
   return d;
 }
 
@@ -4077,11 +4087,57 @@ async function generateMonthlyReport() {
   data.lastMonth = hist[prevMonthKey(mk)] || null;
   if (out) out.innerHTML = '<p style="color:var(--muted); font-size:12px;">⏳ Generating report…</p>';
   if (btn) btn.disabled = true;
-  const prompt = `You are a finance analyst. Given this portfolio data for ${data.month}, write a concise monthly investment review: performance summary, top movers, FX impact on AUD value, and 2–3 plain-language observations. Keep it under 300 words. Be direct, no fluff.`;
+  // S2.8: extended analyst context — finance health, holdings x-ray, cash, macro, FX
   try {
-    const text = await askCoworkAI(prompt, [data]);
+    const s = appData.settings || {};
+    const salary = parseFloat(s.monthlySalary) || 0;
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+    let spend30 = 0;
+    (appData.spending || []).forEach(sp => { if (new Date(sp.date) >= cutoff) spend30 += toAUD(parseFloat(sp.amount) || 0, sp.currency || 'AUD'); });
+    const dailyBurn = spend30 / 30;
+    const stress = (dailyBurn > 0 && salary > 0) ? +((salary / 30) / dailyBurn).toFixed(2) : null;
+    data.financeHealth = { stressScore: stress, label: stress == null ? 'no data' : stress >= 1.5 ? 'comfortable' : stress >= 0.8 ? 'watch spending' : 'tight' };
+    const flat = [];
+    Object.keys(data.portfolios).forEach(k => (data.portfolios[k].holdings || []).forEach(h => {
+      if (h.ticker) flat.push({ ticker: h.ticker, name: h.name, audValue: +toAUD(h.marketValue, h.currency).toFixed(0), pnlPct: h.pnlPct });
+    }));
+    flat.sort((a, b) => b.audValue - a.audValue);
+    data.xray = {
+      top5ByValue: flat.slice(0, 5),
+      best3: flat.slice().sort((a, b) => b.pnlPct - a.pnlPct).slice(0, 3),
+      worst3: flat.slice().sort((a, b) => a.pnlPct - b.pnlPct).slice(0, 3)
+    };
+    const portAll = store('portfolios') || {};
+    let cashAUD = 0;
+    Object.keys(portAll).forEach(k => { cashAUD += toAUD(parseFloat(portAll[k].cash) || 0, portAll[k].cashCurrency || PORT_CURRENCIES[k] || portAll[k].currency || 'AUD'); });
+    data.portfolioCashAUD = +cashAUD.toFixed(0);
+    const idx = (appData.marketSnapshot || {}).indices || {};
+    data.macro = ['^AXJO', '^GSPC', '^JKSE'].map(sym => {
+      const i = idx[sym];
+      return (i && i.level != null) ? { sym, name: i.name, level: i.level, dayChgPct: i.prevClose ? +((i.level - i.prevClose) / i.prevClose * 100).toFixed(2) : null } : null;
+    }).filter(Boolean);
+    data.rates.AUD_SGD = (appData.rates || {}).AUD_SGD;
+  } catch (e) { /* context extras are best-effort — report still generates */ }
+  const prompt = `You are a senior portfolio analyst writing a monthly investment review for a private client. Given the data below, produce a structured report. Reply with STRICT JSON only, no other text, no markdown fences:
+{
+  "headline": "one sentence executive summary",
+  "performanceSummary": "2–3 sentences on total portfolio performance, P&L, and vs prior month",
+  "topMovers": [{"ticker":"","name":"","pnlPct":0,"note":"one line"}],
+  "fxImpact": "1–2 sentences on how AUD/USD or AUD/IDR moves affected base-currency value",
+  "healthAssessment": "1–2 sentences linking financial stress score to portfolio sustainability",
+  "riskFlags": ["flag 1", "flag 2"],
+  "actionableSteps": ["step 1", "step 2", "step 3"],
+  "macroContext": "2 sentences on current market indices and relevance to this portfolio",
+  "outlook": "2–3 sentences forward-looking view for next month"
+}
+
+DATA:
+` + JSON.stringify(data);
+  try {
+    const text = await askChatAI(prompt, { model: 'claude-sonnet-4-6', max_tokens: 1500 });
+    const parsed = xrayParseJSON(text);
     const reports = store('reports') || {};
-    reports[mk] = { text, generatedAt: new Date().toISOString(), audValue: data.combined.audValue };
+    reports[mk] = { json: parsed, generatedAt: new Date().toISOString(), audValue: data.combined.audValue };
     store('reports', reports); // store() → save() → pushToCloud() → sbUpsert()
     hist[mk] = { audCost: data.combined.audCost, audValue: data.combined.audValue, audPnl: data.combined.audPnl };
     store('portfolioHistory', hist);
@@ -4099,10 +4155,82 @@ function renderMonthlyReport() {
   const mk = monthKeyNow();
   const r = (store('reports') || {})[mk];
   if (!r) { out.innerHTML = '<p style="color:var(--muted); font-size:12px;">No report yet for ' + monthLabel(mk) + '. Click Generate Report.</p>'; return; }
-  out.innerHTML = `<div class="ai-card">
-    <div style="font-size:11px; color:var(--muted); margin-bottom:8px;">Generated ${new Date(r.generatedAt).toLocaleString()}</div>
-    <div class="ai-output">${escHtml(r.text)}</div>
+  // Legacy pre-v2.8 reports were plain text
+  if (!r.json) {
+    out.innerHTML = `<div class="ai-card">
+      <div style="font-size:11px; color:var(--muted); margin-bottom:8px;">Generated ${new Date(r.generatedAt).toLocaleString()}</div>
+      <div class="ai-output">${escHtml(r.text || '')}</div>
+    </div>`;
+    return;
+  }
+  // S2.8: asset-management-style visual report rendered from saved JSON (no AI call)
+  const j = r.json;
+  const movers = (Array.isArray(j.topMovers) ? j.topMovers : []).slice(0, 6);
+  const secHead = t => `<div style="font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--muted);margin-bottom:4px;">${t}</div>`;
+  out.innerHTML = `<div class="ai-card" style="padding:0;overflow:hidden;">
+    <div style="background:linear-gradient(135deg, var(--n1) 0%, color-mix(in srgb, var(--n1) 75%, #000) 100%); color:#fff; padding:14px 16px;">
+      <div style="font-size:14.5px;font-weight:700;line-height:1.4;">${escHtml(j.headline || 'Monthly Investment Review')}</div>
+      <div style="font-size:10px;opacity:.75;margin-top:4px;">${escHtml(monthLabel(mk))} · Generated ${new Date(r.generatedAt).toLocaleString()}</div>
+    </div>
+    <div style="padding:14px 16px;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:14px;">
+        <div>${secHead('PERFORMANCE SUMMARY')}<div style="font-size:12.5px;line-height:1.55;">${escHtml(j.performanceSummary || '–')}</div></div>
+        <div>${secHead('MACRO CONTEXT')}<div style="font-size:12.5px;line-height:1.55;">${escHtml(j.macroContext || '–')}</div></div>
+      </div>
+      ${movers.length ? `
+      ${secHead('TOP MOVERS')}
+      <div style="height:${Math.max(130, movers.length * 36)}px;margin:4px 0 10px;"><canvas id="reportMoversChart"></canvas></div>
+      <div style="overflow-x:auto;margin-bottom:14px;"><table class="inv-tbl">
+        <thead><tr><th style="text-align:left">Ticker</th><th style="text-align:left">Name</th><th>P&amp;L %</th><th style="text-align:left">Note</th></tr></thead>
+        <tbody>${movers.map(m => {
+          const p = parseFloat(m.pnlPct) || 0;
+          return `<tr>
+            <td><strong>${escHtml(m.ticker || '')}</strong></td>
+            <td style="color:var(--muted);font-size:11px;">${escHtml(m.name || '')}</td>
+            <td style="text-align:right;color:var(--${p >= 0 ? 'ok' : 'err'});font-weight:600;">${p >= 0 ? '+' : ''}${p.toFixed(1)}%</td>
+            <td style="font-size:11px;">${escHtml(m.note || '')}</td>
+          </tr>`; }).join('')}</tbody>
+      </table></div>` : ''}
+      ${(Array.isArray(j.riskFlags) && j.riskFlags.length) ? `
+      ${secHead('RISK FLAGS')}
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
+        ${j.riskFlags.map(f => `<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:11px;background:var(--amber-bg);color:var(--amber);">⚠ ${escHtml(f)}</span>`).join('')}
+      </div>` : ''}
+      ${(Array.isArray(j.actionableSteps) && j.actionableSteps.length) ? `
+      ${secHead('ACTIONABLE STEPS')}
+      <div style="margin-bottom:14px;">
+        ${j.actionableSteps.map((st, i) => `<div style="display:flex;gap:9px;font-size:12.5px;line-height:1.5;padding:4px 0;">
+          <strong style="color:var(--gold);min-width:18px;">${i + 1}.</strong><span>${escHtml(st)}</span></div>`).join('')}
+      </div>` : ''}
+      ${j.outlook ? `${secHead('OUTLOOK')}<div style="font-size:12.5px;line-height:1.55;margin-bottom:14px;">${escHtml(j.outlook)}</div>` : ''}
+      <div style="border-top:1px solid var(--bdr);padding-top:10px;font-size:11px;color:var(--muted);line-height:1.6;">
+        <div><strong>FX impact:</strong> ${escHtml(j.fxImpact || '–')}</div>
+        <div style="margin-top:4px;"><strong>Health:</strong> ${escHtml(j.healthAssessment || '–')}</div>
+      </div>
+      <div class="ai-disclaimer">AI-generated analysis, not financial advice.</div>
+    </div>
   </div>`;
+  if (movers.length) ensureChartJs().then(() => drawReportMoversChart(movers)).catch(() => {});
+}
+
+let reportMoversChartInst = null;
+function drawReportMoversChart(movers) {
+  const c = document.getElementById('reportMoversChart');
+  if (!c || !window.Chart) return;
+  if (reportMoversChartInst) { reportMoversChartInst.destroy(); reportMoversChartInst = null; }
+  const vals = movers.map(m => parseFloat(m.pnlPct) || 0);
+  reportMoversChartInst = new Chart(c, {
+    type: 'bar',
+    data: {
+      labels: movers.map(m => m.ticker || ''),
+      datasets: [{ data: vals, backgroundColor: vals.map(v => v >= 0 ? 'rgba(46,160,90,0.85)' : 'rgba(205,70,70,0.85)'), borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => (ctx.parsed.x >= 0 ? '+' : '') + ctx.parsed.x.toFixed(1) + '%' } } },
+      scales: { x: { ticks: { callback: v => v + '%' }, grid: { color: 'rgba(128,128,128,0.15)' } }, y: { grid: { display: false } } }
+    }
+  });
 }
 
 async function askStrategy() {
@@ -4932,15 +5060,78 @@ function renderCombinedPortfolio() {
   }).filter(Boolean).join('');
   const totalPnL = grandMV - grandCost;
   const totalPct = grandCost > 0 ? (totalPnL/grandCost*100) : 0;
+  // S2.8: total portfolio cash across all portfolios (converted to base)
+  let totalCashAUD = 0;
+  Object.keys(port).forEach(k => {
+    const cc = port[k].cashCurrency || portCurrencies[k] || port[k].currency || 'AUD';
+    totalCashAUD += toAUD(parseFloat(port[k].cash) || 0, cc);
+  });
   el.innerHTML = `
     <div class="inv-sum-grid" style="margin-bottom:12px;">
       <div class="inv-sum-item"><div class="inv-sum-label">Total Cost (${base})</div><div class="inv-sum-val">${fmtMoney(toBase(grandCost,'AUD'),base)}</div></div>
       <div class="inv-sum-item"><div class="inv-sum-label">Market Value (${base})</div><div class="inv-sum-val">${fmtMoney(toBase(grandMV,'AUD'),base)}</div></div>
       <div class="inv-sum-item"><div class="inv-sum-label">Total P&amp;L</div><div class="inv-sum-val" style="color:var(--${totalPnL>=0?'ok':'err'})">${totalPnL>=0?'+':''}${fmtMoney(toBase(totalPnL,'AUD'),base)}</div></div>
       <div class="inv-sum-item"><div class="inv-sum-label">P&amp;L %</div><div class="inv-sum-val" style="color:var(--${totalPnL>=0?'ok':'err'})">${totalPnL>=0?'+':''}${totalPct.toFixed(1)}%</div></div>
+      <div class="inv-sum-item"><div class="inv-sum-label">Total Cash (${base})</div><div class="inv-sum-val">${fmtMoney(toBase(totalCashAUD,'AUD'),base)}</div></div>
     </div>
     <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;">Breakdown by Portfolio</div>
     ${rows || '<p style="font-size:12px;color:var(--muted);">No holdings across any portfolio.</p>'}`;
+  renderCombinedHoldings();   // S2.8: flat merged holdings + watchlist mirror
+}
+
+// ─── S2.8: Combined tab — flat merged holdings + read-only watchlist ───────
+function renderCombinedHoldings() {
+  const el = document.getElementById('invHoldings');
+  if (!el) return;
+  const port = store('portfolios') || {};
+  const base = (appData.settings && appData.settings.baseCurrency) || 'AUD';
+  const portCurrencies = { idr: 'IDR', usd: 'USD', aud: 'AUD' };
+  const portLabel = k => port[k].name || (k === 'idr' ? '🇮🇩 Indonesia' : k === 'usd' ? '🌐 Global' : k === 'aud' ? '🇦🇺 Australia' : k);
+  const all = [];
+  Object.keys(port).forEach(k => {
+    const ccy = port[k].currency || portCurrencies[k] || 'AUD';
+    (port[k].holdings || []).forEach(h => {
+      const costB = toBase(toAUD((h.avgBuyPrice || 0) * (h.qty || 0), ccy), 'AUD');
+      const mvB   = toBase(toAUD((h.currentPrice || 0) * (h.qty || 0), ccy), 'AUD');
+      const pnlB  = mvB - costB;
+      all.push({ portfolio: portLabel(k), ticker: h.ticker || '', name: h.name || '', exchange: h.type || '',
+                 qty: h.qty || 0, costB, mvB, pnlB, pnlPct: costB > 0 ? pnlB / costB * 100 : 0 });
+    });
+  });
+  all.sort((a, b) => b.mvB - a.mvB);
+  const holdingsHtml = !all.length
+    ? '<p style="font-size:12px;color:var(--muted);">No holdings across any portfolio.</p>'
+    : `<div style="overflow-x:auto;"><table class="inv-tbl">
+        <thead><tr>
+          <th style="text-align:left">Portfolio</th><th style="text-align:left">Ticker</th><th style="text-align:left">Name</th>
+          <th style="text-align:left">Exchange</th><th>Qty</th><th>Avg Cost (${base})</th><th>Mkt Value (${base})</th><th>P&amp;L (${base})</th><th>P&amp;L %</th>
+        </tr></thead>
+        <tbody>${all.map(h => `<tr>
+          <td style="font-size:11px;">${escHtml(h.portfolio)}</td>
+          <td><strong>${escHtml(h.ticker)}</strong></td>
+          <td style="color:var(--muted);font-size:11px;">${escHtml(h.name)}</td>
+          <td style="font-size:11px;">${escHtml(h.exchange)}</td>
+          <td style="text-align:right">${h.qty}</td>
+          <td style="text-align:right">${fmtMoney(h.costB, base)}</td>
+          <td style="text-align:right">${fmtMoney(h.mvB, base)}</td>
+          <td style="text-align:right;color:var(--${h.pnlB >= 0 ? 'ok' : 'err'})">${h.pnlB >= 0 ? '+' : ''}${fmtMoney(h.pnlB, base)}</td>
+          <td style="text-align:right;color:var(--${h.pnlB >= 0 ? 'ok' : 'err'})">${h.pnlB >= 0 ? '+' : ''}${h.pnlPct.toFixed(1)}%</td>
+        </tr>`).join('')}</tbody>
+      </table></div>`;
+  const wl = store('watchlist') || [];
+  const watchHtml = !wl.length ? '' :
+    `<div style="font-size:11px;font-weight:600;color:var(--muted);margin:14px 0 4px;">All Watchlist Items <span style="font-weight:400;">(read-only — edit in the Watchlist section)</span></div>
+     <div style="overflow-x:auto;"><table class="inv-tbl">
+       <thead><tr><th style="text-align:left">Ticker</th><th style="text-align:left">Name</th><th style="text-align:left">Tag</th><th>Current Price</th><th>Target Price</th></tr></thead>
+       <tbody>${wl.map(w => `<tr>
+         <td><strong>${escHtml(w.ticker || '')}</strong></td>
+         <td style="color:var(--muted);font-size:11px;">${escHtml(w.name || '')}</td>
+         <td><span class="tag-${escHtml((w.tag || 'watch').toLowerCase())}" style="font-size:10px;padding:1px 7px;border-radius:9px;">${escHtml(w.tag || '')}</span></td>
+         <td style="text-align:right">${w.currentPrice || 0}</td>
+         <td style="text-align:right">${w.targetPrice || 0}</td>
+       </tr>`).join('')}</tbody>
+     </table></div>`;
+  el.innerHTML = `<div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;">All Holdings (${base})</div>` + holdingsHtml + watchHtml;
 }
 
 function deletePortfolio(key) {
@@ -5040,22 +5231,104 @@ function renderPortfolioSummary() {
     </div>`;
 }
 
+// ─── S2.8: Portfolio Cash on Hand (separate from daily-banking cards) ──────
+function avgMonthlySpend(months) {
+  const n = months || 3;
+  const totals = {};
+  (appData.spending || []).forEach(s => {
+    const mk = (s.date || '').slice(0, 7);
+    if (!mk) return;
+    totals[mk] = (totals[mk] || 0) + toAUD(parseFloat(s.amount) || 0, s.currency || 'AUD');
+  });
+  const now = new Date(); const vals = [];
+  for (let i = 0; i < n; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    if (totals[k] > 0) vals.push(totals[k]);
+  }
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+}
+
+function avgMonthlyIncome(months) {
+  const n = months || 3;
+  const totals = {};
+  (appData.income || []).forEach(e => {
+    const mk = (e.date || '').slice(0, 7);
+    if (!mk) return;
+    totals[mk] = (totals[mk] || 0) + toAUD(parseFloat(e.amount) || 0, e.currency || 'AUD');
+  });
+  const now = new Date(); const vals = [];
+  for (let i = 0; i < n; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    if (totals[k] > 0) vals.push(totals[k]);
+  }
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+}
+
+function updPortfolioCash(portKey, val) {
+  const p = store('portfolios') || {};
+  if (!p[portKey]) return;
+  p[portKey].cash = Math.max(0, parseFloat(val) || 0);
+  if (!p[portKey].cashCurrency) p[portKey].cashCurrency = PORT_CURRENCIES[portKey] || p[portKey].currency || 'AUD';
+  store('portfolios', p);   // store() → save() → pushToCloud()
+  renderHoldings();         // refresh runway / top-up numbers
+}
+
+function renderPortfolioCashCard(portKey) {
+  const port = store('portfolios') || {};
+  const p = port[portKey];
+  if (!p) return '';
+  const ccy = p.cashCurrency || PORT_CURRENCIES[portKey] || p.currency || 'AUD';
+  const cash = parseFloat(p.cash) || 0;
+  const r = appData.rates || {};
+  const audTo = aud => ccy === 'IDR' ? aud * (r.AUD_IDR || 12000)
+              : ccy === 'USD' ? aud * (r.AUD_USD || 0.65)
+              : ccy === 'SGD' ? aud * (r.AUD_SGD || 0.85) : aud;
+  // Runway: cash ÷ avg monthly spend (last 3 months, converted to portfolio ccy)
+  const spendCcy = audTo(avgMonthlySpend(3));
+  const runway = spendCcy > 0 ? (cash / spendCcy) : null;
+  // 50% FCF top-up: (avg monthly income − avg monthly spend) ÷ 2, in portfolio ccy
+  const fcfAUD = avgMonthlyIncome(3) - avgMonthlySpend(3);
+  const topUp = fcfAUD > 0 ? audTo(fcfAUD * 0.5) : null;
+  return `<div class="ai-card" style="margin:0 0 12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <div style="font-size:13px;font-weight:600;">💵 Portfolio Cash</div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input type="number" value="${cash}" min="0" step="any" style="width:140px;text-align:right;"
+          onblur="updPortfolioCash('${portKey}', this.value)"
+          onkeydown="if(event.key==='Enter')this.blur()">
+        <span style="font-size:12px;color:var(--muted);font-weight:600;">${escHtml(ccy)}</span>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;margin-top:8px;">
+      <span style="color:var(--muted);">Runway (cash ÷ avg monthly spend)</span>
+      <strong>${runway != null ? runway.toFixed(1) + ' months' : '–'}</strong>
+    </div>
+    <div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;margin-top:4px;">
+      <span style="color:var(--muted);">50% FCF top-up</span>
+      <strong>${topUp != null ? '+' + fmtMoney(topUp, ccy) + ' per month' : '–'}</strong>
+    </div>
+  </div>`;
+}
+
 function renderHoldings() {
   const el = document.getElementById('invHoldings');
   if (!el) return;
   if (activePortfolio === '__combined__') {
-    el.innerHTML = '<p style="color:var(--muted);font-size:12px;padding:4px 0;">Select a specific portfolio to view and edit holdings.</p>';
+    renderCombinedHoldings();   // S2.8: flat merged holdings + watchlist mirror
     return;
   }
   const port = store('portfolios') || {};
   const currency = PORT_CURRENCIES[activePortfolio] || (port[activePortfolio] && port[activePortfolio].currency) || 'AUD';
   const holdings = (port[activePortfolio] && port[activePortfolio].holdings) ? port[activePortfolio].holdings : [];
+  const cashCard = renderPortfolioCashCard(activePortfolio);   // S2.8
   if (!holdings.length) {
-    el.innerHTML = '<p style="color:var(--muted); font-size:12px; padding:4px 0;">No holdings yet. Click + Add to get started.</p>';
+    el.innerHTML = cashCard + '<p style="color:var(--muted); font-size:12px; padding:4px 0;">No holdings yet. Click + Add to get started.</p>';
     return;
   }
   const sym = currency === 'IDR' ? 'Rp' : currency === 'USD' ? 'US$' : 'A$';
-  el.innerHTML = `<div style="overflow-x:auto;">
+  el.innerHTML = cashCard + `<div style="overflow-x:auto;">
     <table class="inv-tbl">
       <thead><tr>
         <th style="text-align:left">Ticker</th>
