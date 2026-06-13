@@ -1899,14 +1899,50 @@ function getProfiles() {
   try { const p = JSON.parse(localStorage.getItem(PROFILES_KEY)); return Array.isArray(p) ? p : []; }
   catch { return []; }
 }
-function saveProfiles(list) { localStorage.setItem(PROFILES_KEY, JSON.stringify(list)); }
+// Profiles registry is stored locally AND in Supabase under a fixed row so any
+// device/incognito tab can recover the full profile list from the cloud.
+const PROFILES_CLOUD_KEY = '__hub_profiles__';
+async function sbGetProfiles() {
+  try {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/reading_state?user_id=eq.${encodeURIComponent(PROFILES_CLOUD_KEY)}&select=data`,
+      { headers: SB_HEADERS }
+    );
+    if (!r.ok) return null;
+    const rows = await r.json();
+    return (rows.length && Array.isArray(rows[0].data)) ? rows[0].data : null;
+  } catch { return null; }
+}
+async function sbSaveProfiles(list) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/reading_state`, {
+      method: 'POST',
+      headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates' },
+      body: JSON.stringify({ user_id: PROFILES_CLOUD_KEY, data: list, updated_at: new Date().toISOString() })
+    });
+  } catch { /* non-critical — local save already succeeded */ }
+}
+function saveProfiles(list) {
+  localStorage.setItem(PROFILES_KEY, JSON.stringify(list));
+  sbSaveProfiles(list); // mirror to cloud so any device can recover the registry
+}
 function activeProfile() { return getProfiles().find(p => p.userId === activeUserId) || null; }
 // Per-profile localStorage cache key — prevents one profile's cache being read as another's
 function dataKey() { return 'financeHub_data_' + activeUserId; }
-// One-time migration: move legacy appData.authHash into the registry as the 'Michael' profile
-function migrateProfilesRegistry() {
-  if (getProfiles().length === 0 && appData.authHash) {
-    saveProfiles([{ name: 'Michael', userId: 'michael-finance-hub', authHash: appData.authHash, pages: null }]);
+// On boot: if local registry is empty, fetch from cloud before showing login overlay.
+// Also seeds the 'Michael' profile from legacy authHash when there is no cloud registry yet.
+async function migrateProfilesRegistry() {
+  if (getProfiles().length === 0) {
+    const cloud = await sbGetProfiles();
+    if (cloud && cloud.length > 0) {
+      localStorage.setItem(PROFILES_KEY, JSON.stringify(cloud));
+      renderLoginOverlay(); // re-render now that profiles are known
+      return;
+    }
+    // No cloud registry yet — seed from legacy authHash (first-time migration)
+    if (appData.authHash) {
+      saveProfiles([{ name: 'Michael', userId: 'michael-finance-hub', authHash: appData.authHash, pages: null }]);
+    }
   }
 }
 
