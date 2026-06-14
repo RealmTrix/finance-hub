@@ -1921,12 +1921,13 @@ async function sbGetProfiles() {
 }
 async function sbSaveProfiles(list) {
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/reading_state`, {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/reading_state`, {
       method: 'POST',
       headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates' },
       body: JSON.stringify({ user_id: PROFILES_CLOUD_KEY, data: list, updated_at: new Date().toISOString() })
     });
-  } catch { /* non-critical — local save already succeeded */ }
+    if (!r.ok) console.warn('[profiles] cloud save failed', r.status, await r.text().catch(()=>''));
+  } catch(e) { console.warn('[profiles] cloud save error', e); }
 }
 function saveProfiles(list) {
   localStorage.setItem(PROFILES_KEY, JSON.stringify(list));
@@ -7547,7 +7548,7 @@ setInterval(tickClock, 1000);
 
 // S2.6: restore the profile identity for this browser session before loading data
 activeUserId = sessionStorage.getItem('hubUser') || activeUserId;
-loadApp().then(() => { migrateProfilesRegistry(); initHome(); checkAuth(); renderMarketStrip(false); });
+loadApp().then(async () => { await migrateProfilesRegistry(); initHome(); checkAuth(); renderMarketStrip(false); });
 </script>
 </body>
 </html>
