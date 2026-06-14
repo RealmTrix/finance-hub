@@ -2214,19 +2214,39 @@ function addCategory() {
   const cats = getCategories();
   if (cats.some(c => c.toLowerCase() === name.toLowerCase())) { alert('That category already exists.'); return; }
   cats.push(name);
+  // Seed new category row into every existing budget month so it shows immediately
+  const key = catNameToKey(name);
+  Object.keys(appData.budget || {}).forEach(mk => {
+    if (appData.budget[mk].expenses && !appData.budget[mk].expenses[key])
+      appData.budget[mk].expenses[key] = { budget: 0, actual: 0 };
+  });
   save();
   if (el) el.value = '';
   renderCategoriesSection();
   populateSpendingFilters();
+  if (document.getElementById('budgetTableWrap')) renderBudget();
 }
 
 function deleteCategory(name) {
   if (name === 'Other') return;   // fallback category must stay
-  if (!confirm(`Remove "${name}" from the category list?\n\nExisting transactions keep this category — it just won't be offered for new transactions.`)) return;
+  const key = catNameToKey(name);
+  // Check if any budget month has a non-zero budget for this category
+  const monthsWithBudget = Object.entries(appData.budget || {})
+    .filter(([, b]) => (b.expenses || {})[key]?.budget > 0);
+  if (monthsWithBudget.length > 0) {
+    const total = monthsWithBudget.reduce((s, [, b]) => s + (b.expenses[key]?.budget || 0), 0);
+    const months = monthsWithBudget.map(([mk]) => mk).join(', ');
+    if (!confirm(`"${name}" has a budget in ${monthsWithBudget.length} month(s) (${months}) totalling ${fmtMoney(total, 'AUD')}.\n\nRemoving this category will delete those budget entries. Existing transactions keep their category label.\n\nContinue?`)) return;
+    // Remove budget rows from all months
+    Object.keys(appData.budget || {}).forEach(mk => {
+      if (appData.budget[mk].expenses) delete appData.budget[mk].expenses[key];
+    });
+  } else if (!confirm(`Remove "${name}" from the category list?\n\nExisting transactions keep this category — it just won't be offered for new transactions.`)) return;
   appData.categories = getCategories().filter(c => c !== name);
   save();
   renderCategoriesSection();
   populateSpendingFilters();
+  if (document.getElementById('budgetTableWrap')) renderBudget();
 }
 
 // ─── Income categories (lazy-seeded, like spending categories) ───────────────
@@ -2453,6 +2473,26 @@ const CAT_LBL  = {
   subscriptions: 'Subscriptions', shopping: 'Shopping', healthcare: 'Healthcare',
   savings: 'Savings', other: 'Other'
 };
+
+// Convert a user-facing category name to a stable budget key (lowercase, underscored)
+function catNameToKey(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+// Keys for user-added categories (not already covered by built-in EXP_CATS)
+function getUserExpCats() {
+  const builtIn = new Set(EXP_CATS.map(k => (CAT_LBL[k] || '').toLowerCase()));
+  return getCategories()
+    .filter(c => !builtIn.has(c.toLowerCase()))
+    .map(c => catNameToKey(c));
+}
+// All expense budget keys: built-in + user-added
+function getAllExpCats() { return [...EXP_CATS, ...getUserExpCats()]; }
+// Label for any expense key (built-in or user-added)
+function getCatLabel(key) {
+  if (CAT_LBL[key]) return CAT_LBL[key];
+  const found = getCategories().find(c => catNameToKey(c) === key);
+  return found || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
 function nowMonthKey() {
   // Cycle runs 15th–14th. Before the 15th we're still in last month's cycle.
   const d = new Date();
@@ -2486,7 +2526,7 @@ function seedMonth(key) {
     const prevKey  = prevDate.getFullYear() + '-' + String(prevDate.getMonth() + 1).padStart(2, '0');
     const prev     = appData.budget[prevKey];
     const inc = {}; INC_CATS.forEach(k => inc[k] = { budget: prev?.income?.[k]?.budget   || 0, actual: 0 });
-    const exp = {}; EXP_CATS.forEach(k => exp[k] = { budget: prev?.expenses?.[k]?.budget || 0, actual: 0 });
+    const exp = {}; getAllExpCats().forEach(k => exp[k] = { budget: prev?.expenses?.[k]?.budget || 0, actual: 0 });
     appData.budget[key] = { income: inc, expenses: exp };
   }
   // Always sync salary budget from Settings if it's currently 0 and monthlySalary is set
@@ -2548,15 +2588,16 @@ function computeExpenseActuals(mk) {
   const start = new Date(y, m - 1, 15);
   const end   = new Date(y, m, 14, 23, 59, 59);
   const result = {};
-  EXP_CATS.forEach(k => result[k] = 0);
+  const allCats = getAllExpCats();
+  allCats.forEach(k => result[k] = 0);
   const keyByLabel = {};
-  EXP_CATS.forEach(k => keyByLabel[CAT_LBL[k].toLowerCase()] = k);
+  allCats.forEach(k => keyByLabel[getCatLabel(k).toLowerCase()] = k);
   (appData.spending || []).forEach(e => {
     if (!e.date) return;
     const d = new Date(e.date);
     if (d >= start && d <= end) {
       const k = keyByLabel[(e.category || 'Other').toLowerCase()] || 'other';
-      result[k] += toAUD(parseFloat(e.amount) || 0, e.currency || 'AUD');
+      result[k] = (result[k] || 0) + toAUD(parseFloat(e.amount) || 0, e.currency || 'AUD');
     }
   });
   return result;
@@ -2578,11 +2619,11 @@ function renderBudget() {
   // Compute totals (both actual columns are derived — only Budgeted is typed in)
   let tIB = 0, tIA = 0, tEB = 0, tEA = 0;
   INC_CATS.forEach(k => { tIB += b.income[k].budget || 0; tIA += incActs[k] || 0; });
-  EXP_CATS.forEach(k => { tEB += b.expenses[k].budget || 0; tEA += expActs[k] || 0; });
+  getAllExpCats().forEach(k => { tEB += (b.expenses[k]?.budget || 0); tEA += expActs[k] || 0; });
 
   // brow: shared row builder. Income uses inverted variance (more = green).
   function brow(key, sec) {
-    const e   = b[sec][key];
+    const e   = b[sec][key] || { budget: 0, actual: 0 };
     const bud = e.budget || 0;
     const act = sec === 'income' ? (incActs[key] || 0) : (expActs[key] || 0);
     const vrn = sec === 'income' ? act - bud : bud - act;  // income: surplus is positive/green
@@ -2595,7 +2636,7 @@ function renderBudget() {
     const actualCell = `<td style="text-align:right;color:var(--muted);">${fmtMoney(act, 'AUD')}</td>`;
     return `
       <tr>
-        <td>${CAT_LBL[key]}</td>
+        <td>${getCatLabel(key)}</td>
         <td><input type="number" min="0" step="any" value="${bud || ''}" placeholder="0"
               onchange="saveBudRow('${mk}','${sec}','${key}','budget',parseFloat(this.value)||0)"></td>
         ${actualCell}
@@ -2609,7 +2650,7 @@ function renderBudget() {
 
   // bmobRow: mobile card version with same logic
   function bmobRow(key, sec) {
-    const e   = b[sec][key];
+    const e   = b[sec][key] || { budget: 0, actual: 0 };
     const bud = e.budget || 0;
     const act = sec === 'income' ? (incActs[key] || 0) : (expActs[key] || 0);
     const vrn = sec === 'income' ? act - bud : bud - act;
@@ -2624,7 +2665,7 @@ function renderBudget() {
          </div>`;
     return `
       <div class="bmob-row">
-        <div class="bmob-cat">${CAT_LBL[key]}</div>
+        <div class="bmob-cat">${getCatLabel(key)}</div>
         <div class="bmob-inputs">
           <div class="bmob-field">
             <span class="bmob-lbl">Budgeted A$</span>
@@ -2665,7 +2706,7 @@ function renderBudget() {
           <td></td>
         </tr>
         <tr><td colspan="5" class="bsec">Expenses <span style="font-size:9px;font-weight:400;color:var(--muted)">(Budgeted is editable · Actual auto-fills from the Spending tab)</span></td></tr>
-        ${EXP_CATS.map(k => brow(k, 'expenses')).join('')}
+        ${getAllExpCats().map(k => brow(k, 'expenses')).join('')}
         <tr class="btot">
           <td>Total Expenses</td>
           <td>${fmtMoney(tEB, 'AUD')}</td>
@@ -2696,7 +2737,7 @@ function renderBudget() {
         </div>
       </div>
       <div class="bmob-section">Expenses</div>
-      ${EXP_CATS.map(k => bmobRow(k,'expenses')).join('')}
+      ${getAllExpCats().map(k => bmobRow(k,'expenses')).join('')}
       <div class="bmob-total">
         <span class="bmob-total-lbl">Total Expenses</span>
         <div class="bmob-total-vals">
@@ -6823,8 +6864,9 @@ let loginSelectedUserId = null;
 
 // All main tabs — used by page-permission checkboxes and applyPagePermissions()
 const ALL_TABS = [
-  ['home','Home'], ['personal-finance','Personal Finance'], ['investments','Investments'],
-  ['income','Income'], ['tax','Tax'], ['ai-chat','AI Chat'], ['settings','Settings'], ['updates','Updates']
+  ['home','Home'], ['personal-finance','Personal Finance'], ['credit-cards','Credit Cards'],
+  ['investments','Investments'], ['income','Income'], ['tax','Tax'],
+  ['ai-chat','AI Chat'], ['settings','Settings'], ['updates','Updates']
 ];
 
 // Hide tab buttons this profile isn't allowed to see (pages: null = all pages)
@@ -7444,7 +7486,7 @@ function renderHomeBudgetCard() {
   const expActs = (typeof computeExpenseActuals === 'function') ? computeExpenseActuals(mk) : {};
   let tIB = 0, tIA = 0, tEB = 0, tEA = 0;
   INC_CATS.forEach(k => { const e = (b.income   || {})[k] || {}; tIB += e.budget || 0; tIA += incActs[k] || 0; });
-  EXP_CATS.forEach(k => { const e = (b.expenses || {})[k] || {}; tEB += e.budget || 0; tEA += expActs[k] || 0; });
+  getAllExpCats().forEach(k => { const e = (b.expenses || {})[k] || {}; tEB += e.budget || 0; tEA += expActs[k] || 0; });
   // Cycle elapsed: days since the 15th over the full 15th→14th cycle length
   const cycleStart = new Date(cycleRef.getFullYear(), cycleRef.getMonth(), 15);
   const cycleEnd   = new Date(cycleRef.getFullYear(), cycleRef.getMonth() + 1, 14, 23, 59, 59);
