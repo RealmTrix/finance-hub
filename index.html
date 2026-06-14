@@ -3091,7 +3091,7 @@ function bulkAssignAccount() {
   let n = 0;
   (appData.spending || []).forEach(r => {
     if (r.cardId) return;                                                   // only unassigned
-    if (filterCard  && String(r.cardId) !== String(filterCard)) return;
+    // filterCard filter is intentionally skipped — we're assigning the UNassigned rows
     if (filterCat   && r.category !== filterCat) return;
     if (filterMonth && (r.date || '').slice(0, 7) !== filterMonth) return;
     r.cardId = cardId; n++;
