@@ -2745,6 +2745,9 @@ function renderCards() {
     netAUD      += c.type === 'Credit' ? -audVal : audVal;
     const negDisp = c.type === 'Credit' ? -dispV : dispV;
     const cls    = negDisp < 0 ? 'bad' : '';
+    const payBtn = c.type === 'Credit'
+      ? `<button class="btn" style="font-size:10px;padding:2px 6px;margin-right:2px;background:var(--ok);color:#fff;border:none;" onclick="payCredit(${i})" title="Record a payment to this card">💳 Pay</button>`
+      : '';
     return `
       <tr>
         <td><input type="text" value="${escHtml(c.name)}" maxlength="40"
@@ -2763,12 +2766,15 @@ function renderCards() {
             <option value="SGD" ${c.currency === 'SGD' ? 'selected' : ''}>SGD</option>
           </select>
         </td>
+        <td><input type="text" value="${escHtml(c.accountRef||'')}" maxlength="10" placeholder="xx1234"
+              style="width:58px;font-size:11px;" title="Account reference shown on bank transfers, e.g. xx1234 — lets the statement parser auto-update this card's balance"
+              onchange="updCard(${i},'accountRef',this.value.trim())"></td>
         <td><input type="number" step="0.01" value="${bal || ''}" placeholder="0"
               onchange="updCard(${i},'balance',parseFloat(this.value)||0)"></td>
         <td class="${cls}">${c.type === 'Credit'
           ? `<span style="color:var(--err)">−${fmtMoney(dispV, base)}</span>`
           : fmtMoney(dispV, base)}</td>
-        <td><button class="btn btn-del" onclick="delCard(${i})" title="Remove account">✕</button></td>
+        <td style="white-space:nowrap">${payBtn}<button class="btn btn-del" onclick="delCard(${i})" title="Remove account">✕</button></td>
       </tr>`;
   }).join('');
 
@@ -2779,9 +2785,10 @@ function renderCards() {
         <th>Account Name</th>
         <th style="text-align:center">Type</th>
         <th style="text-align:center">Currency</th>
+        <th style="text-align:center" title="Account reference shown in bank transfers (e.g. xx1234)">Ref</th>
         <th style="text-align:right">Balance (native)</th>
         <th style="text-align:right">Value (${sym})</th>
-        <th style="width:32px"></th>
+        <th style="width:90px"></th>
       </tr></thead>
       <tbody>
         ${rows}
@@ -2801,7 +2808,7 @@ function updCard(i, field, val) {
 }
 function addCard() {
   seedCards();
-  appData.cards.push({ id: 'c' + Date.now(), name: 'New Account', type: 'Debit', currency: 'AUD', balance: 0 });
+  appData.cards.push({ id: 'c' + Date.now(), name: 'New Account', type: 'Debit', currency: 'AUD', balance: 0, accountRef: '' });
   save();
   renderCards();
 }
@@ -3364,6 +3371,145 @@ function updateConfirmBtn() {
   if (btn) btn.textContent = `✓ Confirm ${n} transaction${n !== 1 ? 's' : ''}`;
 }
 
+// ─── Balance auto-update on statement import ───────────────────────────────
+// Processes ALL rows (not just included/expense ones) so that pocket transfers
+// and credit-card payments correctly update balances even though they don't
+// appear in the spending log. Safe to call before save().
+function applyStatementBalanceUpdates(rows, stmtCardId) {
+  if (!stmtCardId) return;
+  const cards   = appData.cards   || [];
+  const pockets = appData.pockets || [];
+  const stmtCard = cards.find(c => c.id === stmtCardId);
+  if (!stmtCard) return;
+
+  for (const row of rows) {
+    const isOut = /\btransfer to\b/i.test(row.description); // outbound from statement card
+
+    if (row.kind === 'expense') {
+      // Debit: spend = balance down. Credit: balance owed goes up.
+      if (stmtCard.type === 'Debit')  stmtCard.balance = (stmtCard.balance || 0) - row.amount;
+      if (stmtCard.type === 'Credit') stmtCard.balance = (stmtCard.balance || 0) + row.amount;
+
+    } else if (row.kind === 'credit') {
+      // Refund: debit goes up, credit owed goes down (floor at 0).
+      if (stmtCard.type === 'Debit')  stmtCard.balance = (stmtCard.balance || 0) + row.amount;
+      if (stmtCard.type === 'Credit') stmtCard.balance = Math.max(0, (stmtCard.balance || 0) - row.amount);
+
+    } else if (row.kind === 'transfer') {
+      // Update statement card balance by direction
+      const delta = isOut ? -row.amount : row.amount;
+      stmtCard.balance = (stmtCard.balance || 0) + delta;
+
+      // Identify the other side by xx-ref in description
+      const refMatch = row.description.match(/\bxx(\d{2,6})\b/i);
+      if (refMatch) {
+        const ref = refMatch[0].toLowerCase();
+        // Check pockets first (manual pockets only — asset/card pockets derive their value)
+        const pocket = pockets.find(p =>
+          p.sourceType === 'manual' && (p.accountRef || '').toLowerCase() === ref);
+        if (pocket) {
+          pocket.amount = Math.max(0, (pocket.amount || 0) - delta); // opposite to card
+        } else {
+          // Check other cards (e.g. AMEX card with accountRef set)
+          const otherCard = cards.find(c =>
+            c.id !== stmtCard.id && (c.accountRef || '').toLowerCase() === ref);
+          if (otherCard && isOut && otherCard.type === 'Credit') {
+            // Payment to credit card: reduces the amount owed
+            otherCard.balance = Math.max(0, (otherCard.balance || 0) - row.amount);
+          }
+        }
+      } else if (isOut) {
+        // No xx-ref — try matching credit card by name keyword in description
+        const creditCard = cards.find(c =>
+          c.id !== stmtCard.id && c.type === 'Credit' &&
+          (c.name || '').split(/\s+/).some(word =>
+            word.length > 3 && row.description.toLowerCase().includes(word.toLowerCase())));
+        if (creditCard) {
+          creditCard.balance = Math.max(0, (creditCard.balance || 0) - row.amount);
+          // Also drain any pocket named after this card (e.g. "AMEX" pocket when paying AMEX)
+          const keyword = (creditCard.name || '').split(/\s+/)[0].toLowerCase();
+          const linkedPocket = pockets.find(p =>
+            p.sourceType === 'manual' && (p.name || '').toLowerCase().includes(keyword));
+          if (linkedPocket) linkedPocket.amount = Math.max(0, (linkedPocket.amount || 0) - row.amount);
+        }
+      }
+    }
+  }
+  // Caller (commitParsedTransactions) calls save() — do not call here.
+}
+
+// ─── Pay Credit Card dialog ────────────────────────────────────────────────
+let _payCreditIdx = null;
+function payCredit(cardIdx) {
+  const card = (appData.cards || [])[cardIdx];
+  if (!card || card.type !== 'Credit') return;
+  _payCreditIdx = cardIdx;
+  const debitCards = (appData.cards || []).filter(c => c.type === 'Debit');
+  const srcOpts = debitCards.map(c =>
+    `<option value="${escHtml(c.id)}">${escHtml(c.name)}</option>`).join('');
+  let dlg = document.getElementById('_payCreditDlg');
+  if (!dlg) {
+    dlg = document.createElement('div');
+    dlg.id = '_payCreditDlg';
+    dlg.style.cssText = 'display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:var(--card);border:1px solid var(--bdr);border-radius:10px;padding:20px 22px;min-width:270px;box-shadow:0 4px 24px rgba(0,0,0,.35);';
+    document.body.appendChild(dlg);
+  }
+  dlg.innerHTML = `
+    <div style="font-weight:700;margin-bottom:12px;font-size:14px;">💳 Pay ${escHtml(card.name)}</div>
+    <label style="font-size:11px;color:var(--muted);">Amount (${card.currency || 'AUD'})</label>
+    <input type="number" id="_payCreditAmt" min="0" step="0.01"
+      value="${(card.balance || 0).toFixed(2)}"
+      style="width:100%;margin:4px 0 10px;padding:6px 8px;font-size:14px;background:var(--bg);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;box-sizing:border-box;">
+    ${debitCards.length ? `
+    <label style="font-size:11px;color:var(--muted);">Pay from</label>
+    <select id="_payCreditSrc" style="width:100%;margin:4px 0 10px;padding:6px 8px;font-size:13px;background:var(--bg);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;box-sizing:border-box;">${srcOpts}</select>
+    ` : ''}
+    <p style="font-size:10px;color:var(--muted);margin:0 0 10px;">Reduces ${escHtml(card.name)} balance + debits the source account. Also drains any pocket named "${escHtml((card.name||'').split(' ')[0])}".</p>
+    <div style="display:flex;gap:8px;">
+      <button class="btn" style="flex:1;background:var(--ok);color:#fff;border:none;" onclick="confirmPayCredit()">✓ Confirm</button>
+      <button class="btn" style="flex:1;" onclick="closePayCreditDlg()">Cancel</button>
+    </div>`;
+  dlg.style.display = 'block';
+  setTimeout(() => document.getElementById('_payCreditAmt')?.focus(), 50);
+}
+function closePayCreditDlg() {
+  const dlg = document.getElementById('_payCreditDlg');
+  if (dlg) dlg.style.display = 'none';
+  _payCreditIdx = null;
+}
+function confirmPayCredit() {
+  if (_payCreditIdx === null) return;
+  const amt = parseFloat(document.getElementById('_payCreditAmt')?.value) || 0;
+  if (amt <= 0) { closePayCreditDlg(); return; }
+  const cards   = appData.cards   || [];
+  const pockets = appData.pockets || [];
+  const card    = cards[_payCreditIdx];
+  if (!card) return;
+
+  // 1. Reduce credit card balance (owed)
+  card.balance = Math.max(0, (card.balance || 0) - amt);
+
+  // 2. Debit the source account
+  const srcId = document.getElementById('_payCreditSrc')?.value;
+  if (srcId) {
+    const src = cards.find(c => c.id === srcId);
+    if (src) src.balance = (src.balance || 0) - amt;
+  }
+
+  // 3. Drain matching pocket (name contains first word of credit card name, e.g. "AMEX")
+  const keyword = (card.name || '').split(/\s+/)[0].toLowerCase();
+  if (keyword.length > 2) {
+    const pocket = pockets.find(p =>
+      p.sourceType === 'manual' && (p.name || '').toLowerCase().includes(keyword));
+    if (pocket) pocket.amount = Math.max(0, (pocket.amount || 0) - amt);
+  }
+
+  save();
+  renderCards();
+  if (typeof renderPockets === 'function' && document.getElementById('pocketsTable')) renderPockets();
+  closePayCreditDlg();
+}
+
 function commitParsedTransactions() {
   const toAdd = parsedStatementRows.filter(r => r.include);
   if (!toAdd.length) return;
@@ -3376,9 +3522,13 @@ function commitParsedTransactions() {
     const k = normDesc(r.description);
     if (k && r.category) learnMap[k] = r.category;
   });
+  // Auto-update card and pocket balances from ALL rows (incl. unticked transfers)
+  const stmtCardId = (parsedStatementRows[0] || {}).cardId || '';
+  applyStatementBalanceUpdates(parsedStatementRows, stmtCardId);
   save();
   populateSpendingFilters();
   renderSpending();
+  renderCards();
   const msg = document.getElementById('stmtCommitMsg');
   msg.textContent = `✓ ${toAdd.length} transaction${toAdd.length !== 1 ? 's' : ''} added.`;
   msg.style.display = '';
