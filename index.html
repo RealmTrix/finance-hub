@@ -767,6 +767,7 @@ th {
 <nav class="main-tabs" id="mainTabs">
   <button class="tab active" data-tab="home" onclick="showTab('home', this); initHome()">Home</button>
   <button class="tab" data-tab="personal-finance" onclick="showTab('personal-finance', this); initPersonalFinance()">Personal Finance</button>
+  <button class="tab" data-tab="credit-cards" onclick="showTab('credit-cards', this); renderCreditCards()">Credit Cards</button>
   <button class="tab" data-tab="investments" onclick="showTab('investments', this); initInvestments()">Investments</button>
   <button class="tab" data-tab="income" onclick="showTab('income', this); initIncome()">Income</button>
   <button class="tab" data-tab="tax" onclick="showTab('tax', this); initTax()">Tax</button>
@@ -951,6 +952,11 @@ th {
     </div><!-- /pf-plans -->
 
   </div><!-- /tab-personal-finance -->
+
+  <!-- Credit Cards -->
+  <div id="tab-credit-cards" class="tab-panel" style="display:none">
+    <div id="creditCardsWrap"></div>
+  </div><!-- /tab-credit-cards -->
 
   <!-- Investments -->
   <div id="tab-investments" class="tab-panel" style="display:none">
@@ -2808,7 +2814,7 @@ function updCard(i, field, val) {
 }
 function addCard() {
   seedCards();
-  appData.cards.push({ id: 'c' + Date.now(), name: 'New Account', type: 'Debit', currency: 'AUD', balance: 0, accountRef: '' });
+  appData.cards.push({ id: 'c' + Date.now(), name: 'New Account', type: 'Debit', currency: 'AUD', balance: 0, accountRef: '', statementDay: 1, dueOffset: 21 });
   save();
   renderCards();
 }
@@ -3369,6 +3375,190 @@ function updateConfirmBtn() {
   const n = (parsedStatementRows || []).filter(r => r.include).length;
   const btn = document.getElementById('stmtConfirmBtn');
   if (btn) btn.textContent = `✓ Confirm ${n} transaction${n !== 1 ? 's' : ''}`;
+}
+
+// ─── Credit Cards tab ─────────────────────────────────────────────────────
+
+// Returns { start, end, dueDate } Date objects for card's current open statement period
+function getStatementPeriod(card) {
+  const stmtDay = Math.max(1, Math.min(28, parseInt(card.statementDay) || 1));
+  const dueOff  = parseInt(card.dueOffset) || 21;
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  let start, end;
+  if (now.getDate() >= stmtDay) {
+    start = new Date(y, m,     stmtDay);
+    end   = new Date(y, m + 1, stmtDay - 1);
+  } else {
+    start = new Date(y, m - 1, stmtDay);
+    end   = new Date(y, m,     stmtDay - 1);
+  }
+  const due = new Date(end);
+  due.setDate(due.getDate() + dueOff);
+  return { start, end, dueDate: due };
+}
+
+// ISO-string slice helper (reuses existing date strings in spending[])
+function isoDate(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+// Returns spending transactions for this card within [start, end] dates, newest first
+function getCardStatementTxns(card, start, end) {
+  const s0 = isoDate(start), s1 = isoDate(end);
+  return (appData.spending || [])
+    .filter(t => t.cardId === card.id && t.date >= s0 && t.date <= s1)
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+// Previous (closed) statement period — for showing last bill
+function getPrevStatementPeriod(card) {
+  const stmtDay = Math.max(1, Math.min(28, parseInt(card.statementDay) || 1));
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  let start, end;
+  if (now.getDate() >= stmtDay) {
+    start = new Date(y, m - 1, stmtDay);
+    end   = new Date(y, m,     stmtDay - 1);
+  } else {
+    start = new Date(y, m - 2, stmtDay);
+    end   = new Date(y, m - 1, stmtDay - 1);
+  }
+  return { start, end };
+}
+
+function updCreditCardField(cardId, field, val) {
+  const card = (appData.cards || []).find(c => c.id === cardId);
+  if (!card) return;
+  if (field === 'statementDay' || field === 'dueOffset') {
+    card[field] = Math.max(1, parseInt(val) || 1);
+  } else {
+    card[field] = val;
+  }
+  save();
+  renderCreditCards();
+}
+
+function renderCreditCards() {
+  const wrap = document.getElementById('creditCardsWrap');
+  if (!wrap) return;
+  const allCards  = appData.cards   || [];
+  const creditCards = allCards.filter(c => c.type === 'Credit');
+
+  if (!creditCards.length) {
+    wrap.innerHTML = `
+      <div class="card" style="text-align:center;padding:32px 20px;">
+        <div style="font-size:28px;margin-bottom:8px;">💳</div>
+        <div style="font-weight:600;margin-bottom:6px;">No credit cards yet</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Add a card in <strong>Personal Finance → Accounts</strong> and set its type to <strong>Credit</strong>.</div>
+      </div>`;
+    return;
+  }
+
+  const fmtD = d => d.toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' });
+  const today = isoDate(new Date());
+
+  wrap.innerHTML = creditCards.map(card => {
+    const { start, end, dueDate } = getStatementPeriod(card);
+    const { start: ps, end: pe }  = getPrevStatementPeriod(card);
+    const txns     = getCardStatementTxns(card, start, end);
+    const prevTxns = getCardStatementTxns(card, ps, pe);
+    const balance  = txns.reduce((s, t) => s + t.amount, 0);
+    const prevBal  = prevTxns.reduce((s, t) => s + t.amount, 0);
+    const cur      = card.currency || 'AUD';
+    const daysLeft = Math.max(0, Math.round((dueDate - new Date()) / 86400000));
+    const overdue  = dueDate < new Date() && prevBal > 0;
+    const dueTxt   = overdue
+      ? `<span style="color:var(--danger);font-weight:700;">OVERDUE</span>`
+      : `<span style="color:${daysLeft <= 5 ? 'var(--danger)' : daysLeft <= 10 ? 'var(--gold)' : 'var(--ok)'};">${daysLeft}d left</span>`;
+
+    const txnRows = txns.length ? txns.map(t => `
+      <tr>
+        <td style="color:var(--muted);font-size:11px;">${t.date}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(t.description)}</td>
+        <td style="font-size:11px;color:var(--muted);">${escHtml(t.category||'')}</td>
+        <td style="text-align:right;font-weight:600;">${fmtMoney(t.amount, cur)}</td>
+      </tr>`).join('') :
+      `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:12px 0;">No transactions in this period</td></tr>`;
+
+    const stmtDay = card.statementDay || 1;
+    const dueOff  = card.dueOffset    || 21;
+
+    return `
+    <div class="card" style="margin-bottom:16px;" id="cc-card-${card.id}">
+      <!-- Header row -->
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+        <div style="font-size:20px;">💳</div>
+        <div style="font-weight:700;font-size:15px;">${escHtml(card.name)}</div>
+        <span style="font-size:10px;font-weight:600;letter-spacing:.05em;padding:2px 8px;border-radius:10px;background:var(--acc-bg,#e8f0fe);color:var(--acc,#1a73e8);">${cur}</span>
+        <div style="margin-left:auto;display:flex;gap:8px;">
+          <button class="btn" style="background:var(--ok);color:#fff;border:none;font-size:11px;padding:4px 10px;"
+            onclick="payCredit(${allCards.indexOf(card)})">💳 Pay Bill</button>
+        </div>
+      </div>
+
+      <!-- Three stat boxes -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+        <div style="background:var(--bg);border-radius:8px;padding:10px 14px;">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:3px;">CURRENT STATEMENT</div>
+          <div style="font-size:18px;font-weight:700;">${fmtMoney(balance, cur)}</div>
+          <div style="font-size:10px;color:var(--muted);">${fmtD(start)} – today</div>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:10px 14px;">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:3px;">PREVIOUS BILL</div>
+          <div style="font-size:18px;font-weight:700;color:${prevBal > 0 ? 'var(--danger)' : 'var(--ok)'};">${fmtMoney(prevBal, cur)}</div>
+          <div style="font-size:10px;color:var(--muted);">${fmtD(ps)} – ${fmtD(pe)}</div>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:10px 14px;">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:3px;">PAYMENT DUE</div>
+          <div style="font-size:15px;font-weight:700;">${fmtD(dueDate)}</div>
+          <div style="font-size:10px;">${dueTxt}</div>
+        </div>
+      </div>
+
+      <!-- Statement config row -->
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:14px;padding:8px 12px;background:var(--bg);border-radius:8px;">
+        <span style="font-size:11px;color:var(--muted);">Statement settings:</span>
+        <label style="font-size:11px;display:flex;align-items:center;gap:6px;">
+          Closes day
+          <input type="number" min="1" max="28" value="${stmtDay}" style="width:46px;padding:3px 6px;font-size:12px;background:var(--card);color:var(--txt);border:1px solid var(--bdr);border-radius:5px;"
+            onchange="updCreditCardField('${card.id}','statementDay',this.value)">
+          of month
+        </label>
+        <label style="font-size:11px;display:flex;align-items:center;gap:6px;">
+          Payment due
+          <input type="number" min="1" max="60" value="${dueOff}" style="width:46px;padding:3px 6px;font-size:12px;background:var(--card);color:var(--txt);border:1px solid var(--bdr);border-radius:5px;"
+            onchange="updCreditCardField('${card.id}','dueOffset',this.value)">
+          days after close
+        </label>
+        <span style="font-size:10px;color:var(--muted);margin-left:auto;">Next statement closes ${fmtD(end)}</span>
+      </div>
+
+      <!-- Transaction list -->
+      <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">
+        Transactions this period (${txns.length})
+      </div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--bdr);">
+              <th style="text-align:left;padding:4px 8px 6px;font-size:10px;color:var(--muted);font-weight:600;">DATE</th>
+              <th style="text-align:left;padding:4px 8px 6px;font-size:10px;color:var(--muted);font-weight:600;">DESCRIPTION</th>
+              <th style="text-align:left;padding:4px 8px 6px;font-size:10px;color:var(--muted);font-weight:600;">CATEGORY</th>
+              <th style="text-align:right;padding:4px 8px 6px;font-size:10px;color:var(--muted);font-weight:600;">AMOUNT</th>
+            </tr>
+          </thead>
+          <tbody>${txnRows}</tbody>
+          ${txns.length ? `<tfoot>
+            <tr style="border-top:2px solid var(--bdr);">
+              <td colspan="3" style="padding:6px 8px;font-weight:700;font-size:12px;">Total</td>
+              <td style="text-align:right;padding:6px 8px;font-weight:700;">${fmtMoney(balance, cur)}</td>
+            </tr>
+          </tfoot>` : ''}
+        </table>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ─── Balance auto-update on statement import ───────────────────────────────
