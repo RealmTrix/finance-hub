@@ -2787,15 +2787,24 @@ function renderCards() {
   let netAUD = 0;
 
   const rows = appData.cards.map((c, i) => {
-    const bal    = c.balance || 0;
-    const audVal = toAUD(bal, c.currency);
-    const dispV  = toBase(bal, c.currency);
-    netAUD      += c.type === 'Credit' ? -audVal : audVal;
+    // Credit cards: compute balance from current statement period spending
+    let bal;
+    if (c.type === 'Credit') {
+      const { start, end } = getStatementPeriod(c);
+      bal = getCardStatementTxns(c, start, end).reduce((s, t) => s + t.amount, 0);
+    } else {
+      bal = c.balance || 0;
+    }
+    const audVal  = toAUD(bal, c.currency);
+    const dispV   = toBase(bal, c.currency);
+    netAUD       += c.type === 'Credit' ? -audVal : audVal;
     const negDisp = c.type === 'Credit' ? -dispV : dispV;
-    const cls    = negDisp < 0 ? 'bad' : '';
-    const payBtn = c.type === 'Credit'
-      ? `<button class="btn" style="font-size:10px;padding:2px 6px;margin-right:2px;background:var(--ok);color:#fff;border:none;" onclick="payCredit(${i})" title="Record a payment to this card">💳 Pay</button>`
-      : '';
+    const cls     = negDisp < 0 ? 'bad' : '';
+    // Credit balance: read-only mirror from Credit Cards tab (manage payments there)
+    const balCell = c.type === 'Credit'
+      ? `<td style="color:var(--muted);font-size:11px;text-align:right;" title="Auto-computed from spending this statement period — manage in Credit Cards tab">${fmtMoney(bal, c.currency)}</td>`
+      : `<td><input type="number" step="0.01" value="${bal || ''}" placeholder="0"
+              onchange="updCard(${i},'balance',parseFloat(this.value)||0)"></td>`;
     return `
       <tr>
         <td><input type="text" value="${escHtml(c.name)}" maxlength="40"
@@ -2817,12 +2826,11 @@ function renderCards() {
         <td><input type="text" value="${escHtml(c.accountRef||'')}" maxlength="10" placeholder="xx1234"
               style="width:58px;font-size:11px;" title="Account reference shown on bank transfers, e.g. xx1234 — lets the statement parser auto-update this card's balance"
               onchange="updCard(${i},'accountRef',this.value.trim())"></td>
-        <td><input type="number" step="0.01" value="${bal || ''}" placeholder="0"
-              onchange="updCard(${i},'balance',parseFloat(this.value)||0)"></td>
+        ${balCell}
         <td class="${cls}">${c.type === 'Credit'
           ? `<span style="color:var(--err)">−${fmtMoney(dispV, base)}</span>`
           : fmtMoney(dispV, base)}</td>
-        <td style="white-space:nowrap">${payBtn}<button class="btn btn-del" onclick="delCard(${i})" title="Remove account">✕</button></td>
+        <td style="white-space:nowrap"><button class="btn btn-del" onclick="delCard(${i})" title="Remove account">✕</button></td>
       </tr>`;
   }).join('');
 
