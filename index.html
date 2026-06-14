@@ -3423,17 +3423,21 @@ function updateConfirmBtn() {
 
 // Returns { start, end, dueDate } Date objects for card's current open statement period
 function getStatementPeriod(card) {
-  const stmtDay = Math.max(1, Math.min(28, parseInt(card.statementDay) || 1));
+  const raw     = Math.max(1, Math.min(31, parseInt(card.statementDay) || 1));
   const dueOff  = parseInt(card.dueOffset) || 21;
   const now = new Date();
   const y = now.getFullYear(), m = now.getMonth();
+  // Clamp to actual days in each month so Date never rolls over
+  const daysThisMonth = new Date(y, m + 1, 0).getDate();
+  const daysPrevMonth = new Date(y, m,     0).getDate();
+  const stmtDay = Math.min(raw, daysThisMonth);
   let start, end;
   if (now.getDate() >= stmtDay) {
-    start = new Date(y, m,     stmtDay);
-    end   = new Date(y, m + 1, stmtDay - 1);
+    start = new Date(y, m,     Math.min(raw, daysThisMonth));
+    end   = new Date(y, m + 1, Math.min(raw, new Date(y, m + 2, 0).getDate()) - 1);
   } else {
-    start = new Date(y, m - 1, stmtDay);
-    end   = new Date(y, m,     stmtDay - 1);
+    start = new Date(y, m - 1, Math.min(raw, daysPrevMonth));
+    end   = new Date(y, m,     Math.min(raw, daysThisMonth) - 1);
   }
   const due = new Date(end);
   due.setDate(due.getDate() + dueOff);
@@ -3455,16 +3459,17 @@ function getCardStatementTxns(card, start, end) {
 
 // Previous (closed) statement period — for showing last bill
 function getPrevStatementPeriod(card) {
-  const stmtDay = Math.max(1, Math.min(28, parseInt(card.statementDay) || 1));
+  const raw2 = Math.max(1, Math.min(31, parseInt(card.statementDay) || 1));
   const now = new Date();
   const y = now.getFullYear(), m = now.getMonth();
+  const stmtDay = Math.min(raw2, new Date(y, m + 1, 0).getDate());
   let start, end;
   if (now.getDate() >= stmtDay) {
-    start = new Date(y, m - 1, stmtDay);
+    start = new Date(y, m - 1, Math.min(raw2, new Date(y, m, 0).getDate()));
     end   = new Date(y, m,     stmtDay - 1);
   } else {
-    start = new Date(y, m - 2, stmtDay);
-    end   = new Date(y, m - 1, stmtDay - 1);
+    start = new Date(y, m - 2, Math.min(raw2, new Date(y, m - 1, 0).getDate()));
+    end   = new Date(y, m - 1, Math.min(raw2, new Date(y, m, 0).getDate()) - 1);
   }
   return { start, end };
 }
@@ -3563,7 +3568,7 @@ function renderCreditCards() {
         <span style="font-size:11px;color:var(--muted);">Statement settings:</span>
         <label style="font-size:11px;display:flex;align-items:center;gap:6px;">
           Closes day
-          <input type="number" min="1" max="28" value="${stmtDay}" style="width:46px;padding:3px 6px;font-size:12px;background:var(--card);color:var(--txt);border:1px solid var(--bdr);border-radius:5px;"
+          <input type="number" min="1" max="31" value="${stmtDay}" style="width:46px;padding:3px 6px;font-size:12px;background:var(--card);color:var(--txt);border:1px solid var(--bdr);border-radius:5px;"
             onchange="updCreditCardField('${card.id}','statementDay',this.value)">
           of month
         </label>
