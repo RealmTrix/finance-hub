@@ -1,4 +1,4 @@
-<!-- Finance Hub v2.8 — Portfolio Cash + Combined Holdings + Report Revamp -->
+<!-- Finance Hub v2.11 — Weekly + Monthly Reports (materiality movers, auto monthly overview) -->
 <!-- Project Kangaroo | michael-finance-hub -->
 <!-- Built: May 2026 | Sessions: 9 planned -->
 <!DOCTYPE html>
@@ -971,7 +971,7 @@ th {
     <!-- Investments sub-tabs (S6) -->
     <nav class="inv-subtabs">
       <button class="inv-subtab active" onclick="showInvSubTab('inv-portfolio', this)">📊 Portfolio</button>
-      <button class="inv-subtab" onclick="showInvSubTab('inv-report', this)">📝 Monthly Report</button>
+      <button class="inv-subtab" onclick="showInvSubTab('inv-report', this)">📝 Reports</button>
       <button class="inv-subtab" onclick="showInvSubTab('inv-strategy', this)">💡 Strategy</button>
       <button class="inv-subtab" onclick="showInvSubTab('inv-signals', this)">🎯 Signals</button>
     </nav>
@@ -1059,15 +1059,24 @@ th {
 
     </div><!-- /inv-portfolio -->
 
-    <!-- Monthly Report sub-tab (S6) -->
+    <!-- Reports sub-tab (S6 → weekly + monthly overview) -->
     <div id="inv-report" class="inv-panel" style="display:none">
       <div class="card">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
-          <div class="card-title" style="margin-bottom:0;">📝 Monthly Investment Review</div>
-          <button id="genReportBtn" class="btn" style="font-size:11px; padding:5px 12px;" onclick="generateMonthlyReport()">✨ Generate Report</button>
+          <div class="card-title" style="margin-bottom:0;">📝 Weekly Investment Review</div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button id="refreshCtxBtn" class="btn" style="font-size:11px; padding:5px 12px;" onclick="refreshReportContext()">↻ Refresh context</button>
+            <button id="genReportBtn" class="btn btn-primary" style="font-size:11px; padding:5px 12px;" onclick="generateWeeklyReport()">✨ Generate Weekly Report</button>
+          </div>
         </div>
-        <p style="font-size:11px; color:var(--muted); margin-bottom:10px;">Summarises this month's portfolio performance, top movers, and FX impact using your live holdings data. Saved per month so it persists.</p>
-        <div id="invReportOutput"></div>
+        <p style="font-size:11px; color:var(--muted); margin-bottom:6px;">Asset-management-style review of this week's holdings, material movers (ranked by $ impact), FX, and concrete actions. Saved per calendar week (Mon–Sun).</p>
+        <div id="reportCtxStatus" style="font-size:10px; color:var(--muted); margin-bottom:10px;"></div>
+        <div id="weeklyReportOutput"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:6px;">🗓️ Monthly Overview &amp; Direction</div>
+        <p style="font-size:11px; color:var(--muted); margin-bottom:10px;">Auto-generated once 5 weekly reports exist — synthesises them with fresh live data into a higher-level overview and strategic direction. It won't re-run on a set of weeks it has already covered.</p>
+        <div id="monthlyReportOutput"></div>
       </div>
     </div>
 
@@ -1515,7 +1524,7 @@ th {
     </div>
 
     <div class="ver-footer">
-      <span id="versionDisplay">Finance Hub v2.8 — Portfolio Cash + Report</span>
+      <span id="versionDisplay">Finance Hub v2.11 — Weekly + Monthly Reports</span>
       <span id="lastSavedDisplay" style="color:var(--muted)">–</span>
     </div>
   </div>
@@ -1887,7 +1896,7 @@ Date,Description,Amount
     </div>
 
     <div class="ver-footer">
-      <span>Finance Hub v2.8</span>
+      <span>Finance Hub v2.11</span>
       <span>v2.1 roadmap complete — Multi-Profile + Pockets + News + Modern UI</span>
     </div>
   </div>
@@ -4606,7 +4615,7 @@ function showInvSubTab(id, el) {
   const panel = document.getElementById(id);
   if (panel) panel.style.display = '';
   el.classList.add('active');
-  if (id === 'inv-report') renderMonthlyReport();
+  if (id === 'inv-report') { renderWeeklyReport(); generateMonthlyOverview(); }
   if (id === 'inv-strategy') renderXray();   // S2.7a: Portfolio X-Ray
   if (id === 'inv-signals') { renderSignalWatchlist(); renderSignalBrief(); renderTradeLog(); }
 }
@@ -4615,6 +4624,10 @@ function showInvSubTab(id, el) {
 function todayKey() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function monthKeyNow() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
 function monthLabel(key) { const [y,m] = key.split('-').map(Number); return new Date(y, m-1, 1).toLocaleString('en-AU', { month:'long', year:'numeric' }); }
+// Calendar-week (Mon–Sun) helpers — weekly report key is the Monday's date (YYYY-MM-DD)
+function isoWeekMonday(d) { const x = new Date(d); const off = (x.getDay() + 6) % 7; x.setDate(x.getDate() - off); x.setHours(0,0,0,0); return x; }
+function weekKeyNow() { const m = isoWeekMonday(new Date()); return m.getFullYear() + '-' + String(m.getMonth()+1).padStart(2,'0') + '-' + String(m.getDate()).padStart(2,'0'); }
+function weekLabel(key) { const [y,mo,da] = key.split('-').map(Number); return 'Week of ' + new Date(y, mo-1, da).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }); }
 function prevMonthKey(key) { const [y,m] = key.split('-').map(Number); const d = new Date(y, m-2, 1); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
 
 // Supabase Edge Function that proxies to the Anthropic API (avoids browser CORS block).
@@ -4663,7 +4676,8 @@ function gatherPortfolioData() {
       }
     });
     const audCost = toAUD(cost, ccy), audValue = toAUD(mv, ccy);
-    result.portfolios[k] = { currency: ccy, totalCost: +cost.toFixed(2), marketValue: +mv.toFixed(2), pnl: +(mv-cost).toFixed(2), pnlPct: cost>0 ? +((mv-cost)/cost*100).toFixed(1) : 0, audCost: +audCost.toFixed(2), audValue: +audValue.toFixed(2), holdings: hs };
+    const pname = (port[k] && port[k].name) || ({ idr:'Indonesia', usd:'Global', aud:'Australia' }[k]) || k;
+    result.portfolios[k] = { name: pname, currency: ccy, totalCost: +cost.toFixed(2), marketValue: +mv.toFixed(2), pnl: +(mv-cost).toFixed(2), pnlPct: cost>0 ? +((mv-cost)/cost*100).toFixed(1) : 0, audCost: +audCost.toFixed(2), audValue: +audValue.toFixed(2), holdings: hs };
     result.combined.audCost += audCost; result.combined.audValue += audValue;
   });
   result.combined.audCost = +result.combined.audCost.toFixed(2);
@@ -4675,18 +4689,17 @@ function gatherPortfolioData() {
   return result;
 }
 
-async function generateMonthlyReport() {
-  const out = document.getElementById('invReportOutput');
+async function generateWeeklyReport() {
+  const out = document.getElementById('weeklyReportOutput');
   const btn = document.getElementById('genReportBtn');
-  const mk = monthKeyNow();
+  const wk = weekKeyNow();
   const data = gatherPortfolioData();
   const hist = store('portfolioHistory') || {};
-  data.month = monthLabel(mk);
+  data.week = weekLabel(wk);
   data.baseCurrency = appData.settings.baseCurrency;
-  data.lastMonth = hist[prevMonthKey(mk)] || null;
-  if (out) out.innerHTML = '<p style="color:var(--muted); font-size:12px;">⏳ Generating report…</p>';
+  if (out) out.innerHTML = '<p style="color:var(--muted); font-size:12px;">⏳ Generating weekly report…</p>';
   if (btn) btn.disabled = true;
-  // S2.8: extended analyst context — finance health, holdings x-ray, cash, macro, FX
+  // extended analyst context — finance health, materiality-ranked movers, cash, macro, FX
   try {
     const s = appData.settings || {};
     const salary = parseFloat(s.monthlySalary) || 0;
@@ -4696,15 +4709,20 @@ async function generateMonthlyReport() {
     const dailyBurn = spend30 / 30;
     const stress = (dailyBurn > 0 && salary > 0) ? +((salary / 30) / dailyBurn).toFixed(2) : null;
     data.financeHealth = { stressScore: stress, label: stress == null ? 'no data' : stress >= 1.5 ? 'comfortable' : stress >= 0.8 ? 'watch spending' : 'tight' };
+    const totalVal = data.combined.audValue || 0;
     const flat = [];
     Object.keys(data.portfolios).forEach(k => (data.portfolios[k].holdings || []).forEach(h => {
-      if (h.ticker) flat.push({ ticker: h.ticker, name: h.name, audValue: +toAUD(h.marketValue, h.currency).toFixed(0), pnlPct: h.pnlPct });
+      if (!h.ticker) return;
+      const audValue = +toAUD(h.marketValue, h.currency).toFixed(0);
+      const audPnl   = +toAUD(h.pnl, h.currency).toFixed(0);
+      flat.push({ ticker: h.ticker, name: h.name, portfolio: data.portfolios[k].name, audValue, audPnl, pnlPct: h.pnlPct, weightPct: totalVal > 0 ? +(audValue / totalVal * 100).toFixed(1) : 0 });
     }));
-    flat.sort((a, b) => b.audValue - a.audValue);
+    // Materiality = dollar P&L impact (position size × move) — rank movers by |audPnl|, not % alone
     data.xray = {
-      top5ByValue: flat.slice(0, 5),
-      best3: flat.slice().sort((a, b) => b.pnlPct - a.pnlPct).slice(0, 3),
-      worst3: flat.slice().sort((a, b) => a.pnlPct - b.pnlPct).slice(0, 3)
+      moversByMateriality: flat.slice().sort((a, b) => Math.abs(b.audPnl) - Math.abs(a.audPnl)).slice(0, 6),
+      top5ByValue: flat.slice().sort((a, b) => b.audValue - a.audValue).slice(0, 5),
+      best3: flat.slice().sort((a, b) => b.audPnl - a.audPnl).slice(0, 3),
+      worst3: flat.slice().sort((a, b) => a.audPnl - b.audPnl).slice(0, 3)
     };
     const portAll = store('portfolios') || {};
     let cashAUD = 0;
@@ -4717,16 +4735,18 @@ async function generateMonthlyReport() {
     }).filter(Boolean);
     data.rates.AUD_SGD = (appData.rates || {}).AUD_SGD;
   } catch (e) { /* context extras are best-effort — report still generates */ }
-  const prompt = `You are a senior portfolio analyst writing a monthly investment review. Using the DATA below, reply with ONE line of minified, strictly valid JSON and NOTHING else — no markdown, no code fences, no line breaks. Schema: { headline, performanceSummary, topMovers:[{ticker, name, pnlPct, note}], fxImpact, healthAssessment, riskFlags:[strings], actionableSteps:[strings], macroContext, outlook }. headline=1 sentence; performanceSummary/macroContext/outlook=2 short sentences; fxImpact/healthAssessment=1 short sentence; note=one short line; riskFlags=2-3 items; actionableSteps=3 items. CRITICAL: never use the " character inside any string value (use a single quote ' for names/tickers/quotes), and never put a line break inside a value. DATA:\n` + JSON.stringify(data);
+  const prompt = `You are a senior portfolio analyst writing a WEEKLY investment review (asset-management style). Using the DATA below, reply with ONE line of minified, strictly valid JSON and NOTHING else — no markdown, no code fences, no line breaks. Schema: { headline, performanceSummary, topMovers:[{ticker, name, pnlPct, audPnl, note}], fxImpact, healthAssessment, riskFlags:[strings], actionableSteps:[strings], macroContext, outlook }. Rank topMovers by MATERIALITY = dollar P&L impact (position size × move), NOT percentage alone — use DATA.xray.moversByMateriality (audPnl = A$ impact, weightPct = portfolio weight). A small % move on a large position outranks a large % move on a tiny one. headline=1 sentence; performanceSummary/macroContext/outlook=2 short sentences; fxImpact/healthAssessment=1 short sentence; note=one short line that references the $ impact; riskFlags=2-3 items; actionableSteps=3 concrete items. CRITICAL: never use the " character inside any string value (use a single quote ' for names/tickers/quotes), and never put a line break inside a value. DATA:\n` + JSON.stringify(data);
   try {
     const text = await askChatAI(prompt, { model: 'claude-sonnet-4-6', max_tokens: 1500 });
     const parsed = xrayParseJSON(text);
-    const reports = store('reports') || {};
-    reports[mk] = { json: parsed, generatedAt: new Date().toISOString(), audValue: data.combined.audValue };
-    store('reports', reports); // store() → save() → pushToCloud() → sbUpsert()
-    hist[mk] = { audCost: data.combined.audCost, audValue: data.combined.audValue, audPnl: data.combined.audPnl };
+    const reports = store('weeklyReports') || {};
+    reports[wk] = { json: parsed, generatedAt: new Date().toISOString(), audValue: data.combined.audValue };
+    store('weeklyReports', reports); // store() → save() → pushToCloud() → sbUpsert()
+    const mkk = monthKeyNow();
+    hist[mkk] = { audCost: data.combined.audCost, audValue: data.combined.audValue, audPnl: data.combined.audPnl };
     store('portfolioHistory', hist);
-    renderMonthlyReport();
+    renderWeeklyReport();
+    generateMonthlyOverview();   // auto-build/refresh the monthly overview if 5 weeks now exist (deduped)
   } catch (e) {
     if (out) out.innerHTML = `<p style="color:var(--err); font-size:12px;">${escHtml(e.message)}</p>`;
   } finally {
@@ -4734,13 +4754,13 @@ async function generateMonthlyReport() {
   }
 }
 
-function renderMonthlyReport() {
-  const out = document.getElementById('invReportOutput');
+function renderWeeklyReport() {
+  const out = document.getElementById('weeklyReportOutput');
   if (!out) return;
-  const mk = monthKeyNow();
-  const r = (store('reports') || {})[mk];
-  if (!r) { out.innerHTML = '<p style="color:var(--muted); font-size:12px;">No report yet for ' + monthLabel(mk) + '. Click Generate Report.</p>'; return; }
-  // Legacy pre-v2.8 reports were plain text
+  const wk = weekKeyNow();
+  const r = (store('weeklyReports') || {})[wk];
+  if (!r) { out.innerHTML = '<p style="color:var(--muted); font-size:12px;">No weekly report yet for ' + weekLabel(wk) + '. Click Generate Weekly Report.</p>'; return; }
+  // Legacy plain-text reports
   if (!r.json) {
     out.innerHTML = `<div class="ai-card">
       <div style="font-size:11px; color:var(--muted); margin-bottom:8px;">Generated ${new Date(r.generatedAt).toLocaleString()}</div>
@@ -4748,14 +4768,16 @@ function renderMonthlyReport() {
     </div>`;
     return;
   }
-  // S2.8: asset-management-style visual report rendered from saved JSON (no AI call)
+  // asset-management-style visual report rendered from saved JSON (no AI call)
   const j = r.json;
+  const base = (appData.settings && appData.settings.baseCurrency) || 'AUD';
+  const fmtD = v => fmtMoney(toBase(parseFloat(v) || 0, 'AUD'), base);
   const movers = (Array.isArray(j.topMovers) ? j.topMovers : []).slice(0, 6);
   const secHead = t => `<div style="font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--muted);margin-bottom:4px;">${t}</div>`;
   out.innerHTML = `<div class="ai-card" style="padding:0;overflow:hidden;">
     <div style="background:linear-gradient(135deg, var(--n1) 0%, color-mix(in srgb, var(--n1) 75%, #000) 100%); color:#fff; padding:14px 16px;">
-      <div style="font-size:14.5px;font-weight:700;line-height:1.4;">${escHtml(j.headline || 'Monthly Investment Review')}</div>
-      <div style="font-size:10px;opacity:.75;margin-top:4px;">${escHtml(monthLabel(mk))} · Generated ${new Date(r.generatedAt).toLocaleString()}</div>
+      <div style="font-size:14.5px;font-weight:700;line-height:1.4;">${escHtml(j.headline || 'Weekly Investment Review')}</div>
+      <div style="font-size:10px;opacity:.75;margin-top:4px;">${escHtml(weekLabel(wk))} · Generated ${new Date(r.generatedAt).toLocaleString()}</div>
     </div>
     <div style="padding:14px 16px;">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:14px;">
@@ -4763,16 +4785,18 @@ function renderMonthlyReport() {
         <div>${secHead('MACRO CONTEXT')}<div style="font-size:12.5px;line-height:1.55;">${escHtml(j.macroContext || '–')}</div></div>
       </div>
       ${movers.length ? `
-      ${secHead('TOP MOVERS')}
+      ${secHead('TOP MOVERS · by $ impact (materiality)')}
       <div style="height:${Math.max(130, movers.length * 36)}px;margin:4px 0 10px;"><canvas id="reportMoversChart"></canvas></div>
       <div style="overflow-x:auto;margin-bottom:14px;"><table class="inv-tbl">
-        <thead><tr><th style="text-align:left">Ticker</th><th style="text-align:left">Name</th><th>P&amp;L %</th><th style="text-align:left">Note</th></tr></thead>
+        <thead><tr><th style="text-align:left">Ticker</th><th style="text-align:left">Name</th><th>$ Impact</th><th>P&amp;L %</th><th style="text-align:left">Note</th></tr></thead>
         <tbody>${movers.map(m => {
           const p = parseFloat(m.pnlPct) || 0;
+          const d = parseFloat(m.audPnl) || 0;
           return `<tr>
             <td><strong>${escHtml(m.ticker || '')}</strong></td>
             <td style="color:var(--muted);font-size:11px;">${escHtml(m.name || '')}</td>
-            <td style="text-align:right;color:var(--${p >= 0 ? 'ok' : 'err'});font-weight:600;">${p >= 0 ? '+' : ''}${p.toFixed(1)}%</td>
+            <td style="text-align:right;color:var(--${d >= 0 ? 'ok' : 'err'});font-weight:600;">${d >= 0 ? '+' : '−'}${fmtD(Math.abs(d))}</td>
+            <td style="text-align:right;color:var(--${p >= 0 ? 'ok' : 'err'});">${p >= 0 ? '+' : ''}${p.toFixed(1)}%</td>
             <td style="font-size:11px;">${escHtml(m.note || '')}</td>
           </tr>`; }).join('')}</tbody>
       </table></div>` : ''}
@@ -4803,7 +4827,10 @@ function drawReportMoversChart(movers) {
   const c = document.getElementById('reportMoversChart');
   if (!c || !window.Chart) return;
   if (reportMoversChartInst) { reportMoversChartInst.destroy(); reportMoversChartInst = null; }
-  const vals = movers.map(m => parseFloat(m.pnlPct) || 0);
+  const base = (appData.settings && appData.settings.baseCurrency) || 'AUD';
+  // Plot dollar P&L impact (materiality); fall back to % if a legacy report lacks audPnl
+  const hasD = movers.some(m => m.audPnl != null);
+  const vals = movers.map(m => hasD ? +toBase(parseFloat(m.audPnl) || 0, 'AUD').toFixed(0) : (parseFloat(m.pnlPct) || 0));
   reportMoversChartInst = new Chart(c, {
     type: 'bar',
     data: {
@@ -4812,10 +4839,103 @@ function drawReportMoversChart(movers) {
     },
     options: {
       indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => (ctx.parsed.x >= 0 ? '+' : '') + ctx.parsed.x.toFixed(1) + '%' } } },
-      scales: { x: { ticks: { callback: v => v + '%' }, grid: { color: 'rgba(128,128,128,0.15)' } }, y: { grid: { display: false } } }
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => hasD ? ((ctx.parsed.x >= 0 ? '+' : '') + fmtMoney(ctx.parsed.x, base)) : ((ctx.parsed.x >= 0 ? '+' : '') + ctx.parsed.x.toFixed(1) + '%') } } },
+      scales: { x: { grid: { color: 'rgba(128,128,128,0.15)' } }, y: { grid: { display: false } } }
     }
   });
+}
+
+// ─── Monthly Overview: auto-synthesise the 5 latest weekly reports + fresh live data ──
+let monthlyOverviewBusy = false;
+async function generateMonthlyOverview(force) {
+  const out = document.getElementById('monthlyReportOutput');
+  const wkAll = store('weeklyReports') || {};
+  const keys = Object.keys(wkAll).sort().reverse();
+  if (keys.length < 5) {
+    if (out) out.innerHTML = '<p style="color:var(--muted); font-size:12px;">🔒 Monthly overview unlocks once 5 weekly reports exist — you have ' + keys.length + '. Generate weekly reports to build it up.</p>';
+    return;
+  }
+  const latest5 = keys.slice(0, 5);
+  const sig = latest5.join(',');
+  const mreps = store('monthlyReports') || {};
+  // Safeguard: don't re-run on a set of weeks already covered
+  const already = Object.keys(mreps).some(m => mreps[m] && mreps[m].sig === sig);
+  if (already && !force) { renderMonthlyOverview(); return; }
+  if (monthlyOverviewBusy) return;
+  monthlyOverviewBusy = true;
+  if (out) out.innerHTML = '<p style="color:var(--muted); font-size:12px;">⏳ Synthesising monthly overview from your last 5 weekly reports + fresh live data…</p>';
+  try {
+    try { if (typeof refreshAllPrices === 'function') await refreshAllPrices(); } catch (e) {}
+    try { if (typeof fetchFX === 'function') await fetchFX(); } catch (e) {}
+    const cur = gatherPortfolioData();
+    const base = (appData.settings && appData.settings.baseCurrency) || 'AUD';
+    const idx = (appData.marketSnapshot || {}).indices || {};
+    const macro = ['^AXJO', '^GSPC', '^JKSE'].map(sym => { const i = idx[sym]; return (i && i.level != null) ? { sym, name: i.name, level: i.level, dayChgPct: i.prevClose ? +((i.level - i.prevClose) / i.prevClose * 100).toFixed(2) : null } : null; }).filter(Boolean);
+    const weeklies = latest5.slice().reverse().map(k => ({ week: weekLabel(k), report: wkAll[k].json }));   // oldest → newest
+    const ctx = {
+      baseCurrency: base,
+      liveSnapshot: {
+        netWorthAUD: +xrayNetWorthAUD().toFixed(0),
+        combined: cur.combined,
+        portfolios: Object.keys(cur.portfolios).map(k => ({ name: cur.portfolios[k].name, currency: cur.portfolios[k].currency, audValue: cur.portfolios[k].audValue, pnlPct: cur.portfolios[k].pnlPct })),
+        macro,
+        rates: { AUD_USD: (appData.rates || {}).AUD_USD, AUD_IDR: (appData.rates || {}).AUD_IDR, AUD_SGD: (appData.rates || {}).AUD_SGD }
+      },
+      last5WeeklyReports: weeklies
+    };
+    const prompt = `You are the Chief Investment Officer writing a MONTHLY strategic overview for a private client. Synthesise the last 5 WEEKLY reports (oldest→newest) together with the fresh live snapshot below. Stay higher-level than any single week: the month's arc, recurring themes, what changed across the weeks, drift in concentration/risk, and clear forward direction. Reply with ONE line of minified, strictly valid JSON and NOTHING else — no markdown, no code fences, no line breaks. Schema: { headline, overview, themes:[strings], directions:[strings], riskFlags:[strings], outlook }. overview=3-4 sentences on the month's arc; themes=2-4 recurring threads across the weeks; directions=4 concrete strategic directions for next month; riskFlags=2-3 items; outlook=2 sentences. CRITICAL: never use the " character inside any string value (use a single quote '), and never put a line break inside a value. DATA:\n` + JSON.stringify(ctx);
+    const text = await askChatAI(prompt, { model: 'claude-sonnet-4-6', max_tokens: 1600 });
+    const parsed = xrayParseJSON(text);
+    mreps[monthKeyNow()] = { json: parsed, generatedAt: new Date().toISOString(), sig, weeks: latest5 };
+    store('monthlyReports', mreps);   // store() → save() → pushToCloud() → sbUpsert()
+    renderMonthlyOverview();
+  } catch (e) {
+    if (out) out.innerHTML = `<p style="color:var(--err); font-size:12px;">${escHtml(e.message)}</p>`;
+  } finally {
+    monthlyOverviewBusy = false;
+  }
+}
+
+function renderMonthlyOverview() {
+  const out = document.getElementById('monthlyReportOutput');
+  if (!out) return;
+  const mreps = store('monthlyReports') || {};
+  const keys = Object.keys(mreps).sort().reverse();
+  if (!keys.length) {
+    const n = Object.keys(store('weeklyReports') || {}).length;
+    out.innerHTML = '<p style="color:var(--muted); font-size:12px;">🔒 Auto-generates once 5 weekly reports exist — you have ' + n + '.</p>';
+    return;
+  }
+  const mk = keys[0];
+  const r = mreps[mk]; const j = r.json || {};
+  const secHead = t => `<div style="font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--muted);margin-bottom:4px;">${t}</div>`;
+  const numList = arr => (Array.isArray(arr) ? arr : []).map((x, i) => `<div style="display:flex;gap:9px;font-size:12.5px;line-height:1.5;padding:4px 0;"><strong style="color:var(--gold);min-width:18px;">${i + 1}.</strong><span>${escHtml(String(x))}</span></div>`).join('');
+  out.innerHTML = `<div class="ai-card" style="padding:0;overflow:hidden;">
+    <div style="background:linear-gradient(135deg, var(--gold) 0%, color-mix(in srgb, var(--gold) 65%, #000) 100%); color:#fff; padding:14px 16px;">
+      <div style="font-size:14.5px;font-weight:700;line-height:1.4;">${escHtml(j.headline || 'Monthly Strategic Overview')}</div>
+      <div style="font-size:10px;opacity:.85;margin-top:4px;">${escHtml(monthLabel(mk))} · Generated ${new Date(r.generatedAt).toLocaleString()} · synthesised from ${(r.weeks || []).length} weekly reports</div>
+    </div>
+    <div style="padding:14px 16px;">
+      <div style="font-size:12.5px;line-height:1.6;margin-bottom:14px;">${escHtml(j.overview || '–')}</div>
+      ${(Array.isArray(j.themes) && j.themes.length) ? `${secHead('RECURRING THEMES')}<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">${j.themes.map(t => `<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:11px;background:color-mix(in srgb, var(--gold) 15%, transparent);color:var(--gold);">${escHtml(t)}</span>`).join('')}</div>` : ''}
+      ${(Array.isArray(j.directions) && j.directions.length) ? `${secHead('STRATEGIC DIRECTION')}<div style="margin-bottom:14px;">${numList(j.directions)}</div>` : ''}
+      ${(Array.isArray(j.riskFlags) && j.riskFlags.length) ? `${secHead('RISK FLAGS')}<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">${j.riskFlags.map(f => `<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:11px;background:var(--amber-bg);color:var(--amber);">⚠ ${escHtml(f)}</span>`).join('')}</div>` : ''}
+      ${j.outlook ? `${secHead('OUTLOOK')}<div style="font-size:12.5px;line-height:1.55;">${escHtml(j.outlook)}</div>` : ''}
+      <div class="ai-disclaimer">AI-generated synthesis of your weekly reports, not financial advice.</div>
+    </div>
+  </div>`;
+}
+
+async function refreshReportContext() {
+  const st = document.getElementById('reportCtxStatus');
+  const btn = document.getElementById('refreshCtxBtn');
+  if (btn) btn.disabled = true;
+  if (st) st.textContent = '↻ Refreshing live prices & FX…';
+  try {
+    try { if (typeof fetchFX === 'function') await fetchFX(); } catch (e) {}
+    try { if (typeof refreshAllPrices === 'function') await refreshAllPrices(); } catch (e) {}
+    if (st) st.textContent = 'Context refreshed at ' + new Date().toLocaleTimeString('en-AU');
+  } finally { if (btn) btn.disabled = false; }
 }
 
 async function askStrategy() {
