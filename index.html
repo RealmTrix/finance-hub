@@ -892,7 +892,7 @@ th {
           </div>
         </div>
         <div class="sp-filters">
-          <select id="spFilterCard" onchange="renderSpending()"><option value="">All Accounts</option></select>
+          <select id="spFilterCard" onchange="renderSpending()"><option value="">All Sources</option></select>
           <select id="spFilterCat" onchange="renderSpending()">
             <option value="">All Categories</option>
           </select>
@@ -2795,9 +2795,18 @@ function renderCards() {
     let bal;
     if (c.type === 'Credit') {
       const { start, end } = getStatementPeriod(c);
-      bal = getCardStatementTxns(c, start, end).reduce((s, t) => s + t.amount, 0);
+      const { start: ps, end: pe } = getPrevStatementPeriod(c);
+      const cBal  = getCardStatementTxns(c, start, end).reduce((s,t) => s + t.amount, 0);
+      const cPrev = getCardStatementTxns(c, ps, pe).reduce((s,t) => s + t.amount, 0);
+      const cPaid = (appData.cardPayments||[]).filter(p=>p.cardId===c.id).reduce((s,p)=>s+p.amount,0);
+      const netPrev = Math.max(0, cPrev - cPaid);
+      const excess  = Math.max(0, cPaid - cPrev);
+      bal = netPrev + Math.max(0, cBal - excess);
     } else {
-      bal = c.balance || 0;
+      const linked = (appData.pockets||[]).filter(p => p.parentCardId === c.id);
+      bal = linked.length > 0
+        ? linked.reduce((s,p) => s + (parseFloat(p.amount)||0), 0)
+        : (c.balance || 0);
     }
     const audVal  = toAUD(bal, c.currency);
     const dispV   = toBase(bal, c.currency);
@@ -2924,10 +2933,18 @@ function populateSpendingFilters() {
   const cf = document.getElementById('spFilterCard');
   if (!cf) return;
   const curC = cf.value;
-  cf.innerHTML = '<option value="">All Accounts</option><option value="__cash__">💵 Cash</option>';
-  (appData.cards || []).forEach(c => {
+  cf.innerHTML = '<option value="">All Sources</option><option value="__cash__">💵 Cash</option>';
+  // Pockets
+  (appData.pockets || []).forEach(p => {
     const o = document.createElement('option');
-    o.value = c.id; o.textContent = c.name;
+    o.value = `pocket:${p.id}`; o.textContent = `🪣 ${p.name}`;
+    if (curC === `pocket:${p.id}`) o.selected = true;
+    cf.appendChild(o);
+  });
+  // Credit cards only (debit spending is tracked via pockets)
+  (appData.cards || []).filter(c => c.type === 'Credit').forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id; o.textContent = `💳 ${c.name}`;
     if (String(c.id) === String(curC)) o.selected = true;
     cf.appendChild(o);
   });
@@ -2980,7 +2997,14 @@ function renderSpending() {
   const filterMonth = (document.getElementById('spFilterMonth') || {}).value || '';
 
   let rows = [...appData.spending].sort((a, b) => (b.date || '') < (a.date || '') ? -1 : 1);
-  if (filterCard)  rows = rows.filter(r => String(r.cardId) === String(filterCard));
+  if (filterCard) {
+    if (filterCard.startsWith('pocket:')) {
+      const pid = filterCard.slice(7);
+      rows = rows.filter(r => String(r.pocketId) === pid);
+    } else {
+      rows = rows.filter(r => String(r.cardId) === String(filterCard));
+    }
+  }
   if (filterCat)   rows = rows.filter(r => r.category === filterCat);
   if (filterMonth) rows = rows.filter(r => dateToCycleKey(r.date || '') === filterMonth);
 
@@ -2990,13 +3014,17 @@ function renderSpending() {
     return;
   }
 
-  const cardOptsFull = `<option value="__cash__">💵 Cash</option>` +
-    (appData.cards || []).map(c => `<option value="${c.id}">${escHtml(c.name)}</option>`).join('');
+  // Source dropdown: pockets first, then credit cards only
+  const sourceOptsFull = `<option value="__cash__">💵 Cash</option>` +
+    (appData.pockets || []).map(p => `<option value="pocket:${p.id}">🪣 ${escHtml(p.name)}</option>`).join('') +
+    (appData.cards || []).filter(c => c.type === 'Credit').map(c => `<option value="${c.id}">💳 ${escHtml(c.name)}</option>`).join('');
   const catsNow = getCategories();
 
   const trs = rows.map(r => {
-    const cardSel = (`<option value="">—</option>` + cardOptsFull)
-      .replace(`value="${r.cardId}"`, `value="${r.cardId}" selected`);
+    // Determine current source value: pocket takes precedence
+    const srcVal = r.pocketId ? `pocket:${r.pocketId}` : (r.cardId || '');
+    const srcSel = (`<option value="">—</option>` + sourceOptsFull)
+      .replace(`value="${srcVal}"`, `value="${srcVal}" selected`);
     // Live categories + this row's own (possibly deleted) category so history keeps displaying
     const rowCats = (r.category && !catsNow.includes(r.category)) ? [r.category, ...catsNow] : catsNow;
     const catSel = (`<option value="">—</option>` + rowCats.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join(''))
@@ -3012,7 +3040,7 @@ function renderSpending() {
             onchange="updSpending('${r.id}','amount',+this.value)"></td>
       <td><select onchange="updSpending('${r.id}','currency',this.value)">${curSel}</select></td>
       <td><select onchange="updSpending('${r.id}','category',this.value)">${catSel}</select></td>
-      <td><select onchange="updSpending('${r.id}','cardId',this.value)">${cardSel}</select></td>
+      <td><select onchange="updSpendingSource('${r.id}',this.value)">${srcSel}</select></td>
       <td><button class="btn-del" onclick="deleteSpending('${r.id}')">×</button></td>
     </tr>`;
   }).join('');
@@ -3020,7 +3048,7 @@ function renderSpending() {
   wrap.innerHTML = `<div style="overflow-x:auto;"><table class="sp-tbl">
     <thead><tr>
       <th>Date</th><th>Description</th><th>Amount</th><th>Ccy</th>
-      <th>Category</th><th>Account</th><th></th>
+      <th>Category</th><th>Source</th><th></th>
     </tr></thead>
     <tbody>${trs}</tbody>
   </table></div>`;
@@ -3068,7 +3096,7 @@ function addSpending() {
   if (!appData.spending) appData.spending = [];
   appData.spending.unshift({
     id: spUID(), date: new Date().toISOString().slice(0, 10),
-    description: '', amount: 0, currency: 'AUD', category: 'Other', cardId: ''
+    description: '', amount: 0, currency: 'AUD', category: 'Other', cardId: '', pocketId: ''
   });
   save();
   populateSpendingFilters();
@@ -3084,6 +3112,21 @@ function updSpending(id, field, val) {
     renderSpendingTotals([...appData.spending]);
     if (field === 'date') populateSpendingFilters();
   }
+}
+
+function updSpendingSource(id, val) {
+  const entry = (appData.spending || []).find(s => s.id === id);
+  if (!entry) return;
+  if (val && val.startsWith('pocket:')) {
+    const pid = val.slice(7);
+    const pocket = (appData.pockets || []).find(p => p.id === pid);
+    entry.pocketId = pid;
+    entry.cardId   = pocket ? (pocket.parentCardId || '') : '';
+  } else {
+    entry.pocketId = '';
+    entry.cardId   = val || '';
+  }
+  save(); renderSpending();
 }
 
 function deleteSpending(id) {
@@ -3178,7 +3221,9 @@ function cleanStatementDesc(desc) {
 // pockets / credit-card payments (wealth unchanged); 'credit' = refund or
 // discount (not an expense); 'expense' = a real spend.
 function classifyStatementLine(desc, moneyIn) {
-  if (/\btransfer (to|from)\b|fast transfer|payment received|payment thank\s?you|autopay|direct credit.*payment|bpay payment/i.test(desc)) return 'transfer';
+  if (/\btransfer (to|from)\b|fast transfer|netbank credit|scheduled transfer|payment received|payment thank\s?you|autopay|direct credit.*payment|bpay payment/i.test(desc)) return 'transfer';
+  // CommBank pocket-to-pocket: match desc against any known pocket accountRef
+  if ((appData.pockets||[]).some(p => p.accountRef && new RegExp(p.accountRef,'i').test(desc))) return 'transfer';
   if (moneyIn) return 'credit';
   return 'expense';
 }
@@ -3906,6 +3951,7 @@ function renderWealth() {
 
   const lastNW = appData.nwHistory[lastMk];
   const delta  = lastNW != null ? netWorthAUD - lastNW : null;
+  const earmarkedAUD = (appData.pockets||[]).reduce((s,p) => s + pocketValueAUD(p), 0);
 
   // Net worth summary
   const nwSummary = document.getElementById('nwSummary');
@@ -3926,6 +3972,10 @@ function renderWealth() {
       <div class="nw-item"><div class="nw-label">Net Worth</div>
         <div class="nw-val nw-big ${netWorthAUD >= 0 ? 'ok' : 'bad'}">${fmtMoney(toBase(netWorthAUD, 'AUD'), base)}</div></div>
       ${deltaHtml}
+      ${earmarkedAUD > 0 ? `<div class="nw-item" style="grid-column:1/-1;border-top:1px solid var(--bdr);padding-top:8px;margin-top:4px;">
+        <div class="nw-label">🪣 Earmarked in Pockets <span style="font-size:10px;color:var(--muted);">(sub-allocation of existing liquid cash)</span></div>
+        <div class="nw-val" style="color:var(--gold);">${fmtMoney(toBase(earmarkedAUD,'AUD'),base)}</div>
+      </div>` : ''}
     </div>`;
   }
 
@@ -4224,7 +4274,11 @@ function renderPockets() {
             onchange="updPocket('${p.id}','name',this.value)"></td>
       <td><input type="text" value="${escHtml(p.accountRef||'')}" maxlength="10" placeholder="xx0218" style="width:62px;font-size:11px;" title="Last digits shown on bank transfers (e.g. xx0218) — lets the statement parser identify pocket transfers"
             onchange="updPocket('${p.id}','accountRef',this.value.trim())"></td>
-      <td><select onchange="updPocketSource('${p.id}',this.value)" style="font-size:11px;max-width:160px;">${sourceOpts(p)}</select></td>
+      <td><select onchange="updPocket('${p.id}','parentCardId',this.value)" style="font-size:11px;max-width:130px;">
+        <option value="">— None</option>
+        ${(appData.cards||[]).filter(c=>c.type!=='Credit').map(c=>`<option value="${c.id}" ${p.parentCardId===c.id?'selected':''}>${escHtml(c.name)}</option>`).join('')}
+      </select></td>
+      <td><select onchange="updPocketSource('${p.id}',this.value)" style="font-size:11px;max-width:130px;">${sourceOpts(p)}</select></td>
       <td><input type="number" value="${(p.sourceType&&p.sourceType!=='manual') ? val.toFixed(0) : (p.amount||0)}" style="width:85px;text-align:right;" ${manualDisabled}
             onchange="updPocket('${p.id}','amount',+this.value)"></td>
       <td><select onchange="updPocketLink('${p.id}',this.value)" style="font-size:11px;max-width:170px;">${linkOpts(p)}</select></td>
@@ -4233,13 +4287,13 @@ function renderPockets() {
     </tr>`;
   }).join('');
   wrap.innerHTML = `<div style="overflow-x:auto;"><table class="pl-tbl">
-    <thead><tr><th>Pocket</th><th>Acct Ref</th><th>Source</th><th>Value (A$)</th><th>Linked Goal</th><th>Progress</th><th></th></tr></thead>
+    <thead><tr><th>Pocket</th><th>Acct Ref</th><th>Linked to card</th><th>Source</th><th>Value (A$)</th><th>Linked Goal</th><th>Progress</th><th></th></tr></thead>
     <tbody>${rows}</tbody></table></div>`;
 }
 
 function addPocket() {
   if (!Array.isArray(appData.pockets)) appData.pockets = [];
-  appData.pockets.push({ id: pkUID(), name: 'New Pocket', sourceType: 'manual', sourceId: '', amount: 0, currency: 'AUD', linkType: 'none', linkId: '' });
+  appData.pockets.push({ id: pkUID(), name: 'New Pocket', sourceType: 'manual', sourceId: '', amount: 0, currency: 'AUD', linkType: 'none', linkId: '', parentCardId: '' });
   save(); renderPockets();
 }
 function updPocket(id, field, val) {
