@@ -3520,6 +3520,9 @@ function renderCreditCards() {
     const prevTxns = getCardStatementTxns(card, ps, pe);
     const balance  = txns.reduce((s, t) => s + t.amount, 0);
     const prevBal  = prevTxns.reduce((s, t) => s + t.amount, 0);
+    const payments = (appData.cardPayments || []).filter(p => p.cardId === card.id).sort((a,b) => b.date.localeCompare(a.date));
+    const totalPaid = payments.reduce((s,p) => s + p.amount, 0);
+    const netPrevBal = Math.max(0, prevBal - totalPaid);
     const cur      = card.currency || 'AUD';
     const daysLeft = Math.max(0, Math.round((dueDate - new Date()) / 86400000));
     const overdue  = dueDate < new Date() && prevBal > 0;
@@ -3561,7 +3564,8 @@ function renderCreditCards() {
         </div>
         <div style="background:var(--bg);border-radius:8px;padding:10px 14px;">
           <div style="font-size:10px;color:var(--muted);margin-bottom:3px;">PREVIOUS BILL</div>
-          <div style="font-size:18px;font-weight:700;color:${prevBal > 0 ? 'var(--danger)' : 'var(--ok)'};">${fmtMoney(prevBal, cur)}</div>
+          <div style="font-size:18px;font-weight:700;color:${netPrevBal > 0 ? 'var(--danger)' : 'var(--ok)'};">${fmtMoney(netPrevBal, cur)}</div>
+          ${totalPaid > 0 ? `<div style="font-size:10px;color:var(--ok);">−${fmtMoney(totalPaid, cur)} paid</div>` : ''}
           <div style="font-size:10px;color:var(--muted);">${fmtD(ps)} – ${fmtD(pe)}</div>
         </div>
         <div style="background:var(--bg);border-radius:8px;padding:10px 14px;">
@@ -3612,8 +3616,41 @@ function renderCreditCards() {
           </tfoot>` : ''}
         </table>
       </div>
+
+      <!-- Bill Payments section -->
+      <div style="margin-top:16px;border-top:1px solid var(--bdr);padding-top:14px;">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Bill Payments (${payments.length})</div>
+        ${payments.length ? `
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="border-bottom:1px solid var(--bdr);">
+            <th style="text-align:left;padding:4px 8px 6px;font-size:10px;color:var(--muted);font-weight:600;">DATE</th>
+            <th style="text-align:left;padding:4px 8px 6px;font-size:10px;color:var(--muted);font-weight:600;">NOTE</th>
+            <th style="text-align:right;padding:4px 8px 6px;font-size:10px;color:var(--muted);font-weight:600;">AMOUNT</th>
+            <th style="padding:4px 4px 6px;"></th>
+          </tr></thead>
+          <tbody>${payments.map(p => `
+            <tr style="border-bottom:1px solid var(--bdr);">
+              <td style="color:var(--muted);font-size:11px;padding:5px 8px;">${p.date}</td>
+              <td style="padding:5px 8px;">${escHtml(p.note||'Payment')}</td>
+              <td style="text-align:right;font-weight:600;padding:5px 8px;color:var(--ok);">${fmtMoney(p.amount, p.currency||cur)}</td>
+              <td style="padding:5px 4px;text-align:right;"><button class="btn" style="font-size:10px;padding:2px 7px;color:var(--danger);border-color:var(--danger);" onclick="deleteCardPayment('${p.id}')">✕</button></td>
+            </tr>`).join('')}
+          </tbody>
+          <tfoot><tr style="border-top:2px solid var(--bdr);">
+            <td colspan="2" style="padding:6px 8px;font-weight:700;">Total Paid</td>
+            <td style="text-align:right;padding:6px 8px;font-weight:700;color:var(--ok);">${fmtMoney(totalPaid, cur)}</td>
+            <td></td>
+          </tr></tfoot>
+        </table>` : '<div style="font-size:12px;color:var(--muted);padding:8px 0;">No payments recorded yet — use 💳 Pay Bill to log a payment.</div>'}
+      </div>
     </div>`;
   }).join('');
+}
+
+function deleteCardPayment(id) {
+  appData.cardPayments = (appData.cardPayments || []).filter(p => p.id !== id);
+  save();
+  renderCreditCards();
 }
 
 // ─── Balance auto-update on statement import ───────────────────────────────
@@ -3731,17 +3768,16 @@ function confirmPayCredit() {
   const card    = cards[_payCreditIdx];
   if (!card) return;
 
-  // 1. Reduce credit card balance (owed) — add a negative spending entry so the computed balance drops
+  // 1. Reduce stored balance; log payment in cardPayments (not spending)
   card.balance = Math.max(0, (card.balance || 0) - amt);
-  if (!appData.spending) appData.spending = [];
-  appData.spending.push({
-    id: spUID(),
-    date: new Date().toISOString().slice(0,10),
-    description: 'Bill Payment — ' + (card.name || 'Credit Card'),
-    amount: -amt,
+  if (!appData.cardPayments) appData.cardPayments = [];
+  appData.cardPayments.push({
+    id: 'cp' + Date.now() + Math.random().toString(36).slice(2,5),
+    cardId: card.id,
+    amount: amt,
     currency: card.currency || 'AUD',
-    category: 'Other',
-    cardId: card.id
+    date: new Date().toISOString().slice(0,10),
+    note: 'Bill payment'
   });
 
   // 2. Debit the source account
@@ -3762,7 +3798,6 @@ function confirmPayCredit() {
   save();
   renderCards();
   if (typeof renderCreditCards === 'function') renderCreditCards();
-  if (typeof renderSpending === 'function' && document.getElementById('spBody')) renderSpending();
   if (typeof renderPockets === 'function' && document.getElementById('pocketsTable')) renderPockets();
   closePayCreditDlg();
 }
