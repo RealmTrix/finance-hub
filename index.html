@@ -3300,7 +3300,7 @@ function parseAmexStatement(text) {
   // 'transfer' (wealth unchanged — excluded by default); credits/refunds as
   // 'credit' (not an expense — excluded by default). Both can be re-ticked.
   const pipeLines = lines.filter(l => l.startsWith('|') && l.split('|').length >= 4);
-  if (pipeLines.length >= 2) {
+  if (pipeLines.length >= 1) {
     const amtRe2 = /^[+\-]?\$?[\d,]+\.\d{2}(\s*CR)?$/i;
     // Signed statement (CommBank) = at least one amount carries a +/− sign or CR. In that case
     // debits always show "−", so any non-negative amount is money IN (resilient to a lost "+").
@@ -4437,9 +4437,28 @@ function renderPockets() {
       <td><button class="btn-del" onclick="deletePocket('${p.id}')">×</button></td>
     </tr>`;
   }).join('');
-  wrap.innerHTML = `<div style="overflow-x:auto;"><table class="pl-tbl">
+  // Per-debit-card transaction-pocket picker — the pocket statement transfers move in/out of
+  const debitCards = (appData.cards || []).filter(c => c.type !== 'Credit');
+  const pickerRows = debitCards.map(c => {
+    const linked = (appData.pockets || []).filter(p => p.parentCardId === c.id);
+    const opts = '<option value="">— none —</option>' + linked.map(p => `<option value="${p.id}" ${p.isPrimary ? 'selected' : ''}>${escHtml(p.name || '')}</option>`).join('');
+    return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:5px;flex-wrap:wrap;">
+      <span style="min-width:130px;">💳 ${escHtml(c.name)}</span>
+      <select onchange="updTxnPocket('${c.id}', this.value)" style="font-size:11px;">${opts}</select>
+      ${linked.length ? '' : '<span style="font-size:10px;color:var(--muted);">↓ link a pocket to this card below first</span>'}
+    </div>`;
+  }).join('');
+  const pickerHtml = debitCards.length ? `<div style="border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--muted);margin-bottom:8px;">🔁 TRANSACTION POCKET PER DEBIT CARD <span style="font-weight:400;text-transform:none;">— statement transfers move money in/out of this pocket</span></div>
+    ${pickerRows}</div>` : '';
+  wrap.innerHTML = pickerHtml + `<div style="overflow-x:auto;"><table class="pl-tbl">
     <thead><tr><th>Pocket</th><th>Acct Ref</th><th>Linked to card</th><th>Value (A$)</th><th>Linked Goal</th><th title="Main transaction pocket for the card — the source/destination of statement transfers">Primary</th><th>Progress</th><th></th></tr></thead>
     <tbody>${rows}</tbody></table></div>`;
+}
+// Pick the transaction (primary) pocket for a debit card — clears the flag on its other pockets
+function updTxnPocket(cardId, pocketId) {
+  (appData.pockets || []).forEach(p => { if (p.parentCardId === cardId) p.isPrimary = (p.id === pocketId); });
+  save(); renderPockets();
 }
 
 // One primary (transaction) pocket per linked card — used as the source/destination for statement transfers
