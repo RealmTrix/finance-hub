@@ -3302,6 +3302,11 @@ function parseAmexStatement(text) {
   const pipeLines = lines.filter(l => l.startsWith('|') && l.split('|').length >= 4);
   if (pipeLines.length >= 2) {
     const amtRe2 = /^[+\-]?\$?[\d,]+\.\d{2}(\s*CR)?$/i;
+    // Signed statement (CommBank) = at least one amount carries a +/− sign or CR. In that case
+    // debits always show "−", so any non-negative amount is money IN (resilient to a lost "+").
+    // Unsigned statement (AmEx) = every amount is a bare expense → only an explicit "+" is money in.
+    const signedStmt = pipeLines.some(l => l.split('|').map(c => c.replace(/\*/g, '').trim())
+      .some(c => /^[+\-]\$?[\d,]+\.\d{2}/.test(c) || /\d\s*CR$/i.test(c)));
     for (const line of pipeLines) {
       const cells = line.split('|').map(c => c.replace(/\*/g, '').trim()).filter(c => c !== '');
       if (cells.length < 3) continue;                                   // separator / empty rows
@@ -3314,7 +3319,7 @@ function parseAmexStatement(text) {
       const rawAmt = cells[amtIdx];
       const amount = Math.abs(parseFloat(rawAmt.replace(/[^0-9.\-]/g, '')));
       if (!isFinite(amount) || amount <= 0) continue;
-      const moneyIn = /^\+/.test(rawAmt) || /CR\s*$/i.test(rawAmt);
+      const moneyIn = signedStmt ? (/CR\s*$/i.test(rawAmt) || !/^\s*-/.test(rawAmt)) : (/^\s*\+/.test(rawAmt) || /CR\s*$/i.test(rawAmt));
       // Description = remaining cells that aren't dates or amounts
       const description = cleanStatementDesc(
         cells.filter((c, i) => i !== amtIdx && !normaliseDate(c)).join(' '));
@@ -3495,6 +3500,7 @@ function applyStatementAccount(cardId) {
 
 function renderParsedPreview(rows) {
   const cats = getCategories();
+  const incCats = getIncomeCategories();
   const cards = (appData.cards || []);
   const tbody = document.getElementById('stmtPreviewBody');
   document.getElementById('stmtPreviewTitle').textContent = `${rows.length} transaction${rows.length !== 1 ? 's' : ''} found`;
@@ -3515,7 +3521,8 @@ function renderParsedPreview(rows) {
       <td style="text-align:right; white-space:nowrap; color:var(--${r.moneyIn ? 'ok' : 'txt'});">${r.moneyIn ? '+' : '−'}$${r.amount.toFixed(2)}</td>
       <td>
         <select onchange="parsedStatementRows[${i}].category=this.value" style="font-size:11px; background:var(--bg); color:var(--txt); border:1px solid var(--bdr); border-radius:4px; padding:2px 4px;">
-          ${cats.map(c => `<option value="${c}" ${c===r.category?'selected':''}>${c}</option>`).join('')}
+          <optgroup label="Expense">${cats.map(c => `<option value="${c}" ${c===r.category?'selected':''}>${c}</option>`).join('')}</optgroup>
+          <optgroup label="Income / Credit">${incCats.map(c => `<option value="inc:${c}" ${('inc:'+c)===r.category?'selected':''}>${escHtml(c)}</option>`).join('')}</optgroup>
         </select>
       </td>
       <td>
@@ -3797,6 +3804,20 @@ function deleteCardPayment(id) {
 // Processes ALL rows (not just included/expense ones) so that pocket transfers
 // and credit-card payments correctly update balances even though they don't
 // appear in the spending log. Safe to call before save().
+// Identify a credit card being paid off by a statement line (xx-ref, name word, or AMEX↔American Express alias)
+function matchCreditCardForPayment(desc) {
+  const cards = (appData.cards || []).filter(c => c.type === 'Credit');
+  const d = (desc || '').toLowerCase();
+  const refM = d.match(/\bxx(\d{2,6})\b/);
+  if (refM) { const c = cards.find(c => (c.accountRef || '').toLowerCase() === refM[0]); if (c) return c; }
+  return cards.find(c => {
+    const name = (c.name || '').toLowerCase();
+    if ((c.name || '').split(/\s+/).some(w => w.replace(/[^a-z0-9]/gi, '').length > 3 && d.includes(w.replace(/[^a-z0-9]/gi, '').toLowerCase()))) return true;
+    if ((name.includes('amex') || name.includes('american express')) && (d.includes('amex') || d.includes('american express'))) return true;
+    return false;
+  }) || null;
+}
+
 function applyStatementBalanceUpdates(rows, stmtCardId) {
   if (!stmtCardId) return;
   const cards   = appData.cards   || [];
@@ -3840,12 +3861,10 @@ function applyStatementBalanceUpdates(rows, stmtCardId) {
       const otherDelta = inn ? -row.amount : row.amount; // mirror of the account side
       other.amount = Math.max(0, (parseFloat(other.amount) || 0) + otherDelta);
       logMove(other.name || ('Pocket ' + (other.accountRef || '')), otherDelta, row);
-    } else if (!other && !inn && row.kind === 'transfer') {
-      // Outbound transfer with no matching pocket → likely a credit-card payment (e.g. AMEX)
-      const refM = (row.description || '').match(/\bxx(\d{2,6})\b/i);
-      let cc = refM ? cards.find(c => c.id !== stmtCard.id && (c.accountRef || '').toLowerCase() === refM[0].toLowerCase()) : null;
-      if (!cc) cc = cards.find(c => c.id !== stmtCard.id && c.type === 'Credit' && (c.name || '').split(/\s+/).some(w => w.length > 3 && row.description.toLowerCase().includes(w.toLowerCase())));
-      if (cc && cc.type === 'Credit') {
+    } else if (!other && !inn) {
+      // Outbound transfer with no matching pocket → likely a credit-card payment (e.g. AMEX): reduce owed
+      const cc = matchCreditCardForPayment(row.description);
+      if (cc && cc.id !== stmtCard.id) {
         cc.balance = Math.max(0, (cc.balance || 0) - row.amount);
         logMove(cc.name + ' (owed)', -row.amount, row);
       }
@@ -3943,21 +3962,30 @@ function commitParsedTransactions() {
   const learnMap = getCategoryMap();
   const stmtCardId = (parsedStatementRows[0] || {}).cardId || '';
   const primary = primaryPocketForCard(stmtCardId);   // source pocket for this account
+  // 1) Income: salary or money-in tagged to an income category → Income log (received) + auto-post to budget. Idempotent, applies regardless of Include.
+  (parsedStatementRows || []).forEach(r => {
+    if (!r.moneyIn || r.dup) return;
+    const type = /salary/i.test(r.description) ? 'Salary'
+               : (typeof r.category === 'string' && r.category.startsWith('inc:')) ? r.category.slice(4)
+               : null;
+    if (type) postIncomeFromStatement(r, type);
+  });
+  // 2) Spending: included rows only, excluding income lines and credit-card payoffs (those aren't spending)
   toAdd.forEach(r => {
-    // Money-out = positive spend; money-in tagged to a budget category = counter-spend (negative → reduces that category's actual)
-    const amt = (r.moneyIn ? -1 : 1) * r.amount;
+    const isIncome = r.moneyIn && ((typeof r.category === 'string' && r.category.startsWith('inc:')) || /salary/i.test(r.description));
+    if (isIncome) return;
+    if (!r.moneyIn && matchCreditCardForPayment(r.description)) return;   // e.g. paying off AMEX — balance handled, not a spend
+    const amt = (r.moneyIn ? -1 : 1) * r.amount;                          // money-in to a budget category = counter-spend (negative)
+    const cat = (typeof r.category === 'string' && r.category.startsWith('inc:')) ? 'Other' : r.category;
     appData.spending.push({
       id: spUID(), date: r.date, description: r.description,
-      amount: +amt.toFixed(2), currency: 'AUD', category: r.category,
+      amount: +amt.toFixed(2), currency: 'AUD', category: cat,
       cardId: r.cardId || '',
       pocketId: (primary && primary.parentCardId === r.cardId) ? primary.id : ''   // tag Source so debit imports register the account
     });
-    // Learn merchant→category only from real spends (not money-in lines)
     const k = normDesc(r.description);
-    if (k && r.category && !r.moneyIn) learnMap[k] = r.category;
+    if (k && cat && !r.moneyIn) learnMap[k] = cat;   // learn merchant→category only from real spends
   });
-  // Salary credits → Income log (received) + auto-post to budget income, once
-  (parsedStatementRows || []).forEach(r => { if (r.moneyIn && !r.dup && /salary/i.test(r.description)) postSalaryFromStatement(r); });
   // Pocket/card balance movements from ALL rows (incl. unticked transfers) + movements ledger
   applyStatementBalanceUpdates(parsedStatementRows, stmtCardId);
   save();
@@ -3971,20 +3999,21 @@ function commitParsedTransactions() {
   setTimeout(() => closeStatementModal(), 1400);
 }
 
-// Salary detected in a statement: add/flag an Income-log entry as received and auto-post it to the budget once
-function postSalaryFromStatement(r) {
+// Income detected in a statement (salary or income-category credit): add/flag an Income-log entry as received and auto-post to budget once
+function postIncomeFromStatement(r, type) {
   const list = store('income') || [];
-  const match = e => e.type === 'Salary' && e.date === r.date && Math.abs((parseFloat(e.amount) || 0) - r.amount) < 0.005;
+  const t = (typeof INCOME_TYPE_BUDGET_MAP !== 'undefined' && INCOME_TYPE_BUDGET_MAP[type]) ? type : 'Other';
+  const match = e => e.type === t && e.date === r.date && Math.abs((parseFloat(e.amount) || 0) - r.amount) < 0.005;
   let entry = list.find(match);
   if (!entry) {
-    entry = { id: 'inc_' + Date.now() + Math.random().toString(36).slice(2, 5), date: r.date, source: r.description.replace(/\s+/g, ' ').slice(0, 40), amount: +r.amount.toFixed(2), currency: 'AUD', type: 'Salary', received: true, posted: false };
+    entry = { id: 'inc_' + Date.now() + Math.random().toString(36).slice(2, 5), date: r.date, source: r.description.replace(/\s+/g, ' ').slice(0, 40), amount: +r.amount.toFixed(2), currency: 'AUD', type: t, received: true, posted: false };
     list.unshift(entry);
   } else { entry.received = true; }
   if (!entry.posted) {
     const mk = (entry.date || '').slice(0, 7);
     const budget = store('budget') || {};
     if (!budget[mk]) budget[mk] = { income: {}, expenses: {} };
-    const rowKey = (typeof INCOME_TYPE_BUDGET_MAP !== 'undefined' && INCOME_TYPE_BUDGET_MAP[entry.type]) || 'salary';
+    const rowKey = (typeof INCOME_TYPE_BUDGET_MAP !== 'undefined' && INCOME_TYPE_BUDGET_MAP[t]) || 'otherIncome';
     budget[mk].income[rowKey] = (parseFloat(budget[mk].income[rowKey]) || 0) + toAUD(parseFloat(entry.amount) || 0, entry.currency || 'AUD');
     store('budget', budget);
     entry.posted = true;
