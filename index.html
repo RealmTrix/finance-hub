@@ -6012,7 +6012,9 @@ function renderStressScore() {
 
   const today = new Date(); today.setHours(0,0,0,0);
   const nextPay = new Date(nextPayStr); nextPay.setHours(0,0,0,0);
-  const daysUntilPay = Math.max(0, Math.round((nextPay - today) / 86400000));
+  // Auto-advance to next month's pay if today is on or past the stored pay date
+  if (today >= nextPay) { nextPay.setMonth(nextPay.getMonth() + 1); }
+  const daysUntilPay = Math.round((nextPay - today) / 86400000);
 
   // Daily burn = average daily spending over last 30 days
   const spending = store('spending') || [];
@@ -6036,7 +6038,7 @@ function renderStressScore() {
   }
   score = daysUntilPay / (dailyBurn > 0 ? 1 : 1); // ratio of days until pay vs daily burn as AUD
   // Score = days of runway = days until pay / (daily burn / daily accrual)
-  score = daysUntilPay > 0 ? (dailySalaryAccrual / dailyBurn) : 0;
+  score = dailySalaryAccrual / dailyBurn;
 
   if (score >= 1.5)      { color = 'var(--ok)';    label = "You're comfortable"; }
   else if (score >= 0.8) { color = 'var(--amber)';  label = 'Keep an eye on spending'; }
