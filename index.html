@@ -1,4 +1,4 @@
-<!-- Finance Hub v2.11 — Weekly + Monthly Reports (materiality movers, auto monthly overview) -->
+<!-- Finance Hub v2.12 — CommBank bucket movements (pocket transfers, salary auto-post, counter-spend, movements ledger) -->
 <!-- Project Kangaroo | michael-finance-hub -->
 <!-- Built: May 2026 | Sessions: 9 planned -->
 <!DOCTYPE html>
@@ -845,6 +845,7 @@ th {
       <button class="pf-subtab" onclick="showPFTab('pf-spending',this)">Spending</button>
       <button class="pf-subtab" onclick="showPFTab('pf-wealth',this)">Wealth</button>
       <button class="pf-subtab" onclick="showPFTab('pf-plans',this)">Plans</button>
+      <button class="pf-subtab" onclick="showPFTab('pf-movements',this)">Movements</button>
     </nav>
 
     <!-- Budget sub-tab (Session 2 — unchanged) -->
@@ -954,6 +955,17 @@ th {
         <div id="plansWrap"></div>
       </div>
     </div><!-- /pf-plans -->
+
+    <div id="pf-movements" class="pf-panel" style="display:none">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+          <div class="card-title" style="margin-bottom:0">🔁 All Balance Movements</div>
+          <button class="btn" style="font-size:11px;padding:5px 12px;" onclick="clearMovements()">Clear log</button>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Combined statement of every money movement across your cards &amp; pockets (from statement imports). Money in is green (+), money out is red (−).</p>
+        <div id="movementsWrap"></div>
+      </div>
+    </div><!-- /pf-movements -->
 
   </div><!-- /tab-personal-finance -->
 
@@ -1524,7 +1536,7 @@ th {
     </div>
 
     <div class="ver-footer">
-      <span id="versionDisplay">Finance Hub v2.11 — Weekly + Monthly Reports</span>
+      <span id="versionDisplay">Finance Hub v2.12 — Bucket Movements + Ledger</span>
       <span id="lastSavedDisplay" style="color:var(--muted)">–</span>
     </div>
   </div>
@@ -1896,7 +1908,7 @@ Date,Description,Amount
     </div>
 
     <div class="ver-footer">
-      <span>Finance Hub v2.11</span>
+      <span>Finance Hub v2.12</span>
       <span>v2.1 roadmap complete — Multi-Profile + Pockets + News + Modern UI</span>
     </div>
   </div>
@@ -2933,6 +2945,33 @@ function showPFTab(id, el) {
   if (id === 'pf-spending') { populateSpendingFilters(); renderSpending(); }
   if (id === 'pf-wealth')   { renderWealth(); renderPockets(); }
   if (id === 'pf-plans')    renderPlans();
+  if (id === 'pf-movements') renderMovements();
+}
+
+// ─── All Balance Movements — combined ledger of card/pocket money movements ──
+function renderMovements() {
+  const wrap = document.getElementById('movementsWrap');
+  if (!wrap) return;
+  const base = (appData.settings && appData.settings.baseCurrency) || 'AUD';
+  const moves = (appData.movements || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.id || '').localeCompare(a.id || ''));
+  if (!moves.length) { wrap.innerHTML = '<p style="text-align:center;color:var(--muted);padding:16px 0;font-size:12px;">No movements yet. Import a CommBank statement to populate this ledger.</p>'; return; }
+  const rows = moves.map(m => {
+    const up = (m.delta || 0) >= 0;
+    return `<tr>
+      <td style="white-space:nowrap;">${escHtml(m.date || '')}</td>
+      <td>${escHtml(m.account || '')}</td>
+      <td style="max-width:240px;word-break:break-word;font-size:11px;color:var(--muted);">${escHtml(m.note || '')}</td>
+      <td style="text-align:right;white-space:nowrap;color:var(--${up ? 'ok' : 'err'});font-weight:600;">${up ? '+' : '−'}${fmtMoney(toBase(Math.abs(m.delta || 0), 'AUD'), base)}</td>
+    </tr>`;
+  }).join('');
+  wrap.innerHTML = `<div style="overflow-x:auto;"><table class="pl-tbl">
+    <thead><tr><th>Date</th><th>Account / Pocket</th><th>Description</th><th style="text-align:right;">Amount (${base})</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+function clearMovements() {
+  if (!confirm('Clear the entire balance-movements log? This does not change any balances.')) return;
+  appData.movements = [];
+  save(); renderMovements();
 }
 
 // ─── S3: spending ─────────────────────────────────────────────────────────
@@ -3283,6 +3322,7 @@ function parseAmexStatement(text) {
       const kind = classifyStatementLine(description, moneyIn);
       rows.push({
         date, description, amount: +amount.toFixed(2),
+        moneyIn,                                   // true = + (money in), false = − (money out)
         category: kind === 'expense' ? guessCategory(description) : 'Other',
         include: kind === 'expense',
         kind,
@@ -3461,8 +3501,8 @@ function renderParsedPreview(rows) {
   tbody.innerHTML = rows.map((r, i) => `
     <tr>
       <td style="white-space:nowrap;">${r.date}</td>
-      <td style="max-width:200px; word-break:break-word;">${r.description}${r.dup ? ' <span style="font-size:9px;font-weight:700;color:var(--amber);background:var(--amber-bg);padding:1px 5px;border-radius:6px;white-space:nowrap;">ALREADY IMPORTED</span>' : ''}${r.kind === 'transfer' ? ` <span style="font-size:9px;font-weight:700;color:var(--n1);background:var(--bg);border:1px solid var(--bdr);padding:1px 5px;border-radius:6px;white-space:nowrap;" title="Movement between your own accounts — wealth unchanged, not an expense">⇄ TRANSFER${r.pocketName ? ' · ' + escHtml(r.pocketName) : ''}</span>` : ''}${r.kind === 'credit' ? ' <span style="font-size:9px;font-weight:700;color:var(--ok);background:var(--ok-bg);padding:1px 5px;border-radius:6px;white-space:nowrap;" title="Refund/credit — not an expense">CREDIT</span>' : ''}</td>
-      <td style="text-align:right; white-space:nowrap;">$${r.amount.toFixed(2)}</td>
+      <td style="max-width:200px; word-break:break-word;">${r.description}${r.dup ? ' <span style="font-size:9px;font-weight:700;color:var(--amber);background:var(--amber-bg);padding:1px 5px;border-radius:6px;white-space:nowrap;">ALREADY IMPORTED</span>' : ''}${r.kind === 'transfer' ? ` <span style="font-size:9px;font-weight:700;color:#7aa2ff;background:rgba(122,162,255,.18);border:1px solid rgba(122,162,255,.55);padding:1px 5px;border-radius:6px;white-space:nowrap;" title="Movement between your own accounts — wealth unchanged, not an expense">⇄ TRANSFER${r.pocketName ? ' · ' + escHtml(r.pocketName) : ''}</span>` : ''}${r.kind === 'credit' ? ' <span style="font-size:9px;font-weight:700;color:var(--ok);background:var(--ok-bg);padding:1px 5px;border-radius:6px;white-space:nowrap;" title="Refund/credit — not an expense">CREDIT</span>' : ''}</td>
+      <td style="text-align:right; white-space:nowrap; color:var(--${r.moneyIn ? 'ok' : 'txt'});">${r.moneyIn ? '+' : '−'}$${r.amount.toFixed(2)}</td>
       <td>
         <select onchange="parsedStatementRows[${i}].category=this.value" style="font-size:11px; background:var(--bg); color:var(--txt); border:1px solid var(--bdr); border-radius:4px; padding:2px 4px;">
           ${cats.map(c => `<option value="${c}" ${c===r.category?'selected':''}>${c}</option>`).join('')}
@@ -3480,9 +3520,11 @@ function renderParsedPreview(rows) {
 }
 
 function updateConfirmBtn() {
-  const n = (parsedStatementRows || []).filter(r => r.include).length;
+  const rows = parsedStatementRows || [];
+  const n = rows.filter(r => r.include).length;
+  const moves = rows.filter(r => !r.include && (r.kind === 'transfer' || r.kind === 'credit')).length;
   const btn = document.getElementById('stmtConfirmBtn');
-  if (btn) btn.textContent = `✓ Confirm ${n} transaction${n !== 1 ? 's' : ''}`;
+  if (btn) btn.textContent = `✓ Confirm ${n} transaction${n !== 1 ? 's' : ''}` + (moves ? ` + ${moves} movement${moves !== 1 ? 's' : ''}` : '');
 }
 
 // ─── Credit Cards tab ─────────────────────────────────────────────────────
@@ -3751,57 +3793,50 @@ function applyStatementBalanceUpdates(rows, stmtCardId) {
   const pockets = appData.pockets || [];
   const stmtCard = cards.find(c => c.id === stmtCardId);
   if (!stmtCard) return;
+  const primary = primaryPocketForCard(stmtCardId);   // main transaction pocket of this account
+  appData.movements = appData.movements || [];
+  const logMove = (account, delta, row) => appData.movements.push({
+    id: 'mv' + Date.now() + Math.random().toString(36).slice(2, 6),
+    date: row.date, account, delta: +(+delta).toFixed(2), currency: 'AUD',
+    kind: row.kind, note: row.description, src: 'statement'
+  });
+  const pocketByRef = (desc) => {
+    const m = (desc || '').match(/\bxx(\d{2,6})\b/i);
+    if (!m) return null;
+    const ref = m[0].toLowerCase();
+    return pockets.find(p => (p.accountRef || '').toLowerCase() === ref) || null;
+  };
 
   for (const row of rows) {
-    const isOut = /\btransfer to\b/i.test(row.description); // outbound from statement card
+    const inn = !!row.moneyIn;                          // money in (+) vs out (−)
+    const signed = inn ? row.amount : -row.amount;      // from the statement account's perspective
 
-    if (row.kind === 'expense') {
-      // Debit: spend = balance down. Credit: balance owed goes up.
-      if (stmtCard.type === 'Debit')  stmtCard.balance = (stmtCard.balance || 0) - row.amount;
-      if (stmtCard.type === 'Credit') stmtCard.balance = (stmtCard.balance || 0) + row.amount;
+    // 1) Statement account side → its primary (transaction) pocket, else the card balance
+    if (primary) {
+      primary.amount = Math.max(0, (parseFloat(primary.amount) || 0) + signed);
+      logMove(primary.name || 'Transaction pocket', signed, row);
+    } else if (stmtCard.type === 'Credit') {
+      stmtCard.balance = Math.max(0, (stmtCard.balance || 0) + (inn ? -row.amount : row.amount));
+      logMove(stmtCard.name + ' (owed)', inn ? -row.amount : row.amount, row);
+    } else {
+      stmtCard.balance = (stmtCard.balance || 0) + signed;
+      logMove(stmtCard.name, signed, row);
+    }
 
-    } else if (row.kind === 'credit') {
-      // Refund: debit goes up, credit owed goes down (floor at 0).
-      if (stmtCard.type === 'Debit')  stmtCard.balance = (stmtCard.balance || 0) + row.amount;
-      if (stmtCard.type === 'Credit') stmtCard.balance = Math.max(0, (stmtCard.balance || 0) - row.amount);
-
-    } else if (row.kind === 'transfer') {
-      // Update statement card balance by direction
-      const delta = isOut ? -row.amount : row.amount;
-      stmtCard.balance = (stmtCard.balance || 0) + delta;
-
-      // Identify the other side by xx-ref in description
-      const refMatch = row.description.match(/\bxx(\d{2,6})\b/i);
-      if (refMatch) {
-        const ref = refMatch[0].toLowerCase();
-        // Check pockets first (manual pockets only — asset/card pockets derive their value)
-        const pocket = pockets.find(p =>
-          p.sourceType === 'manual' && (p.accountRef || '').toLowerCase() === ref);
-        if (pocket) {
-          pocket.amount = Math.max(0, (pocket.amount || 0) - delta); // opposite to card
-        } else {
-          // Check other cards (e.g. AMEX card with accountRef set)
-          const otherCard = cards.find(c =>
-            c.id !== stmtCard.id && (c.accountRef || '').toLowerCase() === ref);
-          if (otherCard && isOut && otherCard.type === 'Credit') {
-            // Payment to credit card: reduces the amount owed
-            otherCard.balance = Math.max(0, (otherCard.balance || 0) - row.amount);
-          }
-        }
-      } else if (isOut) {
-        // No xx-ref — try matching credit card by name keyword in description
-        const creditCard = cards.find(c =>
-          c.id !== stmtCard.id && c.type === 'Credit' &&
-          (c.name || '').split(/\s+/).some(word =>
-            word.length > 3 && row.description.toLowerCase().includes(word.toLowerCase())));
-        if (creditCard) {
-          creditCard.balance = Math.max(0, (creditCard.balance || 0) - row.amount);
-          // Also drain any pocket named after this card (e.g. "AMEX" pocket when paying AMEX)
-          const keyword = (creditCard.name || '').split(/\s+/)[0].toLowerCase();
-          const linkedPocket = pockets.find(p =>
-            p.sourceType === 'manual' && (p.name || '').toLowerCase().includes(keyword));
-          if (linkedPocket) linkedPocket.amount = Math.max(0, (linkedPocket.amount || 0) - row.amount);
-        }
+    // 2) Counterparty side for pocket-to-pocket transfers (named xx-ref)
+    const other = pocketByRef(row.description);
+    if (other && other !== primary) {
+      const otherDelta = inn ? -row.amount : row.amount; // mirror of the account side
+      other.amount = Math.max(0, (parseFloat(other.amount) || 0) + otherDelta);
+      logMove(other.name || ('Pocket ' + (other.accountRef || '')), otherDelta, row);
+    } else if (!other && !inn && row.kind === 'transfer') {
+      // Outbound transfer with no matching pocket → likely a credit-card payment (e.g. AMEX)
+      const refM = (row.description || '').match(/\bxx(\d{2,6})\b/i);
+      let cc = refM ? cards.find(c => c.id !== stmtCard.id && (c.accountRef || '').toLowerCase() === refM[0].toLowerCase()) : null;
+      if (!cc) cc = cards.find(c => c.id !== stmtCard.id && c.type === 'Credit' && (c.name || '').split(/\s+/).some(w => w.length > 3 && row.description.toLowerCase().includes(w.toLowerCase())));
+      if (cc && cc.type === 'Credit') {
+        cc.balance = Math.max(0, (cc.balance || 0) - row.amount);
+        logMove(cc.name + ' (owed)', -row.amount, row);
       }
     }
   }
@@ -3891,28 +3926,61 @@ function confirmPayCredit() {
 }
 
 function commitParsedTransactions() {
+  if (!(parsedStatementRows || []).length) return;
   const toAdd = parsedStatementRows.filter(r => r.include);
-  if (!toAdd.length) return;
   if (!appData.spending) appData.spending = [];
   const learnMap = getCategoryMap();
-  toAdd.forEach(r => {
-    appData.spending.push({ id: spUID(), date: r.date, description: r.description, amount: r.amount, currency: 'AUD', category: r.category, cardId: r.cardId || '' });
-    // Learn: remember which category you confirmed for this merchant line,
-    // so future parses of the same merchant auto-categorise correctly
-    const k = normDesc(r.description);
-    if (k && r.category) learnMap[k] = r.category;
-  });
-  // Auto-update card and pocket balances from ALL rows (incl. unticked transfers)
   const stmtCardId = (parsedStatementRows[0] || {}).cardId || '';
+  const primary = primaryPocketForCard(stmtCardId);   // source pocket for this account
+  toAdd.forEach(r => {
+    // Money-out = positive spend; money-in tagged to a budget category = counter-spend (negative → reduces that category's actual)
+    const amt = (r.moneyIn ? -1 : 1) * r.amount;
+    appData.spending.push({
+      id: spUID(), date: r.date, description: r.description,
+      amount: +amt.toFixed(2), currency: 'AUD', category: r.category,
+      cardId: r.cardId || '',
+      pocketId: (primary && primary.parentCardId === r.cardId) ? primary.id : ''   // tag Source so debit imports register the account
+    });
+    // Learn merchant→category only from real spends (not money-in lines)
+    const k = normDesc(r.description);
+    if (k && r.category && !r.moneyIn) learnMap[k] = r.category;
+  });
+  // Salary credits → Income log (received) + auto-post to budget income, once
+  (parsedStatementRows || []).forEach(r => { if (r.moneyIn && /salary/i.test(r.description)) postSalaryFromStatement(r); });
+  // Pocket/card balance movements from ALL rows (incl. unticked transfers) + movements ledger
   applyStatementBalanceUpdates(parsedStatementRows, stmtCardId);
   save();
   populateSpendingFilters();
   renderSpending();
   renderCards();
+  if (typeof renderMovements === 'function') renderMovements();
   const msg = document.getElementById('stmtCommitMsg');
-  msg.textContent = `✓ ${toAdd.length} transaction${toAdd.length !== 1 ? 's' : ''} added.`;
+  msg.textContent = `✓ ${toAdd.length} logged · balances & movements updated.`;
   msg.style.display = '';
-  setTimeout(() => closeStatementModal(), 1200);
+  setTimeout(() => closeStatementModal(), 1400);
+}
+
+// Salary detected in a statement: add/flag an Income-log entry as received and auto-post it to the budget once
+function postSalaryFromStatement(r) {
+  const list = store('income') || [];
+  const match = e => e.type === 'Salary' && e.date === r.date && Math.abs((parseFloat(e.amount) || 0) - r.amount) < 0.005;
+  let entry = list.find(match);
+  if (!entry) {
+    entry = { id: 'inc_' + Date.now() + Math.random().toString(36).slice(2, 5), date: r.date, source: r.description.replace(/\s+/g, ' ').slice(0, 40), amount: +r.amount.toFixed(2), currency: 'AUD', type: 'Salary', received: true, posted: false };
+    list.unshift(entry);
+  } else { entry.received = true; }
+  if (!entry.posted) {
+    const mk = (entry.date || '').slice(0, 7);
+    const budget = store('budget') || {};
+    if (!budget[mk]) budget[mk] = { income: {}, expenses: {} };
+    const rowKey = (typeof INCOME_TYPE_BUDGET_MAP !== 'undefined' && INCOME_TYPE_BUDGET_MAP[entry.type]) || 'salary';
+    budget[mk].income[rowKey] = (parseFloat(budget[mk].income[rowKey]) || 0) + toAUD(parseFloat(entry.amount) || 0, entry.currency || 'AUD');
+    store('budget', budget);
+    entry.posted = true;
+  }
+  store('income', list);
+  if (typeof renderIncomeTable === 'function') renderIncomeTable();
+  if (typeof renderIncomeSummary === 'function') renderIncomeSummary();
 }
 
 // ─── S3: wealth ────────────────────────────────────────────────────────────
@@ -4324,18 +4392,34 @@ function renderPockets() {
       <td><input type="number" value="${p.amount||0}" style="width:85px;text-align:right;"
             onchange="updPocket('${p.id}','amount',+this.value)"></td>
       <td><select onchange="updPocketLink('${p.id}',this.value)" style="font-size:11px;max-width:170px;">${linkOpts(p)}</select></td>
+      <td style="text-align:center;"><input type="checkbox" ${p.isPrimary ? 'checked' : ''} title="Mark as the main transaction pocket for its linked card — statement imports treat this as the source of transfers in/out" onchange="updPocketPrimary('${p.id}', this.checked)"></td>
       <td>${progress}</td>
       <td><button class="btn-del" onclick="deletePocket('${p.id}')">×</button></td>
     </tr>`;
   }).join('');
   wrap.innerHTML = `<div style="overflow-x:auto;"><table class="pl-tbl">
-    <thead><tr><th>Pocket</th><th>Acct Ref</th><th>Linked to card</th><th>Value (A$)</th><th>Linked Goal</th><th>Progress</th><th></th></tr></thead>
+    <thead><tr><th>Pocket</th><th>Acct Ref</th><th>Linked to card</th><th>Value (A$)</th><th>Linked Goal</th><th title="Main transaction pocket for the card — the source/destination of statement transfers">Primary</th><th>Progress</th><th></th></tr></thead>
     <tbody>${rows}</tbody></table></div>`;
+}
+
+// One primary (transaction) pocket per linked card — used as the source/destination for statement transfers
+function updPocketPrimary(id, checked) {
+  const p = (appData.pockets || []).find(x => x.id === id);
+  if (!p) return;
+  if (checked) {
+    (appData.pockets || []).forEach(x => { if (x.parentCardId === p.parentCardId && x.id !== id) x.isPrimary = false; });
+  }
+  p.isPrimary = !!checked;
+  save(); renderPockets();
+}
+function primaryPocketForCard(cardId) {
+  const ps = (appData.pockets || []).filter(p => p.parentCardId === cardId);
+  return ps.find(p => p.isPrimary) || ps[0] || null;
 }
 
 function addPocket() {
   if (!Array.isArray(appData.pockets)) appData.pockets = [];
-  appData.pockets.push({ id: pkUID(), name: 'New Pocket', sourceType: 'manual', sourceId: '', amount: 0, currency: 'AUD', linkType: 'none', linkId: '', parentCardId: '' });
+  appData.pockets.push({ id: pkUID(), name: 'New Pocket', sourceType: 'manual', sourceId: '', amount: 0, currency: 'AUD', linkType: 'none', linkId: '', parentCardId: '', isPrimary: false });
   save(); renderPockets();
 }
 function updPocket(id, field, val) {
@@ -6472,7 +6556,7 @@ function renderIncomeTable() {
     const rowTypes = (e.type && !incCats.includes(e.type)) ? [e.type, ...incCats] : incCats;
     return `<tr>
       <td><input type="date" value="${e.date||''}" style="font-size:11px;border:none;background:transparent;color:var(--txt);" onchange="updIncome('${e.id}','date',this.value)"></td>
-      <td><input type="text" value="${escHtml(e.source||'')}" maxlength="60" placeholder="e.g. KPMG" style="width:110px;font-size:11px;" onchange="updIncome('${e.id}','source',this.value)"></td>
+      <td><input type="text" value="${escHtml(e.source||'')}" maxlength="60" placeholder="e.g. KPMG" style="width:110px;font-size:11px;" onchange="updIncome('${e.id}','source',this.value)">${e.received ? ' <span style="font-size:9px;font-weight:700;color:var(--ok);background:var(--ok-bg);padding:1px 5px;border-radius:6px;white-space:nowrap;" title="Confirmed received from a bank statement import">✓ received</span>' : ''}</td>
       <td><input type="number" min="0" step="0.01" value="${e.amount||''}" style="width:90px;font-size:11px;" onchange="updIncome('${e.id}','amount',parseFloat(this.value)||0)"></td>
       <td><select style="font-size:11px;" onchange="updIncome('${e.id}','currency',this.value)">
         <option value="AUD" ${(e.currency||'AUD')==='AUD'?'selected':''}>AUD</option>
@@ -6484,7 +6568,7 @@ function renderIncomeTable() {
         ${rowTypes.map(t=>`<option value="${t}" ${e.type===t?'selected':''}>${t}</option>`).join('')}
       </select></td>
       <td style="text-align:right;">${fmtMoney(toBase(audVal,'AUD'), base)}</td>
-      <td style="text-align:center;"><button class="btn" style="font-size:10px;padding:3px 8px;" onclick="postIncomeToBudget('${e.id}')">Post</button></td>
+      <td style="text-align:center;">${e.posted ? '<span style="font-size:10px;color:var(--ok);">✓ posted</span>' : `<button class="btn" style="font-size:10px;padding:3px 8px;" onclick="postIncomeToBudget('${e.id}')">Post</button>`}</td>
       <td><button class="btn-del" onclick="deleteIncome('${e.id}')">×</button></td>
     </tr>`;
   }).join('');
