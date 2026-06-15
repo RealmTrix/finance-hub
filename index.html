@@ -4935,12 +4935,13 @@ function renderXrayHoldings() {
   });
   const total = data.combined.audValue || 0;
   if (!rows.length || total <= 0) { el.innerHTML = '<span style="color:var(--muted);">No holdings yet — add them in the Portfolio sub-tab.</span>'; return; }
-  const fmtA = v => 'A$ ' + (v < 0 ? '−' : '') + Math.abs(Math.round(v)).toLocaleString('en-AU');
+  const base = (appData.settings && appData.settings.baseCurrency) || 'AUD';
+  const fmtA = v => fmtMoney(toBase(v, 'AUD'), base);   // display in base currency to match the Combined view
   const top5   = rows.slice().sort((a,b) => b.audValue - a.audValue).slice(0, 5);
   const best3  = rows.slice().sort((a,b) => b.audPnl - a.audPnl).slice(0, 3);
   const worst3 = rows.slice().sort((a,b) => a.audPnl - b.audPnl).slice(0, 3);
   const sec = t => `<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:10px 0 5px;">${t}</div>`;
-  let html = sec('Top 5 holdings · % of total A$' + Math.round(total).toLocaleString('en-AU'));
+  let html = sec('Top 5 holdings · % of total ' + fmtA(total));
   html += top5.map(r => {
     const pct = total > 0 ? r.audValue / total * 100 : 0;
     return `<div style="margin-bottom:6px;">
@@ -5133,24 +5134,37 @@ function xrayParseJSON(raw) {
   // Escape double-quotes embedded inside string values — the #1 cause of
   // "Expected ',' or ']' after array element". A " only closes a string when the next
   // non-space char is structural (, : } ] or end); otherwise it's text and gets escaped.
-  const fixQuotes = s => {
+  const isWs = c => c === ' ' || c === '\t' || c === '\n' || c === '\r';
+  const isValStart = c => c === '"' || c === '{' || c === '[' || c === '-' || (c >= '0' && c <= '9');
+  // Repair the #1 failure: unescaped " (and raw newlines/tabs) inside string values.
+  // A " closes the string only when what follows is unambiguously structural; after a
+  // candidate , or : the next token must look like a new value/key, otherwise the quote
+  // is mid-sentence prose and gets escaped to \".
+  const fixStr = s => {
     let out = '', inStr = false;
     for (let i = 0; i < s.length; i++) {
       const ch = s[i];
       if (!inStr) { out += ch; if (ch === '"') inStr = true; continue; }
       if (ch === '\\') { out += ch + (s[i + 1] || ''); i++; continue; } // preserve existing escapes
+      if (ch === '\n') { out += '\\n'; continue; }
+      if (ch === '\r') { out += '\\r'; continue; }
+      if (ch === '\t') { out += '\\t'; continue; }
       if (ch === '"') {
-        let j = i + 1;
-        while (j < s.length && (s[j] === ' ' || s[j] === '\t' || s[j] === '\n' || s[j] === '\r')) j++;
+        let j = i + 1; while (j < s.length && isWs(s[j])) j++;
         const nx = s[j];
-        if (nx === undefined || nx === ',' || nx === ':' || nx === '}' || nx === ']') { out += '"'; inStr = false; }
-        else { out += '\\"'; }
+        let closing;
+        if (nx === undefined || nx === '}' || nx === ']') closing = true;
+        else if (nx === ',' || nx === ':') { let k = j + 1; while (k < s.length && isWs(s[k])) k++; const c2 = s[k]; closing = (c2 === undefined) || isValStart(c2) || c2 === ']' || c2 === '}'; }
+        else closing = false;
+        if (closing) { out += '"'; inStr = false; } else out += '\\"';
       } else { out += ch; }
     }
     return out;
   };
-  repairs.push(fixQuotes);                                                   // 7. escape embedded quotes
-  repairs.push(s => fixQuotes(s).replace(/,(\s*[}\]])/g, '$1'));             // 8. quotes + trailing commas
+  const joinObjs = s => s.replace(/}\s*{/g, '},{').replace(/]\s*\[/g, '],[');
+  const dropTrail = s => s.replace(/,(\s*[}\]])/g, '$1');
+  repairs.push(fixStr);                                          // 7. escape embedded quotes + control chars in strings
+  repairs.push(s => dropTrail(joinObjs(fixStr(s))));             // 8. robust combined pass
   let lastErr = null;
   for (const fix of repairs) {
     try { return JSON.parse(fix(body)); } catch (e) { lastErr = e; }
