@@ -822,6 +822,10 @@ th {
         <div id="homePortfolioBody" style="font-size:13px;"></div>
       </div>
       <div class="card">
+        <div class="card-title">💳 Credit Usage</div>
+        <div id="homeCreditBody" style="font-size:13px;"></div>
+      </div>
+      <div class="card">
         <div class="card-title">🛂 Visa Countdown</div>
         <div id="homeVisaBody" style="font-size:13px;"></div>
       </div>
@@ -3487,6 +3491,8 @@ function updCreditCardField(cardId, field, val) {
   if (!card) return;
   if (field === 'statementDay' || field === 'dueOffset') {
     card[field] = Math.max(1, parseInt(val) || 1);
+  } else if (field === 'creditLimit') {
+    card[field] = Math.max(0, parseFloat(val) || 0);
   } else {
     card[field] = val;
   }
@@ -3520,9 +3526,15 @@ function renderCreditCards() {
     const prevTxns = getCardStatementTxns(card, ps, pe);
     const balance  = txns.reduce((s, t) => s + t.amount, 0);
     const prevBal  = prevTxns.reduce((s, t) => s + t.amount, 0);
-    const payments = (appData.cardPayments || []).filter(p => p.cardId === card.id).sort((a,b) => b.date.localeCompare(a.date));
-    const totalPaid = payments.reduce((s,p) => s + p.amount, 0);
-    const netPrevBal = Math.max(0, prevBal - totalPaid);
+    const payments   = (appData.cardPayments || []).filter(p => p.cardId === card.id).sort((a,b) => b.date.localeCompare(a.date));
+    const totalPaid  = payments.reduce((s,p) => s + p.amount, 0);
+    const netPrevBal = Math.max(0, prevBal - totalPaid);      // deduct from prev bill first
+    const excessPaid = Math.max(0, totalPaid - prevBal);       // overflow deducts from current
+    const netBalance = Math.max(0, balance - excessPaid);
+    const totalOwed  = netPrevBal + netBalance;
+    const limit      = parseFloat(card.creditLimit) || 0;
+    const utilPct    = limit > 0 ? Math.min(100, totalOwed / limit * 100) : null;
+    const nearLimit  = utilPct !== null && utilPct >= 90;
     const cur      = card.currency || 'AUD';
     const daysLeft = Math.max(0, Math.round((dueDate - new Date()) / 86400000));
     const overdue  = dueDate < new Date() && prevBal > 0;
@@ -3559,7 +3571,8 @@ function renderCreditCards() {
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
         <div style="background:var(--bg);border-radius:8px;padding:10px 14px;">
           <div style="font-size:10px;color:var(--muted);margin-bottom:3px;">CURRENT STATEMENT</div>
-          <div style="font-size:18px;font-weight:700;">${fmtMoney(balance, cur)}</div>
+          <div style="font-size:18px;font-weight:700;">${fmtMoney(netBalance, cur)}</div>
+          ${excessPaid > 0 ? `<div style="font-size:10px;color:var(--ok);">−${fmtMoney(excessPaid, cur)} overpayment</div>` : ''}
           <div style="font-size:10px;color:var(--muted);">${fmtD(start)} – today</div>
         </div>
         <div style="background:var(--bg);border-radius:8px;padding:10px 14px;">
@@ -3590,8 +3603,29 @@ function renderCreditCards() {
             onchange="updCreditCardField('${card.id}','dueOffset',this.value)">
           days after close
         </label>
+        <label style="font-size:11px;display:flex;align-items:center;gap:6px;">
+          Credit limit
+          <input type="number" min="0" step="100" value="${card.creditLimit || 0}" style="width:72px;padding:3px 6px;font-size:12px;background:var(--card);color:var(--txt);border:1px solid var(--bdr);border-radius:5px;"
+            onchange="updCreditCardField('${card.id}','creditLimit',this.value)">
+          ${cur}
+        </label>
         <span style="font-size:10px;color:var(--muted);margin-left:auto;">Next statement closes ${fmtD(end)}</span>
       </div>
+
+      <!-- Credit utilisation bar -->
+      ${limit > 0 ? `
+      <div style="margin-bottom:14px;padding:10px 14px;background:var(--bg);border-radius:8px;">
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px;">
+          <span style="font-weight:600;color:${nearLimit ? 'var(--danger)' : 'var(--txt)'};">${nearLimit ? '⚠ ' : ''}Credit Utilisation — ${utilPct.toFixed(0)}%</span>
+          <span style="color:var(--muted);">${fmtMoney(totalOwed, cur)} of ${fmtMoney(limit, cur)}</span>
+        </div>
+        <div style="background:var(--bdr);border-radius:4px;height:8px;overflow:hidden;">
+          <div style="height:100%;width:${utilPct.toFixed(1)}%;background:${nearLimit ? 'var(--danger)' : utilPct >= 70 ? 'var(--amber)' : 'var(--ok)'};border-radius:4px;"></div>
+        </div>
+        <div style="font-size:10px;margin-top:4px;color:${nearLimit ? 'var(--danger)' : 'var(--muted)'};font-weight:${nearLimit ? '700' : '400'};">
+          ${nearLimit ? `⚠ Only ${fmtMoney(limit - totalOwed, cur)} (${(100 - utilPct).toFixed(0)}%) remaining` : `${fmtMoney(limit - totalOwed, cur)} available`}
+        </div>
+      </div>` : ''}
 
       <!-- Transaction list -->
       <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">
@@ -7530,6 +7564,7 @@ function renderHome() {
 
   renderHomeBudgetCard();
   renderHomePortfolioCard();
+  renderHomeCreditCard();
   renderHomeVisaCard();
   renderHomePlansCard();
 }
@@ -7615,6 +7650,42 @@ function renderHomeVisaCard() {
     '<div class="home-big" style="color:' + color + ';">' + daysLeft + ' <span style="font-size:13px;font-weight:600;">days</span></div>' +
     '<div style="font-size:12px;font-weight:600;color:' + color + ';">' + label + '</div>' +
     '<div class="home-sub">' + escHtml(s.visaType ? s.visaType + ' visa' : 'Visa') + ' expires ' + s.visaExpiry + '</div>' + prHtml;
+}
+
+function renderHomeCreditCard() {
+  const el = document.getElementById('homeCreditBody');
+  if (!el) return;
+  const creditCards = (appData.cards || []).filter(c => c.type === 'Credit');
+  if (!creditCards.length) { el.innerHTML = '<span style="color:var(--muted);">No credit cards set up.</span>'; return; }
+  el.innerHTML = creditCards.map(card => {
+    const limit = parseFloat(card.creditLimit) || 0;
+    const cur   = card.currency || 'AUD';
+    const { start, end } = getStatementPeriod(card);
+    const { start: ps, end: pe } = getPrevStatementPeriod(card);
+    const balance  = getCardStatementTxns(card, start, end).reduce((s,t) => s + t.amount, 0);
+    const prevBal  = getCardStatementTxns(card, ps, pe).reduce((s,t) => s + t.amount, 0);
+    const totalPaid = (appData.cardPayments || []).filter(p => p.cardId === card.id).reduce((s,p) => s + p.amount, 0);
+    const netPrevBal = Math.max(0, prevBal - totalPaid);
+    const excessPaid = Math.max(0, totalPaid - prevBal);
+    const netBalance = Math.max(0, balance - excessPaid);
+    const totalOwed  = netPrevBal + netBalance;
+    const utilPct    = limit > 0 ? Math.min(100, totalOwed / limit * 100) : null;
+    const nearLimit  = utilPct !== null && utilPct >= 90;
+    const barColor   = nearLimit ? 'var(--danger)' : utilPct >= 70 ? 'var(--amber)' : 'var(--ok)';
+    return `<div style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+        <span style="font-weight:600;">${escHtml(card.name)}</span>
+        <span>${fmtMoney(totalOwed, cur)}${limit > 0 ? ' / ' + fmtMoney(limit, cur) : ''}</span>
+      </div>
+      ${limit > 0 ? `
+      <div style="background:var(--bdr);border-radius:4px;height:7px;overflow:hidden;">
+        <div style="height:100%;width:${utilPct.toFixed(1)}%;background:${barColor};border-radius:4px;"></div>
+      </div>
+      <div style="font-size:10px;margin-top:3px;color:${nearLimit ? 'var(--danger)' : 'var(--muted)'};font-weight:${nearLimit ? '700' : '400'};">
+        ${nearLimit ? '⚠ Only ' + fmtMoney(limit - totalOwed, cur) + ' (' + (100 - utilPct).toFixed(0) + '%) remaining' : utilPct.toFixed(0) + '% used · ' + fmtMoney(limit - totalOwed, cur) + ' available'}
+      </div>` : '<div style="font-size:10px;color:var(--muted);">Set credit limit in Credit Cards tab</div>'}
+    </div>`;
+  }).join('');
 }
 
 function renderHomePlansCard() {
