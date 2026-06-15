@@ -4717,23 +4717,7 @@ async function generateMonthlyReport() {
     }).filter(Boolean);
     data.rates.AUD_SGD = (appData.rates || {}).AUD_SGD;
   } catch (e) { /* context extras are best-effort — report still generates */ }
-  const prompt = `You are a senior portfolio analyst writing a monthly investment review for a private client. Given the data below, produce a structured report. Reply with STRICT JSON only, no other text, no markdown fences:
-{
-  "headline": "one sentence executive summary",
-  "performanceSummary": "2–3 sentences on total portfolio performance, P&L, and vs prior month",
-  "topMovers": [{"ticker":"","name":"","pnlPct":0,"note":"one line"}],
-  "fxImpact": "1–2 sentences on how AUD/USD or AUD/IDR moves affected base-currency value",
-  "healthAssessment": "1–2 sentences linking financial stress score to portfolio sustainability",
-  "riskFlags": ["flag 1", "flag 2"],
-  "actionableSteps": ["step 1", "step 2", "step 3"],
-  "macroContext": "2 sentences on current market indices and relevance to this portfolio",
-  "outlook": "2–3 sentences forward-looking view for next month"
-}
-
-Rules: output valid JSON only. Inside every string value, never use the " character — if you need to quote a name or ticker, use single quotes ' instead. Keep each value on one line.
-
-DATA:
-` + JSON.stringify(data);
+  const prompt = `You are a senior portfolio analyst writing a monthly investment review. Using the DATA below, reply with ONE line of minified, strictly valid JSON and NOTHING else — no markdown, no code fences, no line breaks. Schema: { headline, performanceSummary, topMovers:[{ticker, name, pnlPct, note}], fxImpact, healthAssessment, riskFlags:[strings], actionableSteps:[strings], macroContext, outlook }. headline=1 sentence; performanceSummary/macroContext/outlook=2 short sentences; fxImpact/healthAssessment=1 short sentence; note=one short line; riskFlags=2-3 items; actionableSteps=3 items. CRITICAL: never use the " character inside any string value (use a single quote ' for names/tickers/quotes), and never put a line break inside a value. DATA:\n` + JSON.stringify(data);
   try {
     const text = await askChatAI(prompt, { model: 'claude-sonnet-4-6', max_tokens: 1500 });
     const parsed = xrayParseJSON(text);
