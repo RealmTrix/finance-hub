@@ -3937,8 +3937,11 @@ function renderWealth() {
     return total;
   })();
 
-  // Manual assets (existing user-entered entries)
-  const manualAssetsAUD = appData.assets.reduce((s, a) => s + toAUD(a.value || 0, a.currency || 'AUD'), 0);
+  // Manual assets (existing user-entered entries). Superannuation counted at a 30% discount in the final wealth calc.
+  const manualAssetsAUD = appData.assets.reduce((s, a) => {
+    const v = toAUD(a.value || 0, a.currency || 'AUD');
+    return s + (a.type === 'Superannuation' ? v * 0.7 : v);
+  }, 0);
 
   const totalAssetsAUD = liquidAUD + portfolioAUD + manualAssetsAUD;
   const manualLiabAUD = appData.liabilities.reduce((s, l) => s + toAUD(l.value || 0, l.currency || 'AUD'), 0);
@@ -4634,8 +4637,8 @@ function gatherPortfolioData() {
   const rates = appData.rates || {};
   const result = { portfolios: {}, combined: { audCost: 0, audValue: 0 } };
   let best = null, worst = null;
-  ['idr','usd','aud'].forEach(k => {
-    const ccy = PORT_CURRENCIES[k];
+  Object.keys(port).forEach(k => {
+    const ccy = PORT_CURRENCIES[k] || (port[k] && port[k].currency) || 'AUD';
     const holdings = (port[k] && port[k].holdings) ? port[k].holdings : [];
     let cost = 0, mv = 0; const hs = [];
     holdings.forEach(h => {
@@ -4908,14 +4911,15 @@ function renderXrayHoldings() {
   const data = gatherPortfolioData();
   const rows = [];
   const exch = { ASX: 0, NYSE: 0, IDX: 0, Crypto: 0 };
-  ['idr','usd','aud'].forEach(k => {
+  Object.keys(data.portfolios).forEach(k => {
     const p = data.portfolios[k] || {};
+    const ccy = p.currency || 'AUD';
     (p.holdings || []).forEach(h => {
-      const audValue = toAUD(h.marketValue || 0, p.currency);
-      const audPnl   = toAUD(h.pnl || 0, p.currency);
+      const audValue = toAUD(h.marketValue || 0, ccy);
+      const audPnl   = toAUD(h.pnl || 0, ccy);
       rows.push({ ticker: h.ticker || '?', name: h.name || h.ticker || '?', audValue, audPnl, pnlPct: h.pnlPct });
-      const ex = (h.type === 'Crypto') ? 'Crypto' : (k === 'aud' ? 'ASX' : k === 'usd' ? 'NYSE' : 'IDX');
-      exch[ex] += audValue;
+      const ex = (h.type === 'Crypto') ? 'Crypto' : (ccy === 'AUD' ? 'ASX' : ccy === 'USD' ? 'NYSE' : ccy === 'IDR' ? 'IDX' : null);
+      if (ex) exch[ex] += audValue;
     });
   });
   const total = data.combined.audValue || 0;
@@ -4961,8 +4965,13 @@ function xrayAvgMonthlySpendBase() {
 function renderXrayCashMacro() {
   const el = document.getElementById('xrayCashMacroBody');
   if (!el) return;
+  // Debit cash: sum ALL debit cards; pocket-linked cards use summed pocket balances (safeguard for multiple debit cards)
+  const dbal = (c) => {
+    const linked = (appData.pockets || []).filter(p => p.parentCardId === c.id);
+    return linked.length ? linked.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0) : (c.balance || 0);
+  };
   const cash = (appData.cards || []).filter(c => c.type === 'Debit')
-    .reduce((s, c) => s + toBase(c.balance || 0, c.currency || 'AUD'), 0);
+    .reduce((s, c) => s + toBase(dbal(c), c.currency || 'AUD'), 0);
   const burn = xrayAvgMonthlySpendBase();
   const runway = burn > 0 ? cash / burn : null;
   const sec = t => `<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:10px 0 5px;">${t}</div>`;
@@ -5067,7 +5076,7 @@ function xrayNetWorthAUD() {
   ['idr','usd','aud'].forEach(k => {
     (((appData.portfolios || {})[k] || {}).holdings || []).forEach(h => { portfolio += toAUD((h.currentPrice || 0) * (h.qty || 0), ccy[k]); });
   });
-  const manual = (appData.assets || []).reduce((s, a) => s + toAUD(a.value || 0, a.currency || 'AUD'), 0);
+  const manual = (appData.assets || []).reduce((s, a) => { const v = toAUD(a.value || 0, a.currency || 'AUD'); return s + (a.type === 'Superannuation' ? v * 0.7 : v); }, 0);
   const liabs = (appData.liabilities || []).reduce((s, l) => s + toAUD(l.value || 0, l.currency || 'AUD'), 0)
               + (appData.cards || []).filter(c => c.type === 'Credit').reduce((s, c) => s + toAUD(c.balance || 0, c.currency || 'AUD'), 0);
   return liquid + portfolio + manual - liabs;
@@ -5082,9 +5091,25 @@ function xrayParseJSON(raw) {
   // Extract outermost { ... }
   const a = t.indexOf('{'), b = t.lastIndexOf('}');
   if (a === -1 || b === -1) throw new Error('AI did not return valid JSON — try again. Raw: ' + t.slice(0, 120));
-  try { return JSON.parse(t.slice(a, b + 1)); } catch (e) { throw new Error('Could not parse AI JSON: ' + e.message + ' — try again.'); }
+  const body = t.slice(a, b + 1);
+  // Progressive repair passes — keeps report/strategy JSON parsing resilient to minor AI formatting slips,
+  // now and after any future code changes. Each pass runs on the original body; first success wins.
+  const repairs = [
+    s => s,                                                       // 1. as-is
+    s => s.replace(/,(\s*[}\]])/g, '$1'),                         // 2. drop trailing commas
+    s => s.replace(/[\u0000-\u001F]+/g, ' '),                     // 3. strip raw control chars (e.g. literal newlines in strings)
+    s => s.replace(/}\s*{/g, '},{').replace(/]\s*\[/g, '],['),    // 4. insert missing commas between objects/arrays
+    s => s.replace(/("(?:[^"\\]|\\.)*")\s*\n\s*(")/g, '$1,$2'),   // 5. comma between adjacent string elements split by a newline
+    s => s.replace(/,(\s*[}\]])/g, '$1').replace(/[\u0000-\u001F]+/g, ' ').replace(/}\s*{/g, '},{') // 6. combined
+  ];
+  let lastErr = null;
+  for (const fix of repairs) {
+    try { return JSON.parse(fix(body)); } catch (e) { lastErr = e; }
+  }
+  throw new Error('Could not parse AI JSON: ' + (lastErr ? lastErr.message : 'unknown') + ' — try again.');
 }
 
+let pendingStrategyPlan = null;   // holds a generated-but-unsaved artifact until the user Saves or Discards
 async function generateStrategyPlan() {
   const out = document.getElementById('xrayPlanOut');
   const btn = document.getElementById('xrayGenBtn');
@@ -5114,18 +5139,45 @@ async function generateStrategyPlan() {
     }
     const raw = await askChatAI(prompt, { model: 'claude-sonnet-4-6', max_tokens: 1200 });
     const plan = xrayParseJSON(raw);
-    const mk = monthKeyNow();
-    const plans = store('strategyPlans') || {};
-    plans[mk] = { plan, scenario: scenario || null, generatedAt: new Date().toISOString() };
-    store('strategyPlans', plans);   // store() → save() → pushToCloud() → sbUpsert()
-    out.innerHTML = renderStrategyArtifact(plans[mk], 'live');
+    // Hold as a pending (unsaved) artifact — user chooses Save (→ Saved Plans) or Discard
+    pendingStrategyPlan = { plan, scenario: scenario || null, generatedAt: new Date().toISOString() };
+    out.innerHTML = renderStrategyArtifact(pendingStrategyPlan, 'live') +
+      `<div style="display:flex; gap:8px; margin-top:10px;">
+        <button class="btn btn-primary" style="font-size:11px; padding:5px 12px;" onclick="saveStrategyPlan()">💾 Save to plans</button>
+        <button class="btn" style="font-size:11px; padding:5px 12px;" onclick="discardStrategyPlan()">✕ Discard</button>
+      </div>`;
     drawPlanCharts(plan, 'live');
-    renderSavedPlans();
   } catch (e) {
     out.innerHTML = `<p style="color:var(--err); font-size:12px;">${escHtml(e.message)}</p>`;
   } finally {
     if (btn) btn.disabled = false;
   }
+}
+
+function saveStrategyPlan() {
+  if (!pendingStrategyPlan) return;
+  const mk = monthKeyNow();
+  const plans = store('strategyPlans') || {};
+  plans[mk] = pendingStrategyPlan;
+  store('strategyPlans', plans);   // store() → save() → pushToCloud() → sbUpsert()
+  pendingStrategyPlan = null;
+  const out = document.getElementById('xrayPlanOut');
+  if (out) out.innerHTML = `<p style="color:var(--ok); font-size:12px;">✓ Saved to plans for ${monthLabel(mk)}.</p>`;
+  renderSavedPlans();
+}
+
+function discardStrategyPlan() {
+  pendingStrategyPlan = null;
+  const out = document.getElementById('xrayPlanOut');
+  if (out) out.innerHTML = '<p style="color:var(--muted); font-size:12px;">Plan discarded.</p>';
+}
+
+function deleteStrategyPlan(mk) {
+  if (!confirm('Delete the saved plan for ' + monthLabel(mk) + '?')) return;
+  const plans = store('strategyPlans') || {};
+  delete plans[mk];
+  store('strategyPlans', plans);   // store() → save() → pushToCloud() → sbUpsert()
+  renderSavedPlans();
 }
 
 function renderStrategyArtifact(entry, suffix) {
@@ -5201,7 +5253,10 @@ function renderSavedPlans() {
     return `<div style="border:1px solid rgba(128,128,128,.3); border-radius:8px; padding:10px; margin-bottom:8px;">
       <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleSavedPlan('${mk}')">
         <strong style="font-size:12px;">${monthLabel(mk)}${e.scenario ? ' · what-if' : ''}</strong>
-        <span id="xraySavedChev_${mk}" style="color:var(--muted); font-size:11px;">▸ expand</span>
+        <span style="display:flex; gap:10px; align-items:center;">
+          <span id="xraySavedChev_${mk}" style="color:var(--muted); font-size:11px;">▸ expand</span>
+          <span onclick="event.stopPropagation();deleteStrategyPlan('${mk}')" title="Delete plan" style="color:var(--err); font-size:12px; cursor:pointer;">🗑</span>
+        </span>
       </div>
       <div style="font-size:11px; color:var(--muted); margin-top:4px;">${escHtml(preview)}</div>
       <div id="xraySaved_${mk}" style="display:none; margin-top:8px;"></div>
@@ -6573,7 +6628,7 @@ function renderWealthTrajectory() {
 
   // Current net worth from Wealth tab
   const toA = (val, cur) => toAUD(parseFloat(val) || 0, cur || 'AUD');
-  const assets = (appData.assets || []).reduce((s, a) => s + toA(a.value, a.currency), 0);
+  const assets = (appData.assets || []).reduce((s, a) => { const v = toA(a.value, a.currency); return s + (a.type === 'Superannuation' ? v * 0.7 : v); }, 0);
   const liabs  = (appData.liabilities || []).reduce((s, l) => s + toA(l.value, l.currency), 0);
   // Also include credit card balances as liabilities (mirror of Wealth tab)
   const creditLiab = (appData.cards || []).filter(c => c.type === 'Credit').reduce((s, c) => s + toA(c.balance, c.currency), 0);
@@ -7614,7 +7669,7 @@ function renderHome() {
           portfolio += toAUD((h.currentPrice || 0) * (h.qty || 0), ccy[k]);
         });
       });
-      const manualAssets = (appData.assets || []).reduce((s, a) => s + toAUD(a.value || 0, a.currency || 'AUD'), 0);
+      const manualAssets = (appData.assets || []).reduce((s, a) => { const v = toAUD(a.value || 0, a.currency || 'AUD'); return s + (a.type === 'Superannuation' ? v * 0.7 : v); }, 0);
       const assets = liquid + portfolio + manualAssets;
       const liabs  = (appData.liabilities || []).reduce((s, l) => s + toAUD(l.value || 0, l.currency || 'AUD'), 0)
                    + (appData.cards || []).filter(c => c.type === 'Credit')
