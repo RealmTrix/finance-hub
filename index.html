@@ -3927,11 +3927,11 @@ function renderWealth() {
   // Auto: non-liquid = investment portfolio market values
   const portfolioAUD = (() => {
     const port = store('portfolios') || {};
-    const ccy  = { idr:'IDR', usd:'USD', aud:'AUD' };
     let total = 0;
-    ['idr','usd','aud'].forEach(k => {
+    Object.keys(port).forEach(k => {
+      const ccy = PORT_CURRENCIES[k] || port[k].currency || 'AUD';
       (port[k]?.holdings || []).forEach(h => {
-        total += toAUD((h.currentPrice || 0) * (h.qty || 0), ccy[k]);
+        total += toAUD((h.currentPrice || 0) * (h.qty || 0), ccy);
       });
     });
     return total;
@@ -4028,12 +4028,13 @@ function renderWealth() {
     const portLabels = { idr: '🇮🇩 Indonesia', usd: '🌐 Global', aud: '🇦🇺 Australia' };
     const portCcy    = { idr: 'IDR', usd: 'USD', aud: 'AUD' };
     const port       = store('portfolios') || {};
-    const investRows = ['idr','usd','aud'].map(k => {
+    const investRows = Object.keys(port).map(k => {
       const mv = (port[k]?.holdings || []).reduce((s,h) => s + (h.currentPrice||0)*(h.qty||0), 0);
       if (!mv) return '';
-      const ccy = portCcy[k];
+      const ccy = portCcy[k] || port[k].currency || 'AUD';
+      const label = portLabels[k] || ('📁 ' + escHtml(port[k].name || 'Portfolio'));
       return `<tr style="opacity:0.75;">
-        <td>${portLabels[k]} portfolio <span style="font-size:10px;color:var(--muted)">(investments)</span></td>
+        <td>${label} portfolio <span style="font-size:10px;color:var(--muted)">(investments)</span></td>
         <td>📈 Investment</td>
         <td style="text-align:right">${fmtMoney(mv, ccy)}</td>
         <td>${ccy}</td>
@@ -5094,11 +5095,12 @@ function nwCreditOwed(c) {
 
 // Read-only net worth mirror (same calc as the Home card — no nwHistory write)
 function xrayNetWorthAUD() {
-  const ccy = { idr: 'IDR', usd: 'USD', aud: 'AUD' };
   const liquid = (appData.cards || []).filter(c => c.type !== 'Credit').reduce((s, c) => s + toAUD(nwDebitBal(c), c.currency || 'AUD'), 0);
   let portfolio = 0;
-  ['idr','usd','aud'].forEach(k => {
-    (((appData.portfolios || {})[k] || {}).holdings || []).forEach(h => { portfolio += toAUD((h.currentPrice || 0) * (h.qty || 0), ccy[k]); });
+  const port = appData.portfolios || {};
+  Object.keys(port).forEach(k => {
+    const pccy = PORT_CURRENCIES[k] || port[k].currency || 'AUD';
+    ((port[k] || {}).holdings || []).forEach(h => { portfolio += toAUD((h.currentPrice || 0) * (h.qty || 0), pccy); });
   });
   const manual = (appData.assets || []).reduce((s, a) => { const v = toAUD(a.value || 0, a.currency || 'AUD'); return s + (a.type === 'Superannuation' ? v * 0.7 : v); }, 0);
   const liabs = (appData.liabilities || []).reduce((s, l) => s + toAUD(l.value || 0, l.currency || 'AUD'), 0)
@@ -7684,13 +7686,14 @@ function renderHome() {
   const nwEl = document.getElementById('homeNetWorthBody');
   if (nwEl) {
     try {
-      const ccy = { idr: 'IDR', usd: 'USD', aud: 'AUD' };
       const liquid = (appData.cards || []).filter(c => c.type !== 'Credit')
         .reduce((s, c) => s + toAUD(nwDebitBal(c), c.currency || 'AUD'), 0);
       let portfolio = 0;
-      ['idr','usd','aud'].forEach(k => {
-        (((appData.portfolios || {})[k] || {}).holdings || []).forEach(h => {
-          portfolio += toAUD((h.currentPrice || 0) * (h.qty || 0), ccy[k]);
+      const _port = appData.portfolios || {};
+      Object.keys(_port).forEach(k => {
+        const pccy = PORT_CURRENCIES[k] || _port[k].currency || 'AUD';
+        ((_port[k] || {}).holdings || []).forEach(h => {
+          portfolio += toAUD((h.currentPrice || 0) * (h.qty || 0), pccy);
         });
       });
       const manualAssets = (appData.assets || []).reduce((s, a) => { const v = toAUD(a.value || 0, a.currency || 'AUD'); return s + (a.type === 'Superannuation' ? v * 0.7 : v); }, 0);
@@ -7757,12 +7760,13 @@ function renderHomePortfolioCard() {
   const el = document.getElementById('homePortfolioBody');
   if (!el) return;
   const fmt = v => 'A$ ' + (v < 0 ? '−' : '') + Math.abs(Math.round(v)).toLocaleString('en-AU');
-  const ccy = { idr: 'IDR', usd: 'USD', aud: 'AUD' };
+  const _port = appData.portfolios || {};
   let cost = 0, val = 0, count = 0, best = null;
-  ['idr','usd','aud'].forEach(k => {
-    (((appData.portfolios || {})[k] || {}).holdings || []).forEach(h => {
-      const c = toAUD((h.avgBuyPrice || 0) * (h.qty || 0), ccy[k]);
-      const v = toAUD((h.currentPrice || 0) * (h.qty || 0), ccy[k]);
+  Object.keys(_port).forEach(k => {
+    const pccy = PORT_CURRENCIES[k] || _port[k].currency || 'AUD';
+    ((_port[k] || {}).holdings || []).forEach(h => {
+      const c = toAUD((h.avgBuyPrice || 0) * (h.qty || 0), pccy);
+      const v = toAUD((h.currentPrice || 0) * (h.qty || 0), pccy);
       cost += c; val += v; count++;
       if (h.ticker && c > 0) {
         const pct = (v - c) / c * 100;
