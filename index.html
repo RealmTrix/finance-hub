@@ -3916,9 +3916,13 @@ function renderWealth() {
 
   const base = (appData.settings && appData.settings.baseCurrency) || 'AUD';
 
-  // Auto: liquid assets = debit card balances
+  // Auto: liquid assets = debit card balances (pocket-aggregated if pockets are linked)
   const debitCards = (appData.cards || []).filter(c => c.type !== 'Credit');
-  const liquidAUD  = debitCards.reduce((s, c) => s + toAUD(c.balance || 0, c.currency || 'AUD'), 0);
+  const debitCardBal = (c) => {
+    const linked = (appData.pockets||[]).filter(p => p.parentCardId === c.id);
+    return linked.length > 0 ? linked.reduce((s,p) => s + (parseFloat(p.amount)||0), 0) : (c.balance || 0);
+  };
+  const liquidAUD = debitCards.reduce((s, c) => s + toAUD(debitCardBal(c), c.currency || 'AUD'), 0);
 
   // Auto: non-liquid = investment portfolio market values
   const portfolioAUD = (() => {
@@ -3937,10 +3941,21 @@ function renderWealth() {
   const manualAssetsAUD = appData.assets.reduce((s, a) => s + toAUD(a.value || 0, a.currency || 'AUD'), 0);
 
   const totalAssetsAUD = liquidAUD + portfolioAUD + manualAssetsAUD;
-  const manualLiabAUD  = appData.liabilities.reduce((s, l) => s + toAUD(l.value || 0, l.currency || 'AUD'), 0);
-  const cardLiabAUD    = (appData.cards || []).filter(c => c.type === 'Credit')
-                           .reduce((s, c) => s + toAUD(c.balance || 0, c.currency || 'AUD'), 0);
-  const totalLiabAUD   = manualLiabAUD + cardLiabAUD;
+  const manualLiabAUD = appData.liabilities.reduce((s, l) => s + toAUD(l.value || 0, l.currency || 'AUD'), 0);
+  // Credit card liabilities via waterfall (payments deduct prev bill first, then current)
+  const creditCardOwed = (c) => {
+    const { start, end } = getStatementPeriod(c);
+    const { start: ps, end: pe } = getPrevStatementPeriod(c);
+    const bal  = getCardStatementTxns(c, start, end).reduce((s,t) => s + t.amount, 0);
+    const prev = getCardStatementTxns(c, ps, pe).reduce((s,t) => s + t.amount, 0);
+    const paid = (appData.cardPayments||[]).filter(p => p.cardId === c.id).reduce((s,p) => s + p.amount, 0);
+    const netPrev = Math.max(0, prev - paid);
+    const excess  = Math.max(0, paid - prev);
+    return netPrev + Math.max(0, bal - excess);
+  };
+  const cardLiabAUD = (appData.cards || []).filter(c => c.type === 'Credit')
+                         .reduce((s, c) => s + toAUD(creditCardOwed(c), c.currency || 'AUD'), 0);
+  const totalLiabAUD = manualLiabAUD + cardLiabAUD;
   const netWorthAUD    = totalAssetsAUD - totalLiabAUD;
 
   // Snapshot current month
@@ -3951,15 +3966,13 @@ function renderWealth() {
 
   const lastNW = appData.nwHistory[lastMk];
   const delta  = lastNW != null ? netWorthAUD - lastNW : null;
-  const earmarkedAUD = (appData.pockets||[]).reduce((s,p) => s + pocketValueAUD(p), 0);
+  // Earmarked = only pockets linked to a plan/milestone/wealthGoal
+  const earmarkedAUD = (appData.pockets||[]).filter(p => p.linkType && p.linkType !== 'none').reduce((s,p) => s + pocketValueAUD(p), 0);
 
   // Net worth summary
   const nwSummary = document.getElementById('nwSummary');
   if (nwSummary) {
-    const deltaHtml = delta != null
-      ? `<div class="nw-item"><div class="nw-label">vs Last Month</div>
-           <div class="nw-val ${delta >= 0 ? 'ok' : 'bad'}">${delta >= 0 ? '▲' : '▼'} ${fmtMoney(Math.abs(toBase(delta, 'AUD')), base)}</div></div>`
-      : `<div class="nw-item"><div class="nw-label">vs Last Month</div><div class="nw-val" style="color:var(--muted)">—</div></div>`;
+    // deltaHtml inlined directly into the NW grid row below
     nwSummary.innerHTML = `<div class="nw-grid">
       <div class="nw-item"><div class="nw-label">💧 Liquid (Accounts)</div>
         <div class="nw-val ok">${fmtMoney(toBase(liquidAUD, 'AUD'), base)}</div></div>
@@ -3969,9 +3982,16 @@ function renderWealth() {
         <div class="nw-val ok">${fmtMoney(toBase(totalAssetsAUD, 'AUD'), base)}</div></div>
       <div class="nw-item"><div class="nw-label">Total Liabilities</div>
         <div class="nw-val bad">${fmtMoney(toBase(totalLiabAUD, 'AUD'), base)}</div></div>
-      <div class="nw-item"><div class="nw-label">Net Worth</div>
-        <div class="nw-val nw-big ${netWorthAUD >= 0 ? 'ok' : 'bad'}">${fmtMoney(toBase(netWorthAUD, 'AUD'), base)}</div></div>
-      ${deltaHtml}
+      <div style="grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--bdr);padding-top:10px;margin-top:4px;">
+        <div class="nw-item" style="text-align:left;">
+          <div class="nw-label">Net Worth</div>
+          <div class="nw-val nw-big ${netWorthAUD >= 0 ? 'ok' : 'bad'}">${fmtMoney(toBase(netWorthAUD, 'AUD'), base)}</div>
+        </div>
+        <div class="nw-item" style="text-align:right;">
+          <div class="nw-label">vs Last Month</div>
+          <div class="nw-val ${delta != null ? (delta >= 0 ? 'ok' : 'bad') : ''}" style="${delta == null ? 'color:var(--muted)' : ''}">${delta != null ? (delta >= 0 ? '▲ ' : '▼ ') + fmtMoney(Math.abs(toBase(delta,'AUD')),base) : '—'}</div>
+        </div>
+      </div>
       ${earmarkedAUD > 0 ? `<div class="nw-item" style="grid-column:1/-1;border-top:1px solid var(--bdr);padding-top:8px;margin-top:4px;">
         <div class="nw-label">🪣 Earmarked in Pockets <span style="font-size:10px;color:var(--muted);">(sub-allocation of existing liquid cash)</span></div>
         <div class="nw-val" style="color:var(--gold);">${fmtMoney(toBase(earmarkedAUD,'AUD'),base)}</div>
@@ -3983,15 +4003,17 @@ function renderWealth() {
   const assetsWrap = document.getElementById('assetsWrap');
   if (assetsWrap) {
     // Auto rows: debit cards (liquid)
-    const liquidRows = debitCards.map(c =>
-      `<tr style="opacity:0.75;">
+    const liquidRows = debitCards.map(c => {
+      const cbal = debitCardBal(c);
+      return `<tr style="opacity:0.75;">
         <td>${escHtml(c.name)} <span style="font-size:10px;color:var(--muted)">(account)</span></td>
         <td>💧 Liquid</td>
-        <td style="text-align:right">${fmtMoney(c.balance||0, c.currency)}</td>
+        <td style="text-align:right">${fmtMoney(cbal, c.currency)}</td>
         <td>${c.currency}</td>
-        <td style="text-align:right">${fmtMoney(toBase(c.balance||0, c.currency||'AUD'), base)}</td>
+        <td style="text-align:right">${fmtMoney(toBase(cbal, c.currency||'AUD'), base)}</td>
         <td></td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
 
     // Auto rows: investment portfolios
     const portLabels = { idr: '🇮🇩 Indonesia', usd: '🌐 Global', aud: '🇦🇺 Australia' };
@@ -4060,15 +4082,16 @@ function renderWealth() {
         <td><button class="btn-del" onclick="deleteLiability('${l.id}')">×</button></td>
       </tr>`;
     }).join('');
-    const autoRows = (appData.cards || []).filter(c => c.type === 'Credit').map(c =>
-      `<tr style="opacity:0.75;">
+    const autoRows = (appData.cards || []).filter(c => c.type === 'Credit').map(c => {
+      const owed = creditCardOwed(c);
+      return `<tr style="opacity:0.75;">
         <td>${escHtml(c.name)} <span style="font-size:10px;color:var(--muted)">(credit card)</span></td>
-        <td style="text-align:right">${fmtMoney(c.balance||0, c.currency)}</td>
+        <td style="text-align:right">${fmtMoney(owed, c.currency)}</td>
         <td>${c.currency}</td>
-        <td style="text-align:right">${fmtMoney(toBase(c.balance||0, c.currency||'AUD'), base)}</td>
+        <td style="text-align:right">${fmtMoney(toBase(owed, c.currency||'AUD'), base)}</td>
         <td></td>
-      </tr>`
-    ).join('');
+      </tr>`;
+    }).join('');
     const noLiabs = !appData.liabilities.length && !(appData.cards||[]).some(c => c.type === 'Credit');
     liabsWrap.innerHTML = noLiabs
       ? '<p style="text-align:center;color:var(--muted);padding:16px 0;font-size:12px;">No liabilities. Click + Add Liability to start.</p>'
@@ -4268,7 +4291,6 @@ function renderPockets() {
            <div style="height:6px;background:var(--bdr);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${barColor};border-radius:3px;"></div></div>
          </div>`
       : '<span style="font-size:11px;color:var(--muted);">—</span>';
-    const manualDisabled = (p.sourceType && p.sourceType !== 'manual') ? 'disabled title="Value comes from the linked source"' : '';
     return `<tr>
       <td><input type="text" value="${escHtml(p.name||'')}" maxlength="40" style="width:110px;"
             onchange="updPocket('${p.id}','name',this.value)"></td>
@@ -4278,8 +4300,7 @@ function renderPockets() {
         <option value="">— None</option>
         ${(appData.cards||[]).filter(c=>c.type!=='Credit').map(c=>`<option value="${c.id}" ${p.parentCardId===c.id?'selected':''}>${escHtml(c.name)}</option>`).join('')}
       </select></td>
-      <td><select onchange="updPocketSource('${p.id}',this.value)" style="font-size:11px;max-width:130px;">${sourceOpts(p)}</select></td>
-      <td><input type="number" value="${(p.sourceType&&p.sourceType!=='manual') ? val.toFixed(0) : (p.amount||0)}" style="width:85px;text-align:right;" ${manualDisabled}
+      <td><input type="number" value="${p.amount||0}" style="width:85px;text-align:right;"
             onchange="updPocket('${p.id}','amount',+this.value)"></td>
       <td><select onchange="updPocketLink('${p.id}',this.value)" style="font-size:11px;max-width:170px;">${linkOpts(p)}</select></td>
       <td>${progress}</td>
@@ -4287,7 +4308,7 @@ function renderPockets() {
     </tr>`;
   }).join('');
   wrap.innerHTML = `<div style="overflow-x:auto;"><table class="pl-tbl">
-    <thead><tr><th>Pocket</th><th>Acct Ref</th><th>Linked to card</th><th>Source</th><th>Value (A$)</th><th>Linked Goal</th><th>Progress</th><th></th></tr></thead>
+    <thead><tr><th>Pocket</th><th>Acct Ref</th><th>Linked to card</th><th>Value (A$)</th><th>Linked Goal</th><th>Progress</th><th></th></tr></thead>
     <tbody>${rows}</tbody></table></div>`;
 }
 
