@@ -3731,8 +3731,18 @@ function confirmPayCredit() {
   const card    = cards[_payCreditIdx];
   if (!card) return;
 
-  // 1. Reduce credit card balance (owed)
+  // 1. Reduce credit card balance (owed) — add a negative spending entry so the computed balance drops
   card.balance = Math.max(0, (card.balance || 0) - amt);
+  if (!appData.spending) appData.spending = [];
+  appData.spending.push({
+    id: spUID(),
+    date: new Date().toISOString().slice(0,10),
+    description: 'Bill Payment — ' + (card.name || 'Credit Card'),
+    amount: -amt,
+    currency: card.currency || 'AUD',
+    category: 'Other',
+    cardId: card.id
+  });
 
   // 2. Debit the source account
   const srcId = document.getElementById('_payCreditSrc')?.value;
@@ -3751,6 +3761,8 @@ function confirmPayCredit() {
 
   save();
   renderCards();
+  if (typeof renderCreditCards === 'function') renderCreditCards();
+  if (typeof renderSpending === 'function' && document.getElementById('spBody')) renderSpending();
   if (typeof renderPockets === 'function' && document.getElementById('pocketsTable')) renderPockets();
   closePayCreditDlg();
 }
