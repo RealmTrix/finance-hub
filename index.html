@@ -3438,10 +3438,20 @@ function normaliseDate(raw) {
 // v2.6: a transaction already in the Spending log (same date + description + amount)
 // is a duplicate — happens when overlapping statement cycles are pasted.
 function isDuplicateTxn(r) {
-  return (appData.spending || []).some(s =>
+  const norm = t => (t || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const d = norm(r.description);
+  // Already logged as a spending entry (expenses + counter-spends; compare by absolute amount)
+  const inSpending = (appData.spending || []).some(s =>
     s.date === r.date &&
-    Math.abs((parseFloat(s.amount) || 0) - r.amount) < 0.005 &&
-    (s.description || '').replace(/\s+/g, ' ').trim().toLowerCase() === r.description.replace(/\s+/g, ' ').trim().toLowerCase()
+    Math.abs(Math.abs(parseFloat(s.amount) || 0) - r.amount) < 0.005 &&
+    norm(s.description) === d
+  );
+  if (inSpending) return true;
+  // Transfers/credits/salary create no spending row — only movement-ledger entries; check those too
+  return (appData.movements || []).some(m =>
+    m.date === r.date &&
+    Math.abs(Math.abs(m.delta || 0) - r.amount) < 0.005 &&
+    norm(m.note) === d
   );
 }
 
@@ -3808,6 +3818,7 @@ function applyStatementBalanceUpdates(rows, stmtCardId) {
   };
 
   for (const row of rows) {
+    if (row.dup) continue;                              // already imported — don't re-apply balances or re-log
     const inn = !!row.moneyIn;                          // money in (+) vs out (−)
     const signed = inn ? row.amount : -row.amount;      // from the statement account's perspective
 
@@ -3946,7 +3957,7 @@ function commitParsedTransactions() {
     if (k && r.category && !r.moneyIn) learnMap[k] = r.category;
   });
   // Salary credits → Income log (received) + auto-post to budget income, once
-  (parsedStatementRows || []).forEach(r => { if (r.moneyIn && /salary/i.test(r.description)) postSalaryFromStatement(r); });
+  (parsedStatementRows || []).forEach(r => { if (r.moneyIn && !r.dup && /salary/i.test(r.description)) postSalaryFromStatement(r); });
   // Pocket/card balance movements from ALL rows (incl. unticked transfers) + movements ledger
   applyStatementBalanceUpdates(parsedStatementRows, stmtCardId);
   save();
