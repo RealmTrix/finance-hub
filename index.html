@@ -3351,7 +3351,8 @@ function parseAmexStatement(text) {
       if (!date) continue;
       const amount = Math.abs(parseFloat(rawAmt));
       if (!isFinite(amount) || amount <= 0) continue;
-      rows.push({ date, description: desc, amount: +amount.toFixed(2), category: guessCategory(desc), include: true });
+      const moneyIn = /^\s*\+/.test(parts[2]) || /CR/i.test(parts[2]);   // explicit + or CR only (CSV may be AmEx expenses)
+      rows.push({ date, description: desc, amount: +amount.toFixed(2), moneyIn, category: guessCategory(desc), include: true });
     }
     return rows;
   }
@@ -3373,6 +3374,7 @@ function parseAmexStatement(text) {
     const kind = classifyStatementLine(description, moneyIn);
     rows.push({
       date, description, amount: +amount.toFixed(2),
+      moneyIn,                                   // true = + (money in), false = − (money out)
       category: kind === 'expense' ? guessCategory(description) : 'Other',
       include: kind === 'expense',
       kind,
@@ -3415,7 +3417,8 @@ function parseAmexStatement(text) {
     if (!date || !description) continue;
     description = cleanStatementDesc(description);
     if (!description) continue;
-    rows.push({ date, description, amount: +amount.toFixed(2), category: guessCategory(description), include: true });
+    const moneyIn = /[+]\s*\$?[\d,]+\.\d{2}/.test(line) || /\d\s*CR\s*$/i.test(line);   // explicit + or CR = money in
+    rows.push({ date, description, amount: +amount.toFixed(2), moneyIn, category: guessCategory(description), include: true });
   }
   return rows;
 }
