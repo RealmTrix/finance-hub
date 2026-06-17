@@ -1,4 +1,4 @@
-<!-- Finance Hub v2.12 — CommBank bucket movements (pocket transfers, salary auto-post, counter-spend, movements ledger) -->
+<!-- Finance Hub v2.13 — Signal Brief fix + TradingView/analyst/catalyst, AI coach (Sonnet + richer context), Home base-currency + spending pie, fortnightly pocket calibration, movements tickbox-clear, 2dp rounding -->
 <!-- Project Kangaroo | michael-finance-hub -->
 <!-- Built: May 2026 | Sessions: 9 planned -->
 <!DOCTYPE html>
@@ -818,6 +818,10 @@ th {
         <div id="homeBudgetBody" style="font-size:13px;"></div>
       </div>
       <div class="card">
+        <div class="card-title">🥧 Spending Mix</div>
+        <div id="homeSpendingPieBody" style="font-size:13px;"></div>
+      </div>
+      <div class="card">
         <div class="card-title">📈 Portfolio Pulse</div>
         <div id="homePortfolioBody" style="font-size:13px;"></div>
       </div>
@@ -960,7 +964,7 @@ th {
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
           <div class="card-title" style="margin-bottom:0">🔁 All Balance Movements</div>
-          <button class="btn" style="font-size:11px;padding:5px 12px;" onclick="clearMovements()">Clear log</button>
+          <button class="btn" style="font-size:11px;padding:5px 12px;" onclick="clearSelectedMovements()" title="Removes only the ticked rows from this ledger. Balances are never changed — cleared movements stay applied.">🗑 Clear selected</button>
         </div>
         <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Combined statement of every money movement across your cards &amp; pockets (from statement imports). Money in is green (+), money out is red (−).</p>
         <div id="movementsWrap"></div>
@@ -1536,7 +1540,7 @@ th {
     </div>
 
     <div class="ver-footer">
-      <span id="versionDisplay">Finance Hub v2.12 — Bucket Movements + Ledger</span>
+      <span id="versionDisplay">Finance Hub v2.13 — AI Coach + Signal Brief + Spending Pie</span>
       <span id="lastSavedDisplay" style="color:var(--muted)">–</span>
     </div>
   </div>
@@ -1908,7 +1912,7 @@ Date,Description,Amount
     </div>
 
     <div class="ver-footer">
-      <span>Finance Hub v2.12</span>
+      <span>Finance Hub v2.13</span>
       <span>v2.1 roadmap complete — Multi-Profile + Pockets + News + Modern UI</span>
     </div>
   </div>
@@ -2340,6 +2344,8 @@ function setCurrency(cur, btn) {
   // S2+: refresh currency-sensitive views when base currency changes
   if (appData.budget && document.getElementById('budgetTableWrap')) renderBudget();
   if (appData.cards  && document.getElementById('cardsTableWrap'))  renderCards();
+  // Home dashboard reads base currency for Net Worth, Budget, Portfolio + spending pie
+  if (document.getElementById('homeStressBody') && typeof renderHome === 'function') renderHome();
 }
 
 // ─── Tab navigation ───────────────────────────────────────────────────────
@@ -2439,6 +2445,8 @@ function baseSym() {
   const c = (appData.settings && appData.settings.baseCurrency) || 'AUD';
   return c === 'IDR' ? 'Rp' : c === 'USD' ? 'US$' : c === 'SGD' ? 'S$' : 'A$';
 }
+// Round any "moving number" (balances, deltas) to 2 decimals — kills float-precision tails.
+function round2(n) { return Math.round(((+n) || 0) * 100) / 100; }
 
 // ─── S2: FX Rates ─────────────────────────────────────────────────────────
 async function fetchFX() {
@@ -2958,6 +2966,7 @@ function renderMovements() {
   const rows = moves.map(m => {
     const up = (m.delta || 0) >= 0;
     return `<tr>
+      <td style="text-align:center;width:28px;"><input type="checkbox" class="mv-chk" value="${escHtml(m.id || '')}"></td>
       <td style="white-space:nowrap;">${escHtml(m.date || '')}</td>
       <td>${escHtml(m.account || '')}</td>
       <td style="max-width:240px;word-break:break-word;font-size:11px;color:var(--muted);">${escHtml(m.note || '')}</td>
@@ -2965,12 +2974,21 @@ function renderMovements() {
     </tr>`;
   }).join('');
   wrap.innerHTML = `<div style="overflow-x:auto;"><table class="pl-tbl">
-    <thead><tr><th>Date</th><th>Account / Pocket</th><th>Description</th><th style="text-align:right;">Amount (${base})</th></tr></thead>
-    <tbody>${rows}</tbody></table></div>`;
+    <thead><tr><th style="text-align:center;width:28px;"><input type="checkbox" id="mvSelectAll" title="Select all" onchange="toggleAllMovements(this.checked)"></th><th>Date</th><th>Account / Pocket</th><th>Description</th><th style="text-align:right;">Amount (${base})</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>
+    <p style="font-size:11px;color:var(--muted);margin-top:8px;">Tick rows (or use the header box for Select all), then <strong>Clear selected</strong> above. Clearing only removes ledger entries — pocket and card balances are never reverted.</p>`;
 }
-function clearMovements() {
-  if (!confirm('Clear the entire balance-movements log? This does not change any balances.')) return;
-  appData.movements = [];
+// Select-all toggle for the movements ledger
+function toggleAllMovements(checked) {
+  document.querySelectorAll('#movementsWrap .mv-chk').forEach(cb => { cb.checked = checked; });
+}
+// Remove ONLY the ticked rows. Balances are never reverted — a cleared movement stays applied.
+function clearSelectedMovements() {
+  const ids = Array.from(document.querySelectorAll('#movementsWrap .mv-chk:checked')).map(cb => cb.value);
+  if (!ids.length) { alert('No movements ticked. Tick the rows you want to clear, or use the Select all box.'); return; }
+  if (!confirm('Clear ' + ids.length + ' selected movement' + (ids.length === 1 ? '' : 's') + '? This only removes the ledger entries — balances are NOT changed.')) return;
+  const idSet = new Set(ids);
+  appData.movements = (appData.movements || []).filter(m => !idSet.has(m.id));
   save(); renderMovements();
 }
 
@@ -3848,13 +3866,13 @@ function applyStatementBalanceUpdates(rows, stmtCardId) {
 
     // 1) Statement account side → its primary (transaction) pocket, else the card balance
     if (primary) {
-      primary.amount = Math.max(0, (parseFloat(primary.amount) || 0) + signed);
+      primary.amount = round2(Math.max(0, (parseFloat(primary.amount) || 0) + signed));
       logMove(primary.name || 'Transaction pocket', signed, row);
     } else if (stmtCard.type === 'Credit') {
-      stmtCard.balance = Math.max(0, (stmtCard.balance || 0) + (inn ? -row.amount : row.amount));
+      stmtCard.balance = round2(Math.max(0, (stmtCard.balance || 0) + (inn ? -row.amount : row.amount)));
       logMove(stmtCard.name + ' (owed)', inn ? -row.amount : row.amount, row);
     } else {
-      stmtCard.balance = (stmtCard.balance || 0) + signed;
+      stmtCard.balance = round2((stmtCard.balance || 0) + signed);
       logMove(stmtCard.name, signed, row);
     }
 
@@ -3862,13 +3880,13 @@ function applyStatementBalanceUpdates(rows, stmtCardId) {
     const other = pocketByRef(row.description);
     if (other && other !== primary) {
       const otherDelta = inn ? -row.amount : row.amount; // mirror of the account side
-      other.amount = Math.max(0, (parseFloat(other.amount) || 0) + otherDelta);
+      other.amount = round2(Math.max(0, (parseFloat(other.amount) || 0) + otherDelta));
       logMove(other.name || ('Pocket ' + (other.accountRef || '')), otherDelta, row);
     } else if (!other && !inn) {
       // Outbound transfer with no matching pocket → likely a credit-card payment (e.g. AMEX): reduce owed
       const cc = matchCreditCardForPayment(row.description);
       if (cc && cc.id !== stmtCard.id) {
-        cc.balance = Math.max(0, (cc.balance || 0) - row.amount);
+        cc.balance = round2(Math.max(0, (cc.balance || 0) - row.amount));
         logMove(cc.name + ' (owed)', -row.amount, row);
       }
     }
@@ -4432,11 +4450,15 @@ function renderPockets() {
         <option value="">— None</option>
         ${(appData.cards||[]).filter(c=>c.type!=='Credit').map(c=>`<option value="${c.id}" ${p.parentCardId===c.id?'selected':''}>${escHtml(c.name)}</option>`).join('')}
       </select></td>
-      <td><input type="number" value="${p.amount||0}" style="width:85px;text-align:right;"
-            onchange="updPocket('${p.id}','amount',+this.value)"></td>
+      <td><input type="number" value="${round2(p.amount||0)}" style="width:85px;text-align:right;"
+            onchange="updPocket('${p.id}','amount',round2(this.value))"></td>
       <td><select onchange="updPocketLink('${p.id}',this.value)" style="font-size:11px;max-width:170px;">${linkOpts(p)}</select></td>
       <td style="text-align:center;"><input type="checkbox" ${p.isPrimary ? 'checked' : ''} title="Mark as the main transaction pocket for its linked card — statement imports treat this as the source of transfers in/out" onchange="updPocketPrimary('${p.id}', this.checked)"></td>
       <td>${progress}</td>
+      <td style="text-align:center;white-space:nowrap;">
+        <button class="btn" style="font-size:10px;padding:2px 7px;" onclick="calibratePocket('${p.id}')" title="Reconcile this pocket to your real bank balance — any difference is logged as spending (Balance Calibration). Do this ~once a fortnight.">⚖️ Reconcile</button>
+        <div style="font-size:9px;color:${(!p.lastReconciled || (Date.now()-new Date(p.lastReconciled).getTime()>14*86400000))?'var(--amber)':'var(--muted)'};margin-top:2px;">${p.lastReconciled ? ((Date.now()-new Date(p.lastReconciled).getTime()>14*86400000)?'due':'✓ '+p.lastReconciled) : 'never'}</div>
+      </td>
       <td><button class="btn-del" onclick="deletePocket('${p.id}')">×</button></td>
     </tr>`;
   }).join('');
@@ -4455,7 +4477,7 @@ function renderPockets() {
     <div style="font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--muted);margin-bottom:8px;">🔁 TRANSACTION POCKET PER DEBIT CARD <span style="font-weight:400;text-transform:none;">— statement transfers move money in/out of this pocket</span></div>
     ${pickerRows}</div>` : '';
   wrap.innerHTML = pickerHtml + `<div style="overflow-x:auto;"><table class="pl-tbl">
-    <thead><tr><th>Pocket</th><th>Acct Ref</th><th>Linked to card</th><th>Value (A$)</th><th>Linked Goal</th><th title="Main transaction pocket for the card — the source/destination of statement transfers">Primary</th><th>Progress</th><th></th></tr></thead>
+    <thead><tr><th>Pocket</th><th>Acct Ref</th><th>Linked to card</th><th>Value (A$)</th><th>Linked Goal</th><th title="Main transaction pocket for the card — the source/destination of statement transfers">Primary</th><th>Progress</th><th title="Reconcile to your real bank balance ~once a fortnight">Reconcile</th><th></th></tr></thead>
     <tbody>${rows}</tbody></table></div>`;
 }
 // Pick the transaction (primary) pocket for a debit card — clears the flag on its other pockets
@@ -4505,6 +4527,48 @@ function updPocketLink(id, val) {
 function deletePocket(id) {
   appData.pockets = (appData.pockets || []).filter(x => x.id !== id);
   save(); renderPockets(); renderPlans();
+}
+
+// ─── Fortnightly pocket balance calibration ────────────────────────────────
+// Enter the pocket's real bank balance; any discrepancy is logged as a Spending
+// entry under "Balance Calibration" and the pocket is reset to the actual amount.
+function calibratePocket(id) {
+  const p = (appData.pockets || []).find(x => x.id === id);
+  if (!p) return;
+  const ccy = p.currency || 'AUD';
+  const cur = round2(p.amount || 0);
+  const raw = prompt('Reconcile "' + (p.name || 'pocket') + '"\nRecorded balance: ' + ccy + ' ' + cur.toFixed(2) + '\n\nEnter the ACTUAL balance from your bank:', cur.toFixed(2));
+  if (raw === null) return;
+  const actual = round2(parseFloat(raw));
+  if (isNaN(actual)) { alert('Please enter a valid number.'); return; }
+  const diff = round2(actual - cur);   // + = surplus (money found), − = shortfall (money gone)
+  if (diff !== 0) {
+    if (!Array.isArray(appData.spending)) appData.spending = [];
+    appData.spending.unshift({
+      id: spUID(), date: new Date().toISOString().slice(0, 10),
+      description: 'Balance calibration: ' + (p.name || 'pocket'),
+      amount: round2(-diff),                 // shortfall → positive spend; surplus → negative spend
+      currency: ccy, category: 'Balance Calibration',
+      cardId: p.parentCardId || '', pocketId: p.id
+    });
+    appData.movements = appData.movements || [];
+    appData.movements.push({
+      id: 'mv' + Date.now() + Math.random().toString(36).slice(2, 6),
+      date: new Date().toISOString().slice(0, 10),
+      account: (p.name || 'pocket') + ' (calibration)',
+      delta: round2(toAUD(diff, ccy)), currency: 'AUD',
+      kind: 'calibration', note: 'Reconciled to actual bank balance', src: 'calibration'
+    });
+  }
+  p.amount = actual;
+  p.lastReconciled = new Date().toISOString().slice(0, 10);
+  save();
+  renderPockets();
+  if (typeof renderWealth === 'function' && document.getElementById('nwSummary')) renderWealth();
+  if (typeof renderSpending === 'function' && document.getElementById('spTableWrap') && document.getElementById('spTableWrap').innerHTML.trim()) { populateSpendingFilters(); renderSpending(); }
+  alert(diff === 0
+    ? '✓ Balanced — no discrepancy.'
+    : ('Logged ' + ccy + ' ' + Math.abs(diff).toFixed(2) + (diff < 0 ? ' shortfall as spending (Balance Calibration).' : ' surplus as negative spending (Balance Calibration).')));
 }
 
 // ─── S2: initPersonalFinance — called on load and on PF tab click ──────────
@@ -5436,13 +5500,17 @@ async function generateStrategyPlan() {
   const btn = document.getElementById('xrayGenBtn');
   const scenario = ((document.getElementById('xrayWhatIf') || {}).value || '').trim();
   if (!out) return;
-  out.innerHTML = '<p style="color:var(--muted); font-size:12px;">⏳ Building strategy plan…</p>';
+  out.innerHTML = '<p style="color:var(--muted); font-size:12px;">⏳ Refreshing live prices &amp; building strategy plan…</p>';
   if (btn) btn.disabled = true;
   try {
+    // Refresh context first so newly added/edited portfolios use current prices + FX (fixes stale/missing data)
+    try { if (typeof fetchFX === 'function') await fetchFX(); } catch (e) {}
+    try { if (typeof refreshAllPrices === 'function') await refreshAllPrices(); } catch (e) {}
     const current = gatherPortfolioData();
     current.baseCurrency = appData.settings.baseCurrency;
     const ctx = {
       current,
+      watchlist: (store('watchlist') || []).map(w => ({ ticker: w.ticker, name: w.name, tag: w.tag, currentPrice: w.currentPrice, targetPrice: w.targetPrice })),
       netWorthAUD: +xrayNetWorthAUD().toFixed(2),
       cashBase: +((appData.cards || []).filter(c => c.type === 'Debit').reduce((s, c) => s + toBase(c.balance || 0, c.currency || 'AUD'), 0)).toFixed(2),
       baseCurrency: appData.settings.baseCurrency,
@@ -5707,9 +5775,19 @@ function yfSymbolForSignal(item) {
 // Fetch ~30 days of daily closes + volumes from Yahoo Finance.
 async function fetchOHLCV(yfSymbol) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yfSymbol)}?interval=1d&range=1mo`;
-  const r = await fetch(url);
-  if (!r.ok) throw new Error('OHLCV ' + r.status);
-  const j = await r.json();
+  // Yahoo sends no CORS headers → a bare browser fetch throws "Failed to fetch".
+  // Mirror the working price fetchers: try direct, then a corsproxy fallback.
+  const candidates = [url, 'https://corsproxy.io/?' + encodeURIComponent(url)];
+  let j = null, lastErr = null;
+  for (const u of candidates) {
+    try {
+      const r = await fetch(u);
+      if (!r.ok) { lastErr = new Error('OHLCV ' + r.status); continue; }
+      j = await r.json();
+      break;
+    } catch (e) { lastErr = e; }
+  }
+  if (!j) throw (lastErr || new Error('OHLCV fetch failed'));
   const res = j && j.chart && j.chart.result && j.chart.result[0];
   if (!res || !res.indicators || !res.indicators.quote) throw new Error('no data');
   const q = res.indicators.quote[0];
@@ -5731,6 +5809,58 @@ async function fetchHeadlines(query, key) {
     const j = await r.json();
     return (j.articles || []).slice(0, 3).map(a => ({ title: a.title, source: a.source && a.source.name, publishedAt: a.publishedAt }));
   } catch (e) { return []; }
+}
+
+// Best-effort analyst consensus + price target from Yahoo (no key). Returns null on any failure.
+async function fetchAnalystData(yfSymbol) {
+  const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(yfSymbol)}?modules=financialData,recommendationTrend`;
+  const candidates = ['https://corsproxy.io/?' + encodeURIComponent(url), url];
+  for (const u of candidates) {
+    try {
+      const r = await fetch(u);
+      if (!r.ok) continue;
+      const j = await r.json();
+      const res = j && j.quoteSummary && j.quoteSummary.result && j.quoteSummary.result[0];
+      if (!res) continue;
+      const fd = res.financialData || {};
+      const rt = (res.recommendationTrend && res.recommendationTrend.trend && res.recommendationTrend.trend[0]) || {};
+      const out = {};
+      if (fd.recommendationKey) out.rating = fd.recommendationKey;
+      if (fd.targetMeanPrice && fd.targetMeanPrice.raw != null) out.targetMean = +(+fd.targetMeanPrice.raw).toFixed(2);
+      if (fd.numberOfAnalystOpinions && fd.numberOfAnalystOpinions.raw != null) out.analysts = fd.numberOfAnalystOpinions.raw;
+      if (rt.strongBuy != null) out.dist = { strongBuy: rt.strongBuy, buy: rt.buy, hold: rt.hold, sell: rt.sell, strongSell: rt.strongSell };
+      return Object.keys(out).length ? out : null;
+    } catch (e) { /* try next */ }
+  }
+  return null;
+}
+
+// Map a signal item to a TradingView symbol (EXCHANGE:TICKER) for the chart widget.
+function tvSymbolForSignal(sig) {
+  const t = (sig.ticker || '').trim().toUpperCase();
+  if (!t) return '';
+  const isCrypto = sig.type === 'Crypto' || sig.exchange === 'Crypto';
+  if (isCrypto) return 'CRYPTO:' + t.replace(/-?USD[T]?$/, '') + 'USD';
+  const yf = sig.yfSymbol || '';
+  if (yf.endsWith('.AX')) return 'ASX:' + t.replace(/\.AX$/, '');
+  if (yf.endsWith('.JK')) return 'IDX:' + t.replace(/\.JK$/, '');
+  if (sig.exchange === 'NASDAQ') return 'NASDAQ:' + t;
+  if (sig.exchange === 'NYSE')   return 'NYSE:' + t;
+  return t; // let TradingView resolve
+}
+
+// Lazy-inject a TradingView Advanced Chart iframe (visual chart trend) — toggles open/closed.
+function toggleTvChart(id, tvSym) {
+  const box = document.getElementById(id);
+  if (!box) return;
+  if (box.dataset.open === '1') { box.innerHTML = ''; box.dataset.open = '0'; box.style.display = 'none'; return; }
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const src = 'https://s.tradingview.com/widgetembed/?symbol=' + encodeURIComponent(tvSym) +
+    '&interval=D&hidesidetoolbar=1&symboledit=0&saveimage=0&toolbarbg=' + (dark ? '1e1e1e' : 'f1f3f6') +
+    '&studies=%5B%22RSI%40tv-basicstudies%22%5D&theme=' + (dark ? 'dark' : 'light') +
+    '&style=1&timezone=Australia%2FSydney&withdateranges=1';
+  box.innerHTML = '<iframe src="' + src + '" style="width:100%;height:260px;border:0;border-radius:8px;" frameborder="0" allowtransparency="true" scrolling="no"></iframe>';
+  box.dataset.open = '1'; box.style.display = 'block';
 }
 
 async function generateSignals() {
@@ -5764,8 +5894,14 @@ async function generateSignals() {
         volumeRatio: volRatio != null ? +volRatio.toFixed(2) : null
       };
       sig.headlines = headlines;
-      const prompt = `You are a quantitative trader. Analyse this data for ${item.ticker} and determine if there is a high-conviction short-term opportunity (1 day to 2 weeks). Data: RSI(14)=${sig.metrics.rsi}, price vs 20-day SMA=${sig.metrics.vsSma20Pct}%, volume ratio (today vs 5-day avg)=${sig.metrics.volumeRatio}, recent headlines=${JSON.stringify(headlines.map(h => h.title))}. If yes: state Direction (Long/Short), Entry Zone, Stop-Loss, Target, Time Horizon, Confidence (High/Med/Low), and a 2-sentence reasoning. If no clear opportunity: state 'No signal'. Be specific and direct.`;
-      const text = await askCoworkAI(prompt, [sig.metrics, { headlines }]);
+      const analyst = await fetchAnalystData(yf).catch(() => null);
+      sig.analyst = analyst;
+      const prompt = `You are a quantitative trader and catalyst analyst. Analyse ${item.ticker} (${item.name || ''}) for a high-conviction short-term opportunity (1 day to 2 weeks).\n` +
+        `QUANT: RSI(14)=${sig.metrics.rsi}, price vs 20-day SMA=${sig.metrics.vsSma20Pct}%, volume ratio (today vs 5-day avg)=${sig.metrics.volumeRatio}, last price=${sig.metrics.price}.\n` +
+        `ANALYST CONSENSUS: ${analyst ? JSON.stringify(analyst) : 'unavailable'}.\n` +
+        `RECENT HEADLINES (possible catalysts): ${JSON.stringify((headlines || []).map(h => h.title))}.\n` +
+        `First identify the single most important near-term CATALYST (earnings, product, macro or news) if any. Then, if there is a high-conviction setup, state: Direction (Long/Short), Catalyst, Entry Zone, Stop-Loss, Target, Time Horizon, Confidence (High/Med/Low), and a 2-sentence reasoning that weighs the quant signal, analyst consensus and catalyst together. If no clear opportunity: state 'No signal' and one short reason. Be specific, concrete and direct. Plain text, no markdown.`;
+      const text = await askChatAI(prompt, { model: 'claude-sonnet-4-6', max_tokens: 600 });
       sig.analysis = text;
       sig.noSignal = /no signal/i.test((text || '').slice(0, 60));
     } catch (e) {
@@ -5823,6 +5959,15 @@ function renderSignalCard(sig) {
   </div>`;
   const headHtml = (sig.headlines && sig.headlines.length)
     ? `<div style="font-size:10px; color:var(--muted); margin-top:6px;">📰 ${sig.headlines.map(h => escHtml(h.title || '')).join(' · ')}</div>` : '';
+  const a = sig.analyst || null;
+  const analystHtml = a
+    ? `<div style="font-size:10px; color:var(--muted); margin-top:4px;">📊 Analyst: ${a.rating ? '<strong>' + escHtml(String(a.rating).toUpperCase()) + '</strong>' : '–'}${a.targetMean != null ? ' · target ' + a.targetMean.toLocaleString() : ''}${a.analysts != null ? ' · ' + a.analysts + ' analysts' : ''}</div>`
+    : '';
+  const tvSym = tvSymbolForSignal(sig);
+  const chartId = 'tvchart_' + sig.id;
+  const chartHtml = tvSym
+    ? `<button class="btn" style="font-size:10px; padding:2px 8px; margin-top:6px;" onclick="toggleTvChart('${chartId}','${escHtml(tvSym)}')">📈 Chart</button><div id="${chartId}" data-open="0" style="display:none; margin-top:6px;"></div>`
+    : '';
   return `<div class="sig-card${sig.noSignal ? ' muted' : ''}">
     <div class="sig-head">
       <span class="sig-ticker">${escHtml(sig.ticker || '')}</span>
@@ -5832,8 +5977,10 @@ function renderSignalCard(sig) {
       ${!sig.noSignal ? `<button class="btn" style="font-size:10px; padding:2px 8px; margin-left:auto;" onclick="logTradeFromSignal('${sig.id}')">+ Log trade</button>` : ''}
     </div>
     ${metricsHtml}
+    ${analystHtml}
     <div class="sig-reason" style="white-space:pre-wrap;">${escHtml(txt)}</div>
     ${headHtml}
+    ${chartHtml}
     <div class="sig-time">Signal ID ${sig.id} · ${new Date(sig.generatedAt).toLocaleString()}</div>
   </div>`;
 }
@@ -7697,19 +7844,31 @@ function clearChat() {
 // Concise plain-English + JSON summary of appData for the chat system context (~<800 tokens).
 function buildChatContext() {
   const s = appData.settings || {};
-  const mk = monthKeyNow();
-  const ctx = { month: mk, baseCurrency: s.baseCurrency || 'AUD' };
+  // Budget runs on a 15th→14th cycle: before the 15th we're still in last month's cycle key.
+  const _now = new Date();
+  const _cyc = _now.getDate() >= 15 ? _now : new Date(_now.getFullYear(), _now.getMonth() - 1, 15);
+  const mk = _cyc.getFullYear() + '-' + String(_cyc.getMonth() + 1).padStart(2, '0');
+  const cycleStart = new Date(_cyc.getFullYear(), _cyc.getMonth(), 15);
+  const cycleEnd   = new Date(_cyc.getFullYear(), _cyc.getMonth() + 1, 14, 23, 59, 59);
+  const cycleElapsedPct = Math.min(100, Math.max(0, Math.round((_now - cycleStart) / (cycleEnd - cycleStart) * 100)));
+  const ctx = { cycleMonth: mk, today: _now.toISOString().slice(0, 10), cycleElapsedPct, baseCurrency: s.baseCurrency || 'AUD' };
 
-  // Current month budget totals (income actuals come from the income log)
+  // Current cycle budget totals — expenses auto-derived from the Spending log (NOT the stale .actual field)
   try {
     const b = (appData.budget || {})[mk];
+    const incActs = (typeof computeIncomeActuals === 'function') ? computeIncomeActuals(mk) : {};
+    const expActs = (typeof computeExpenseActuals === 'function') ? computeExpenseActuals(mk) : {};
     if (b) {
-      const incActs = (typeof computeIncomeActuals === 'function') ? computeIncomeActuals(mk) : {};
       let tIB = 0, tIA = 0, tEB = 0, tEA = 0;
-      Object.keys(b.income || {}).forEach(k => { tIB += (b.income[k].budget || 0); tIA += (incActs[k] || 0); });
-      Object.keys(b.expenses || {}).forEach(k => { tEB += (b.expenses[k].budget || 0); tEA += (b.expenses[k].actual || 0); });
-      ctx.budgetThisMonth = { incomeBudget: +tIB.toFixed(0), incomeActual: +tIA.toFixed(0), expenseBudget: +tEB.toFixed(0), expenseActual: +tEA.toFixed(0) };
+      Object.keys(b.income   || {}).forEach(k => { tIB += (b.income[k].budget || 0);   tIA += (incActs[k] || 0); });
+      Object.keys(b.expenses || {}).forEach(k => { tEB += (b.expenses[k].budget || 0); tEA += (expActs[k] || 0); });
+      ctx.budgetThisCycle = { incomeBudget: +tIB.toFixed(2), incomeActual: +tIA.toFixed(2), expenseBudget: +tEB.toFixed(2), expenseActual: +tEA.toFixed(2), remainingToBudget: +(tEB - tEA).toFixed(2), expenseBudgetUsedPct: tEB > 0 ? +(tEA / tEB * 100).toFixed(0) : null };
     }
+    // Where the money actually goes this cycle (top categories) — lets the coach be specific
+    const byCat = Object.keys(expActs)
+      .map(k => ({ category: (typeof getCatLabel === 'function' ? getCatLabel(k) : k), aud: +(expActs[k] || 0).toFixed(2) }))
+      .filter(e => e.aud > 0).sort((a, b) => b.aud - a.aud);
+    if (byCat.length) ctx.spendingByCategoryThisCycle = byCat;
   } catch (e) {}
 
   // Net worth (AUD): assets − liabilities − credit card balances
@@ -7769,10 +7928,24 @@ function buildChatContext() {
       .map(t => ({ ticker: t.ticker, direction: t.direction, entryPrice: t.entryPrice, dateEntered: t.dateEntered }));
   } catch (e) {}
 
-  return 'You are the in-app financial assistant for Michael\'s personal Finance Hub. ' +
-    'Answer using the data snapshot below. All currency in AUD unless noted. ' +
-    'Be concise, direct, and practical. If data is missing, say so rather than guessing.\n\n' +
-    'DATA SNAPSHOT:\n' + JSON.stringify(ctx);
+  // Savings pockets (earmarked sub-allocations of liquid cash)
+  try {
+    ctx.pockets = (appData.pockets || []).map(p => ({ name: p.name, balanceAUD: +pocketValueAUD(p).toFixed(2), lastReconciled: p.lastReconciled || null }));
+  } catch (e) {}
+
+  // Big spending plans + long-term wealth goal
+  try {
+    ctx.plans = (appData.plans || []).filter(p => p.status !== 'Completed')
+      .map(p => ({ name: p.name, target: p.target, targetDate: p.targetDate, status: p.status }));
+    if (appData.wealthGoal && (appData.wealthGoal.target || appData.wealthGoal.targetDate)) ctx.wealthGoal = appData.wealthGoal;
+  } catch (e) {}
+
+  return 'You are Michael\'s personal finance coach inside his Finance Hub app. You have his real, live data below. ' +
+    'Act like a sharp, proactive coach — not a generic chatbot. Reason from the ACTUAL numbers in the snapshot; never claim data is missing or $0 when a figure is present. ' +
+    'Expenses are auto-derived from his spending log on a 15th→14th cycle: budgetThisCycle.expenseActual already reflects real spend, and spendingByCategoryThisCycle shows where it went. ' +
+    'When he asks how he is tracking, compare cycle spend vs budget AND vs cycleElapsedPct (how far through the cycle he is), name the biggest categories, flag anything pacing over budget, and give 1–3 specific, personalised actions with real dollar figures from his data. ' +
+    'Amounts are AUD unless baseCurrency says otherwise. Be concise and concrete; lead with the bottom-line verdict, then the why, then the actions.\n\n' +
+    'DATA SNAPSHOT (Michael\'s live finances):\n' + JSON.stringify(ctx);
 }
 
 function renderChatHistory() {
@@ -7808,8 +7981,8 @@ async function sendChatMessage() {
   try {
     if (!chatContextCache) chatContextCache = buildChatContext();
     const transcript = appData.chatHistory.map(m => (m.role === 'user' ? 'User: ' : 'Assistant: ') + m.content).join('\n');
-    const prompt = chatContextCache + '\n\nCONVERSATION SO FAR:\n' + transcript + '\n\nReply to the last user message as the assistant. Keep it under 200 words.';
-    const reply = await askChatAI(prompt);
+    const prompt = chatContextCache + '\n\nCONVERSATION SO FAR:\n' + transcript + '\n\nReply to the last user message as Michael\'s finance coach. Be specific to his data, lead with the verdict, keep it under 280 words.';
+    const reply = await askChatAI(prompt, { model: 'claude-sonnet-4-6', max_tokens: 900 });
     appData.chatHistory.push({ role: 'assistant', content: reply || '(empty response)' });
     while (appData.chatHistory.length > 20) appData.chatHistory.shift();
     save();
@@ -7967,7 +8140,8 @@ function renderHomeNews(items, fetchedAt) {
 }
 
 function renderHome() {
-  const fmt = v => 'A$ ' + (v < 0 ? '−' : '') + Math.abs(Math.round(v)).toLocaleString('en-AU');
+  const _hbase = (appData.settings && appData.settings.baseCurrency) || 'AUD';
+  const fmt = v => { const b = toBase(v, 'AUD'); return (b < 0 ? '−' : '') + fmtMoney(Math.abs(b), _hbase); };
 
   // 1. Stress score — reuse the Income tab renderer, mirror its output (no logic duplication)
   const hs = document.getElementById('homeStressBody');
@@ -8015,16 +8189,59 @@ function renderHome() {
   }
 
   renderHomeBudgetCard();
+  renderHomeSpendingPie();
   renderHomePortfolioCard();
   renderHomeCreditCard();
   renderHomeVisaCard();
   renderHomePlansCard();
 }
 
+// ─── Home: minimalist spending donut (current 15th–14th cycle, by category) ──
+let homeSpendingPieInst = null;
+function renderHomeSpendingPie() {
+  const el = document.getElementById('homeSpendingPieBody');
+  if (!el) return;
+  const base = (appData.settings && appData.settings.baseCurrency) || 'AUD';
+  const now = new Date();
+  const cycleRef = now.getDate() >= 15 ? now : new Date(now.getFullYear(), now.getMonth() - 1, 15);
+  const mk = cycleRef.getFullYear() + '-' + String(cycleRef.getMonth() + 1).padStart(2, '0');
+  const acts = (typeof computeExpenseActuals === 'function') ? computeExpenseActuals(mk) : {};
+  let entries = Object.keys(acts)
+    .map(k => ({ label: (typeof getCatLabel === 'function' ? getCatLabel(k) : k), aud: acts[k] || 0 }))
+    .filter(e => e.aud > 0);
+  const total = entries.reduce((s, e) => s + e.aud, 0);
+  if (!entries.length || total <= 0) {
+    if (homeSpendingPieInst) { homeSpendingPieInst.destroy(); homeSpendingPieInst = null; }
+    el.innerHTML = '<span style="color:var(--muted);font-size:12px;">No spending recorded this cycle yet.</span>';
+    return;
+  }
+  entries.sort((a, b) => b.aud - a.aud);
+  let top = entries.slice(0, 6);
+  const restSum = entries.slice(6).reduce((s, e) => s + e.aud, 0);
+  if (restSum > 0) { const oi = top.findIndex(e => e.label === 'Other'); if (oi >= 0) top[oi].aud += restSum; else top.push({ label: 'Other', aud: restSum }); }
+  const palette = ['#b8860b', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#f59e0b', '#6b7280'];
+  const legend = top.map((e, i) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;"><span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${palette[i % palette.length]};margin-right:6px;"></span>${escHtml(e.label)}</span><strong>${(e.aud / total * 100).toFixed(0)}%</strong></div>`).join('');
+  el.innerHTML = '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">'
+    + '<div style="position:relative;width:140px;height:140px;flex:0 0 auto;"><canvas id="homeSpendingPieCanvas"></canvas></div>'
+    + '<div style="flex:1;min-width:140px;font-size:11px;">' + legend + '</div></div>'
+    + '<div style="font-size:11px;color:var(--muted);margin-top:6px;">Cycle from 15th · total ' + fmtMoney(toBase(total, 'AUD'), base) + '</div>';
+  ensureChartJs().then(() => {
+    const ctx = document.getElementById('homeSpendingPieCanvas');
+    if (!ctx || typeof Chart === 'undefined') return;
+    if (homeSpendingPieInst) { homeSpendingPieInst.destroy(); homeSpendingPieInst = null; }
+    homeSpendingPieInst = new Chart(ctx, {
+      type: 'doughnut',
+      data: { labels: top.map(e => e.label), datasets: [{ data: top.map(e => +toBase(e.aud, 'AUD').toFixed(2)), backgroundColor: top.map((e, i) => palette[i % palette.length]), borderWidth: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.label + ': ' + fmtMoney(c.parsed, base) } } } }
+    });
+  }).catch(() => {});
+}
+
 function renderHomeBudgetCard() {
   const el = document.getElementById('homeBudgetBody');
   if (!el) return;
-  const fmt = v => 'A$ ' + Math.round(v).toLocaleString('en-AU');
+  const _hbase = (appData.settings && appData.settings.baseCurrency) || 'AUD';
+  const fmt = v => fmtMoney(toBase(v, 'AUD'), _hbase);
   // Budget cycle runs 15th → 14th: before the 15th we're still in last month's cycle
   const now = new Date();
   const cycleRef = now.getDate() >= 15 ? now : new Date(now.getFullYear(), now.getMonth() - 1, 15);
@@ -8054,7 +8271,8 @@ function renderHomeBudgetCard() {
 function renderHomePortfolioCard() {
   const el = document.getElementById('homePortfolioBody');
   if (!el) return;
-  const fmt = v => 'A$ ' + (v < 0 ? '−' : '') + Math.abs(Math.round(v)).toLocaleString('en-AU');
+  const _hbase = (appData.settings && appData.settings.baseCurrency) || 'AUD';
+  const fmt = v => { const b = toBase(v, 'AUD'); return (b < 0 ? '−' : '') + fmtMoney(Math.abs(b), _hbase); };
   const _port = appData.portfolios || {};
   let cost = 0, val = 0, count = 0, best = null;
   Object.keys(_port).forEach(k => {
